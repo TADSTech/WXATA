@@ -1,12 +1,23 @@
 {
   "name": "wxata",
-  "module": "index.ts",
-  "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
+  "version": "1.0.0",
+  "description": "WhatsApp Bot Platform with Bun + Baileys",
+  "main": "index.js",
+  "scripts": {
+    "frontend": "cd frontend && bun dev",
+    "backend": "cd backend && bun run index.ts",
+    "all": "concurrently \"bun run frontend\" \"bun run backend\"",
+    "install:all": "bun install && cd frontend && bun install && cd ../backend && bun install"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "bun"
+  ],
+  "author": "TADS Tech",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
