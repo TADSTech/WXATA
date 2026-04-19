@@ -3,6 +3,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, Shield, Activity, Lock, QrCode, Phone, Wifi, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
+interface BotInfo {
+  prefix: string;
+  scripts: Record<string, BotScript>;
+  root: BotRoot;
+  welcome: BotWelcome;
+}
+
+interface BotScript {
+  trigger: string;
+  response: string;
+  target: string;
+}
+
+interface BotWelcome {
+  enabled: boolean;
+  text: string;
+}
+
+interface BotRoot {
+  target: string;
+}
+
 const Dashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -18,6 +40,24 @@ const Dashboard = () => {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [botInfo, setBotInfo] = useState<BotInfo>({
+    prefix: '!',
+    scripts: {
+      summoner: {
+        trigger: 'summon',
+        response: 'WXATA summoned successfully.',
+        target: 'self'
+      }
+    },
+    root: {
+      target: 'self'
+    },
+    welcome: {
+      enabled: true,
+      text: '╔════════════════════════════╗\n║   WELCOME TO WXATA         ║\n║   SYSTEM ONLINE            ║\n╚════════════════════════════╝'
+    }
+  });
+  const [configStatus, setConfigStatus] = useState('');
   
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -54,10 +94,16 @@ const Dashboard = () => {
           setPairingCode(payload.data);
           setIsConnecting(false);
         }
+
+        if (payload.event === 'bot-info') {
+          setBotInfo(payload.data);
+          setConfigStatus('Config synced');
+        }
       };
 
       socket.onopen = () => {
         console.log('Connected to WXATA backend');
+        socket.send(JSON.stringify({ command: 'GET_BOT_INFO' }));
       };
 
       socket.onclose = () => {
@@ -92,6 +138,55 @@ const Dashboard = () => {
       return;
     }
     sendCommand('QUICK_ACTION', { action });
+  };
+
+  const handlePrefixChange = (value: string) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      prefix: value
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleScriptChange = (field: keyof BotScript, value: string) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      scripts: {
+        ...prev.scripts,
+        summoner: {
+          ...prev.scripts.summoner,
+          [field]: value
+        }
+      }
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleWelcomeChange = (field: keyof BotWelcome, value: string | boolean) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      welcome: {
+        ...prev.welcome,
+        [field]: value
+      }
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleRootChange = (value: string) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      root: {
+        ...prev.root,
+        target: value
+      }
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const saveBotInfo = () => {
+    sendCommand('UPDATE_BOT_INFO', botInfo);
+    setConfigStatus('Saving...');
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -263,6 +358,98 @@ const Dashboard = () => {
                 <span className="text-gray-500">Memory</span>
                 <span>{status.memory}</span>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-black border border-green-500/20 rounded p-4 space-y-4">
+            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-green-500/10 pb-2">Bot Summoner</h3>
+            <div className="space-y-3 text-xs">
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Prefix (emoji or punctuation)</span>
+                <input
+                  type="text"
+                  value={botInfo.prefix}
+                  onChange={(e) => handlePrefixChange(e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Script name</span>
+                <input
+                  type="text"
+                  value="summoner"
+                  disabled
+                  className="w-full bg-black border border-green-500/30 p-2 text-gray-500 outline-none opacity-70"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Trigger word</span>
+                <input
+                  type="text"
+                  value={botInfo.scripts.summoner.trigger}
+                  onChange={(e) => handleScriptChange('trigger', e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Target (self or phone number)</span>
+                <input
+                  type="text"
+                  value={botInfo.scripts.summoner.target}
+                  onChange={(e) => handleScriptChange('target', e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Response</span>
+                <input
+                  type="text"
+                  value={botInfo.scripts.summoner.response}
+                  onChange={(e) => handleScriptChange('response', e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-green-900 uppercase tracking-wider">{configStatus || 'Ready'}</span>
+              <button
+                onClick={saveBotInfo}
+                className="border border-green-500/30 hover:bg-green-500/10 px-3 py-1 text-xs transition-colors"
+              >
+                SAVE CONFIG
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-black border border-green-500/20 rounded p-4 space-y-4">
+            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-green-500/10 pb-2">Welcome On Connect</h3>
+            <div className="space-y-3 text-xs">
+              <label className="flex items-center justify-between gap-3 border border-green-500/20 p-2 rounded">
+                <span className="text-gray-500 uppercase tracking-wider">Enabled</span>
+                <input
+                  type="checkbox"
+                  checked={botInfo.welcome.enabled}
+                  onChange={(e) => handleWelcomeChange('enabled', e.currentTarget.checked)}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Welcome text</span>
+                <textarea
+                  value={botInfo.welcome.text}
+                  onChange={(e) => handleWelcomeChange('text', e.currentTarget.value)}
+                  rows={5}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500 font-mono whitespace-pre-wrap"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Root target (self or phone number)</span>
+                <input
+                  type="text"
+                  value={botInfo.root.target}
+                  onChange={(e) => handleRootChange(e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
             </div>
           </div>
 
