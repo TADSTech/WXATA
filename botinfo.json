@@ -4,7 +4,19 @@
     "summoner": {
       "trigger": "summon",
       "response": "WXATA summoned successfully.",
-      "target": "self"
+      "target": "self",
+      "defaultArgument": "self",
+      "arguments": {
+        "here": {
+          "target": "chat"
+        },
+        "self": {
+          "target": "self"
+        },
+        "here_response": {
+          "response": "WXATA(powered by TADS) was summoned successfully in this chat."
+        }
+      }
     }
   },
   "root": {

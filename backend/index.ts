@@ -9,6 +9,13 @@ interface BotScript {
   trigger: string;
   response: string;
   target: string;
+  defaultArgument?: string;
+  arguments?: Record<string, BotScriptArgument>;
+}
+
+interface BotScriptArgument {
+  target?: string;
+  response?: string;
 }
 
 interface BotInfo {
@@ -35,7 +42,16 @@ const DEFAULT_BOT_INFO: BotInfo = {
     summoner: {
       trigger: 'summon',
       response: 'WXATA summoned successfully.',
-      target: 'self'
+      target: 'self',
+      defaultArgument: 'self',
+      arguments: {
+        here: {
+          target: 'chat'
+        },
+        self: {
+          target: 'self'
+        }
+      }
     }
   },
   root: {
@@ -48,10 +64,41 @@ const DEFAULT_BOT_INFO: BotInfo = {
 };
 
 function sanitizeBotScript(input: Partial<BotScript> | undefined): BotScript {
+  const defaultArgument = typeof input?.defaultArgument === 'string' && input.defaultArgument.trim() ? input.defaultArgument.trim() : 'self';
+  const defaultSummonerArguments = {
+    here: {
+      target: 'chat'
+    },
+    self: {
+      target: 'self'
+    }
+  };
+  const argumentsInput =
+    input?.arguments && typeof input.arguments === 'object'
+      ? input.arguments
+      : input?.trigger === 'summon'
+        ? defaultSummonerArguments
+        : undefined;
+
+  const argumentsMap = Object.entries(argumentsInput ?? {}).reduce<Record<string, BotScriptArgument>>((accumulator, [name, argument]) => {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      return accumulator;
+    }
+
+    accumulator[normalizedName] = {
+      target: typeof argument?.target === 'string' && argument.target.trim() ? argument.target.trim() : undefined,
+      response: typeof argument?.response === 'string' && argument.response.trim() ? argument.response.trim() : undefined
+    };
+    return accumulator;
+  }, {});
+
   return {
     trigger: typeof input?.trigger === 'string' && input.trigger.trim() ? input.trigger.trim() : 'summon',
     response: typeof input?.response === 'string' && input.response.trim() ? input.response.trim() : 'WXATA summoned successfully.',
-    target: typeof input?.target === 'string' && input.target.trim() ? input.target.trim() : 'self'
+    target: typeof input?.target === 'string' && input.target.trim() ? input.target.trim() : 'self',
+    defaultArgument,
+    arguments: Object.keys(argumentsMap).length ? argumentsMap : undefined
   };
 }
 
@@ -159,6 +206,10 @@ function resolveTargetJid(
   if (normalizedTarget === 'self' || normalizedTarget === 'root' || normalizedTarget === 'me' || normalizedTarget === 'myself') {
     const selfJid = resolveSelfJid(sock);
     return selfJid;
+  }
+
+  if (normalizedTarget === 'chat' || normalizedTarget === 'here' || normalizedTarget === 'current') {
+    return null;
   }
 
   if (normalizedTarget !== 'self') {
@@ -304,6 +355,26 @@ function senderMatchesRoot(
   return !!senderNumber && !!rootNumber && senderNumber === rootNumber;
 }
 
+function resolveScriptTarget(
+  sock: Awaited<ReturnType<WXATAConnection['createConnection']>>,
+  script: BotScript,
+  argumentName: string | undefined,
+  remoteJid: string | undefined
+): string | null {
+  const normalizedArgumentName = argumentName?.trim().toLowerCase();
+  const fallbackArgument = script.defaultArgument?.trim().toLowerCase() || 'self';
+  const selectedArgumentName = normalizedArgumentName || fallbackArgument;
+  const argumentConfig = script.arguments?.[selectedArgumentName];
+
+  const selectedTarget = argumentConfig?.target ?? script.target;
+
+  if (selectedTarget.trim().toLowerCase() === 'chat' || selectedTarget.trim().toLowerCase() === 'here' || selectedTarget.trim().toLowerCase() === 'current') {
+    return remoteJid ?? null;
+  }
+
+  return resolveTargetJid(sock, selectedTarget);
+}
+
 function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
   sock.ev.on('messages.upsert', async (m) => {
     for (const msg of m.messages) {
@@ -340,12 +411,16 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
           const prefixPattern = escapeRegex(botInfo.prefix.trim());
           const triggerPattern = escapeRegex(script.trigger.trim());
-          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}$`, 'i');
+          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?$`, 'i');
+          const triggerMatch = normalizedText.match(triggerRegex);
 
-          if (triggerRegex.test(normalizedText) && isRootSender) {
-            const targetJid = resolveTargetJid(sock, script.target);
+          if (triggerMatch && isRootSender) {
+            const argumentName = triggerMatch[1];
+            const targetJid = resolveScriptTarget(sock, script, argumentName, remoteJid ?? undefined);
             if (targetJid) {
-              await sendTrackedMessage(sock, targetJid, script.response);
+              const argumentConfig = script.arguments?.[argumentName?.trim().toLowerCase() || script.defaultArgument?.trim().toLowerCase() || 'self'];
+              const responseText = argumentConfig?.response ?? script.response;
+              await sendTrackedMessage(sock, targetJid, responseText);
               dashboard.log('SUCCESS', `${scriptName} triggered by ${remoteJid}; response sent to ${targetJid}`);
             } else {
               dashboard.log('ERROR', `${scriptName} triggered but target could not be resolved`);

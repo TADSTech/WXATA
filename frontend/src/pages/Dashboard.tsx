@@ -14,6 +14,13 @@ interface BotScript {
   trigger: string;
   response: string;
   target: string;
+  defaultArgument?: string;
+  arguments?: Record<string, BotScriptArgument>;
+}
+
+interface BotScriptArgument {
+  target?: string;
+  response?: string;
 }
 
 interface BotWelcome {
@@ -46,7 +53,16 @@ const Dashboard = () => {
       summoner: {
         trigger: 'summon',
         response: 'WXATA summoned successfully.',
-        target: 'self'
+        target: 'self',
+        defaultArgument: 'self',
+        arguments: {
+          here: {
+            target: 'chat'
+          },
+          self: {
+            target: 'self'
+          }
+        }
       }
     },
     root: {
@@ -156,6 +172,40 @@ const Dashboard = () => {
         summoner: {
           ...prev.scripts.summoner,
           [field]: value
+        }
+      }
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleScriptArgumentChange = (argumentName: string, field: keyof BotScriptArgument, value: string) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      scripts: {
+        ...prev.scripts,
+        summoner: {
+          ...prev.scripts.summoner,
+          arguments: {
+            ...prev.scripts.summoner.arguments,
+            [argumentName]: {
+              ...prev.scripts.summoner.arguments?.[argumentName],
+              [field]: value
+            }
+          }
+        }
+      }
+    }));
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleDefaultArgumentChange = (value: string) => {
+    setBotInfo((prev) => ({
+      ...prev,
+      scripts: {
+        ...prev.scripts,
+        summoner: {
+          ...prev.scripts.summoner,
+          defaultArgument: value
         }
       }
     }));
@@ -409,6 +459,56 @@ const Dashboard = () => {
                   className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
                 />
               </label>
+              <label className="block space-y-1">
+                <span className="text-gray-500 uppercase tracking-wider">Default argument</span>
+                <input
+                  type="text"
+                  value={botInfo.scripts.summoner.defaultArgument ?? 'self'}
+                  onChange={(e) => handleDefaultArgumentChange(e.currentTarget.value)}
+                  className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                />
+              </label>
+              <div className="grid grid-cols-1 gap-3 rounded border border-green-500/20 p-3">
+                <div className="text-gray-500 uppercase tracking-wider text-[10px]">Arguments</div>
+                <label className="block space-y-1">
+                  <span className="text-gray-500 uppercase tracking-wider">here.target</span>
+                  <input
+                    type="text"
+                    value={botInfo.scripts.summoner.arguments?.here?.target ?? 'chat'}
+                    onChange={(e) => handleScriptArgumentChange('here', 'target', e.currentTarget.value)}
+                    className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-gray-500 uppercase tracking-wider">self.target</span>
+                  <input
+                    type="text"
+                    value={botInfo.scripts.summoner.arguments?.self?.target ?? 'self'}
+                    onChange={(e) => handleScriptArgumentChange('self', 'target', e.currentTarget.value)}
+                    className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-gray-500 uppercase tracking-wider">here.response override</span>
+                  <input
+                    type="text"
+                    value={botInfo.scripts.summoner.arguments?.here?.response ?? ''}
+                    onChange={(e) => handleScriptArgumentChange('here', 'response', e.currentTarget.value)}
+                    placeholder="optional"
+                    className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500 placeholder:text-green-900/50"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-gray-500 uppercase tracking-wider">self.response override</span>
+                  <input
+                    type="text"
+                    value={botInfo.scripts.summoner.arguments?.self?.response ?? ''}
+                    onChange={(e) => handleScriptArgumentChange('self', 'response', e.currentTarget.value)}
+                    placeholder="optional"
+                    className="w-full bg-black border border-green-500/30 p-2 text-green-500 outline-none focus:border-green-500 placeholder:text-green-900/50"
+                  />
+                </label>
+              </div>
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] text-green-900 uppercase tracking-wider">{configStatus || 'Ready'}</span>
