@@ -6,6 +6,8 @@ import fs from 'fs/promises';
 import path from 'path';
 
 interface BotScript {
+  name: string;
+  desc: string;
   trigger: string;
   response: string;
   target: string;
@@ -23,6 +25,7 @@ interface BotInfo {
   scripts: Record<string, BotScript>;
   root: BotRoot;
   welcome: BotWelcome;
+  permissions: BotPermissions;
 }
 
 interface BotRoot {
@@ -34,12 +37,34 @@ interface BotWelcome {
   text: string;
 }
 
+interface BotPermissions {
+  allowAll: boolean;
+  chats: string[];
+  numbers: string[];
+}
+
 const BOT_INFO_PATH = path.resolve(__dirname, '..', 'botinfo.json');
 const OUTBOUND_MESSAGE_TTL_MS = 15_000;
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
   scripts: {
+    menu: {
+      name: 'menu',
+      desc: 'List all core scripts and their usage',
+      trigger: 'menu',
+      response: 'Available scripts listed below.',
+      target: 'chat'
+    },
+    perm: {
+      name: 'perm',
+      desc: 'Grant bot permissions: chat | all | +number',
+      trigger: 'perm',
+      response: 'Permission updated.',
+      target: 'chat'
+    },
     summoner: {
+      name: 'summoner',
+      desc: 'Send summon response to root or current chat',
       trigger: 'summon',
       response: 'WXATA summoned successfully.',
       target: 'self',
@@ -60,10 +85,17 @@ const DEFAULT_BOT_INFO: BotInfo = {
   welcome: {
     enabled: true,
     text: '╔════════════════════════════╗\n║   WELCOME TO WXATA         ║\n║   SYSTEM ONLINE            ║\n╚════════════════════════════╝'
+  },
+  permissions: {
+    allowAll: false,
+    chats: [],
+    numbers: []
   }
 };
 
-function sanitizeBotScript(input: Partial<BotScript> | undefined): BotScript {
+function sanitizeBotScript(input: Partial<BotScript> | undefined, fallbackName: string): BotScript {
+  const name = typeof input?.name === 'string' && input.name.trim() ? input.name.trim() : fallbackName;
+  const desc = typeof input?.desc === 'string' && input.desc.trim() ? input.desc.trim() : `${name} core script`;
   const defaultArgument = typeof input?.defaultArgument === 'string' && input.defaultArgument.trim() ? input.defaultArgument.trim() : 'self';
   const defaultSummonerArguments = {
     here: {
@@ -94,7 +126,9 @@ function sanitizeBotScript(input: Partial<BotScript> | undefined): BotScript {
   }, {});
 
   return {
-    trigger: typeof input?.trigger === 'string' && input.trigger.trim() ? input.trigger.trim() : 'summon',
+    name,
+    desc,
+    trigger: typeof input?.trigger === 'string' && input.trigger.trim() ? input.trigger.trim() : fallbackName,
     response: typeof input?.response === 'string' && input.response.trim() ? input.response.trim() : 'WXATA summoned successfully.',
     target: typeof input?.target === 'string' && input.target.trim() ? input.target.trim() : 'self',
     defaultArgument,
@@ -115,8 +149,31 @@ function sanitizeBotRoot(input: Partial<BotRoot> | undefined): BotRoot {
   };
 }
 
+function sanitizePermissions(input: Partial<BotPermissions> | undefined): BotPermissions {
+  const chats = Array.isArray(input?.chats)
+    ? input!.chats
+        .filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
+        .map((entry) => entry.trim())
+    : [];
+
+  const numbers = Array.isArray(input?.numbers)
+    ? input!.numbers
+        .filter((entry): entry is string => typeof entry === 'string' && !!entry.trim())
+        .map((entry) => entry.replace(/\D/g, ''))
+        .filter((entry) => !!entry)
+    : [];
+
+  return {
+    allowAll: typeof input?.allowAll === 'boolean' ? input.allowAll : false,
+    chats: Array.from(new Set(chats)),
+    numbers: Array.from(new Set(numbers))
+  };
+}
+
 function migrateLegacyBotInfo(input: Record<string, unknown>): Partial<BotInfo> {
   const defaultSummoner: BotScript = {
+    name: 'summoner',
+    desc: 'Send summon response to root or current chat',
     trigger: 'summon',
     response: 'WXATA summoned successfully.',
     target: 'self'
@@ -131,6 +188,8 @@ function migrateLegacyBotInfo(input: Record<string, unknown>): Partial<BotInfo> 
       prefix: typeof input.prefix === 'string' ? input.prefix : DEFAULT_BOT_INFO.prefix,
       scripts: {
         summoner: {
+          name: 'summoner',
+          desc: 'Send summon response to root or current chat',
           trigger: typeof input.summoner === 'string' ? input.summoner : defaultSummoner.trigger,
           response:
             typeof input.summonResponse === 'string'
@@ -155,12 +214,13 @@ function sanitizeBotInfo(input: Partial<BotInfo> & Record<string, unknown>): Bot
     (input.scripts && typeof input.scripts === 'object' ? input.scripts : migrated.scripts) ?? DEFAULT_BOT_INFO.scripts;
   const rootInput = input.root && typeof input.root === 'object' ? input.root : migrated.root;
   const welcomeInput = input.welcome && typeof input.welcome === 'object' ? input.welcome : undefined;
+  const permissionsInput = input.permissions && typeof input.permissions === 'object' ? input.permissions : undefined;
 
   const scripts = Object.entries(scriptsInput as Record<string, Partial<BotScript>>).reduce<Record<string, BotScript>>(
     (accumulator, [name, script]) => {
       const normalizedName = name.trim();
       if (normalizedName) {
-        accumulator[normalizedName] = sanitizeBotScript(script);
+        accumulator[normalizedName] = sanitizeBotScript(script, normalizedName);
       }
       return accumulator;
     },
@@ -168,15 +228,52 @@ function sanitizeBotInfo(input: Partial<BotInfo> & Record<string, unknown>): Bot
   );
 
   if (!Object.keys(scripts).length) {
-    scripts.summoner = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.summoner);
+    scripts.summoner = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.summoner, 'summoner');
+  }
+
+  if (!scripts.menu) {
+    scripts.menu = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.menu, 'menu');
+  }
+
+  if (!scripts.perm) {
+    scripts.perm = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.perm, 'perm');
   }
 
   return {
     prefix,
     scripts,
     root: sanitizeBotRoot(rootInput as Partial<BotRoot> | undefined),
-    welcome: sanitizeBotWelcome(welcomeInput as Partial<BotWelcome> | undefined)
+    welcome: sanitizeBotWelcome(welcomeInput as Partial<BotWelcome> | undefined),
+    permissions: sanitizePermissions(permissionsInput as Partial<BotPermissions> | undefined)
   };
+}
+
+function buildMenuResponse(botInfo: BotInfo): string {
+  const lines: string[] = [];
+  lines.push('== WXATA SCRIPT MENU ==');
+  lines.push('');
+  lines.push('Highlights:');
+  lines.push(`- Prefix: ${botInfo.prefix}`);
+  lines.push('- Routing args (all scripts): self | +countrycodeNumber');
+  lines.push(`- Permissions: all=${botInfo.permissions.allowAll} chats=${botInfo.permissions.chats.length} numbers=${botInfo.permissions.numbers.length}`);
+  lines.push('');
+
+  for (const [key, script] of Object.entries(botInfo.scripts)) {
+    const baseCommand = `${botInfo.prefix}${script.trigger}`;
+    const argumentNames = Object.keys(script.arguments ?? {});
+    const argsSuffix = argumentNames.length ? ` [${argumentNames.join(' | ')}]` : '';
+    const defaultArgSuffix = script.defaultArgument ? ` (default: ${script.defaultArgument})` : '';
+    lines.push(`> ${script.name || key}`);
+    lines.push(`  command : ${baseCommand}${argsSuffix}${defaultArgSuffix}`);
+    lines.push(`  desc    : ${script.desc}`);
+    if (key === 'perm') {
+      lines.push(`  grants  : ${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber`);
+    }
+    lines.push('');
+  }
+
+  lines.push('Use: <prefix><trigger> [arg]');
+  return lines.join('\n');
 }
 
 async function readBotInfo(): Promise<BotInfo> {
@@ -259,6 +356,76 @@ function normalizeWhatsAppJid(value: string | undefined | null): string | null {
 
   const number = trimmedValue.replace(/\D/g, '');
   return number ? `${number}@s.whatsapp.net` : null;
+}
+
+function normalizePermissionChatId(jid: string | undefined | null): string | null {
+  if (typeof jid !== 'string' || !jid.trim()) {
+    return null;
+  }
+
+  const trimmed = jid.trim();
+  if (trimmed.endsWith('@g.us')) {
+    return trimmed;
+  }
+
+  return normalizeWhatsAppJid(trimmed);
+}
+
+function extractSenderNumber(msg: { key?: { participant?: string | null; remoteJid?: string | null } }): string | null {
+  const senderJid = normalizeWhatsAppJid(msg.key?.participant ?? msg.key?.remoteJid ?? undefined);
+  if (!senderJid) {
+    return null;
+  }
+
+  return senderJid.split('@')[0]?.replace(/\D/g, '') || null;
+}
+
+function isCommandPermitted(botInfo: BotInfo, msg: { key?: { remoteJid?: string | null; participant?: string | null } }): boolean {
+  if (botInfo.permissions.allowAll) {
+    return true;
+  }
+
+  const chatId = normalizePermissionChatId(msg.key?.remoteJid ?? undefined);
+  const senderNumber = extractSenderNumber(msg);
+
+  const chatAllowed = !!chatId && botInfo.permissions.chats.includes(chatId);
+  const numberAllowed = !!senderNumber && botInfo.permissions.numbers.includes(senderNumber);
+
+  return chatAllowed || numberAllowed;
+}
+
+function applyPermissionGrant(botInfo: BotInfo, grantArg: string | undefined, remoteJid: string | undefined): BotPermissions | null {
+  if (!grantArg) {
+    return null;
+  }
+
+  const normalizedArg = grantArg.trim().toLowerCase();
+  const next: BotPermissions = {
+    allowAll: botInfo.permissions.allowAll,
+    chats: [...botInfo.permissions.chats],
+    numbers: [...botInfo.permissions.numbers]
+  };
+
+  if (normalizedArg === 'all') {
+    next.allowAll = true;
+    return sanitizePermissions(next);
+  }
+
+  if (normalizedArg === 'chat') {
+    const chatId = normalizePermissionChatId(remoteJid ?? undefined);
+    if (!chatId) {
+      return null;
+    }
+    next.chats.push(chatId);
+    return sanitizePermissions(next);
+  }
+
+  if (/^\+?\d{7,20}$/.test(normalizedArg)) {
+    next.numbers.push(normalizedArg.replace(/\D/g, ''));
+    return sanitizePermissions(next);
+  }
+
+  return null;
 }
 
 type OutboundMessageRecord = {
@@ -357,11 +524,18 @@ function senderMatchesRoot(
 
 function resolveScriptTarget(
   sock: Awaited<ReturnType<WXATAConnection['createConnection']>>,
+  botInfo: BotInfo,
   script: BotScript,
   argumentName: string | undefined,
   remoteJid: string | undefined
 ): string | null {
   const normalizedArgumentName = argumentName?.trim().toLowerCase();
+
+  const globalTargetOverride = resolveGlobalTargetOverride(sock, botInfo, normalizedArgumentName);
+  if (globalTargetOverride !== undefined) {
+    return globalTargetOverride;
+  }
+
   const fallbackArgument = script.defaultArgument?.trim().toLowerCase() || 'self';
   const selectedArgumentName = normalizedArgumentName || fallbackArgument;
   const argumentConfig = script.arguments?.[selectedArgumentName];
@@ -373,6 +547,36 @@ function resolveScriptTarget(
   }
 
   return resolveTargetJid(sock, selectedTarget);
+}
+
+function resolveGlobalTargetOverride(
+  sock: Awaited<ReturnType<WXATAConnection['createConnection']>>,
+  botInfo: BotInfo,
+  argumentName: string | undefined
+): string | null | undefined {
+  if (!argumentName) {
+    return undefined;
+  }
+
+  if (['self', 'root', 'me', 'myself'].includes(argumentName)) {
+    return resolveTargetJid(sock, botInfo.root.target);
+  }
+
+  if (/^\+?\d{7,20}$/.test(argumentName)) {
+    const number = argumentName.replace(/\D/g, '');
+    return number ? `${number}@s.whatsapp.net` : null;
+  }
+
+  return undefined;
+}
+
+function resolveScriptResponse(script: BotScript, argumentName: string | undefined): string {
+  const normalizedArgumentName = argumentName?.trim().toLowerCase();
+  const fallbackArgument = script.defaultArgument?.trim().toLowerCase() || 'self';
+  const selectedArgumentName = normalizedArgumentName || fallbackArgument;
+  const argumentConfig = script.arguments?.[selectedArgumentName];
+
+  return argumentConfig?.response?.trim() || script.response;
 }
 
 function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
@@ -389,6 +593,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       const isBotEcho = msg.key?.fromMe && wasRecentlySentByBot(remoteJid ?? undefined, text ?? undefined);
       const botInfo = await readBotInfo();
       const isRootSender = senderMatchesRoot(sock, msg, botInfo.root.target);
+      const hasPermission = isRootSender || isCommandPermitted(botInfo, msg);
 
       const participant = msg.key?.participant ?? '-';
       const textPreview = (text ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -414,12 +619,41 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
           const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?$`, 'i');
           const triggerMatch = normalizedText.match(triggerRegex);
 
-          if (triggerMatch && isRootSender) {
+          if (triggerMatch) {
             const argumentName = triggerMatch[1];
-            const targetJid = resolveScriptTarget(sock, script, argumentName, remoteJid ?? undefined);
+
+            if (!hasPermission) {
+              continue;
+            }
+
+            if (scriptName === 'perm') {
+              if (!isRootSender) {
+                if (remoteJid) {
+                  await sendTrackedMessage(sock, remoteJid, 'Permission denied. Root only.');
+                }
+                break;
+              }
+
+              const nextPermissions = applyPermissionGrant(botInfo, argumentName, remoteJid ?? undefined);
+              if (!nextPermissions) {
+                if (remoteJid) {
+                  await sendTrackedMessage(sock, remoteJid, `Usage: ${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber`);
+                }
+                break;
+              }
+
+              const updated = await updateBotInfo({ permissions: nextPermissions });
+              const summary = `Permissions updated. all=${updated.permissions.allowAll} chats=${updated.permissions.chats.length} numbers=${updated.permissions.numbers.length}`;
+              if (remoteJid) {
+                await sendTrackedMessage(sock, remoteJid, summary);
+              }
+              dashboard.log('SUCCESS', `Permission grant applied by ${remoteJid}`);
+              break;
+            }
+
+            const targetJid = resolveScriptTarget(sock, botInfo, script, argumentName, remoteJid ?? undefined);
             if (targetJid) {
-              const argumentConfig = script.arguments?.[argumentName?.trim().toLowerCase() || script.defaultArgument?.trim().toLowerCase() || 'self'];
-              const responseText = argumentConfig?.response ?? script.response;
+              const responseText = scriptName === 'menu' ? buildMenuResponse(botInfo) : resolveScriptResponse(script, argumentName);
               await sendTrackedMessage(sock, targetJid, responseText);
               dashboard.log('SUCCESS', `${scriptName} triggered by ${remoteJid}; response sent to ${targetJid}`);
             } else {

@@ -1,20 +1,36 @@
 {
   "prefix": "!",
   "scripts": {
+    "menu": {
+      "name": "menu",
+      "desc": "List all core scripts and their usage",
+      "trigger": "menu",
+      "response": "Available scripts listed below.",
+      "target": "chat",
+      "defaultArgument": "self"
+    },
+    "perm": {
+      "name": "perm",
+      "desc": "Grant bot permissions: chat | all | +number",
+      "trigger": "perm",
+      "response": "Permission updated.",
+      "target": "chat",
+      "defaultArgument": "self"
+    },
     "summoner": {
-      "trigger": "summon",
-      "response": "WXATA summoned successfully.",
-      "target": "self",
-      "defaultArgument": "self",
+      "name": "summoner",
+      "desc": "Send summon response to root or current chat",
+      "trigger": "bot",
+      "response": "WXATA summoned successfully. ⚡🤖",
+      "target": "here",
+      "defaultArgument": "here",
       "arguments": {
         "here": {
-          "target": "chat"
+          "target": "chat",
+          "response": "Present, Good Sir. ⚡🤖"
         },
         "self": {
           "target": "self"
-        },
-        "here_response": {
-          "response": "WXATA(powered by TADS) was summoned successfully in this chat."
         }
       }
     }
@@ -24,6 +40,13 @@
   },
   "welcome": {
     "enabled": true,
-    "text": "╔══════════════════════════════════════════════╗\n║                 WELCOME TO WXATA             ║\n║            WhatsApp Automation Terminal      ║\n╠══════════════════════════════════════════════╣\n║ STATUS   : ONLINE                            ║\n║ MODE     : PROTOCOL LINK ACTIVE              ║\n║ PREFIX   : !                                 ║\n║ COMMAND  : !summon                           ║\n╠══════════════════════════════════════════════╣\n║ CONTACTS                                     ║\n║ WA      : +2347041029093                     ║\n║ TG GC   : https://t.me/+dR5zABepmkNhYjQ0     ║\n║ X       : https://x.com/tads_tech            ║\n╠══════════════════════════════════════════════╣\n║ NOTES                                        ║\n║ - Edit contacts in botinfo.json              ║\n║ - Keep root.target as self or your number    ║\n║ - Use !summon to validate live command flow  ║\n╚══════════════════════════════════════════════╝"
+    "text": "==============================\n   WELCOME TO WXATA\n   WhatsApp Automation Core\n==============================\nStatus  : ONLINE\nMode    : Protocol Link Active\nPrefix  : !\nCommand : !bot here\n\nContacts\n- WA    : +2347041029093\n- TG GC : https://t.me/+dR5zABepmkNhYjQ0\n- X     : https://x.com/tads_tech\n\nNotes\n- Edit config in botinfo.json\n- root.target = self or a number\n- Use !menu to view scripts\n=============================="
+  },
+  "permissions": {
+    "allowAll": false,
+    "chats": [
+      "120363407343729450@g.us"
+    ],
+    "numbers": []
   }
 }
