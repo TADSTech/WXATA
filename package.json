@@ -6,6 +6,7 @@
   "scripts": {
     "frontend": "cd frontend && bun dev",
     "backend": "cd backend && bun run index.ts",
+    "backend:pair": "cd backend && bun run index.ts",
     "all": "concurrently \"bun run frontend\" \"bun run backend\"",
     "install:all": "bun install && cd frontend && bun install && cd ../backend && bun install"
   },

@@ -20,7 +20,9 @@ WXATA is a high-performance WhatsApp bot built with **Baileys** and powered by *
 ## Roadmap
 - [x] Project Initialization
 - [x] Frontend "Coming Soon" Page
-- [ ] Backend Structure Setup
-- [ ] Baileys Integration
+- [x] Backend Structure Setup
+- [x] Baileys Integration (Fixed Auth/QR issues)
+- [x] Robust Connection Refactor (v18+ Standards)
+- [x] Frontend Dashboard Sync (WebSocket Logs)
 - [ ] Command Handler Implementation
 - [ ] Module System (Games/Tools)

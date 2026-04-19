@@ -1,86 +1,90 @@
-import makeWASocket, { 
-    DisconnectReason, 
-    useMultiFileAuthState, 
-    fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
-} from '@whiskeysockets/baileys';
-import { Boom } from '@hapi/boom';
-import pino from 'pino';
+import { WXATAConnection } from './connection';
 // @ts-ignore
 import * as qrcode from 'qrcode-terminal';
-import path from 'path';
+import { dashboard } from './DashboardServer';
 
-// Set up logger
-const logger = pino({ level: 'info' });
+function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
+  sock.ev.on('messages.upsert', async (m) => {
+    const msg = m.messages[0];
+    if (msg && !msg.key?.fromMe && m.type === 'notify') {
+      const remoteJid = msg.key?.remoteJid;
+      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
 
-async function connectToWhatsApp() {
-    // 1. Setup Authentication
-    // This will save the session in the 'auth_info' folder
-    const authPath = path.resolve(__dirname, 'auth_info');
-    const { state, saveCreds } = await useMultiFileAuthState(authPath);
-    
-    // 2. Fetch Latest Baileys Version
-    const { version, isLatest } = await fetchLatestBaileysVersion();
-    console.log(`Using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
+      if (text?.toLowerCase() === 'ping' && remoteJid) {
+        await sock.sendMessage(remoteJid, { text: 'pong 🟢' });
+        dashboard.log('SUCCESS', `Auto-reply [pong] sent to ${remoteJid}`);
+      }
 
-    // 3. Create Socket Connection
-    const sock = makeWASocket({
-        version,
-        auth: {
-            creds: state.creds,
-            /** caching makes the store faster to send/receive messages */
-            keys: makeCacheableSignalKeyStore(state.keys, logger),
-        },
-        printQRInTerminal: true,
-        logger,
-        browser: ['WXATA', 'Safari', '3.0'],
-    });
-
-    // 4. Handle Connection Updates
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-            console.log('--- SCAN QR CODE BELOW ---');
-            qrcode.generate(qr, { small: true });
-        }
-
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
-            
-            // Reconnect if not logged out
-            if (shouldReconnect) {
-                connectToWhatsApp();
-            } else {
-                console.log('Logged out. Please delete auth_info folder and scan again.');
-            }
-        } else if (connection === 'open') {
-            console.log('🟢 WXATA: Connection successfully opened!');
-        }
-    });
-
-    // 5. Handle Credential Updates (Crucial for session persistence)
-    sock.ev.on('creds.update', saveCreds);
-
-    // 6. Basic Message Handler (Placeholder for Command System)
-    sock.ev.on('messages.upsert', async m => {
-        console.log(JSON.stringify(m, undefined, 2));
-
-        const msg = m.messages[0];
-        if (msg && !msg.key.fromMe && m.type === 'notify') {
-            const remoteJid = msg.key.remoteJid;
-            const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-
-            if (text?.toLowerCase() === 'ping') {
-                await sock.sendMessage(remoteJid!, { text: 'pong 🟢' });
-            }
-        }
-    });
-
-    return sock;
+      const logMsg = `From: ${remoteJid} | Text: ${text}`;
+      console.log(`[MSG] ${logMsg}`);
+      dashboard.log('MSG', logMsg);
+    }
+  });
 }
 
-// Start the bot
-console.log('🚀 Initializing WXATA Backend...');
-connectToWhatsApp().catch(err => console.error('Unexpected error:', err));
+async function startBot() {
+  dashboard.log('INFO', 'Initializing WXATA Backend System...');
+  console.log('🚀 Initializing WXATA Backend...');
+
+  let connectionManager: WXATAConnection | null = null;
+
+  // Listen for commands from the dashboard
+  dashboard.onCommand(async (payload) => {
+    try {
+      if (payload.command === 'START_CONNECTION') {
+        const { method, phoneNumber } = payload.data;
+
+        dashboard.log('INFO', `Starting connection via ${method}...`);
+
+        connectionManager = new WXATAConnection({
+          phoneNumber,
+          usePairingCode: method === 'PHONE',
+          onQR: (qr) => {
+            dashboard.sendQR(qr);
+            qrcode.generate(qr, { small: true });
+          },
+          onPairingCode: (code) => {
+            dashboard.sendPairingCode(code);
+          },
+          onOpen: () => {
+            dashboard.log('SUCCESS', 'Bot is now fully operational');
+          }
+        });
+
+        const sock = await connectionManager.createConnection();
+        attachMessageHandler(sock);
+      }
+
+      if (payload.command === 'QUICK_ACTION') {
+        const { action } = payload.data;
+        dashboard.log('WARN', `Executing Quick Action: ${action}`);
+
+        switch (action) {
+          case 'RESTART_BOT':
+            dashboard.log('INFO', 'Restarting bot system...');
+            process.exit(0); // PM2 or a wrapper script should handle restart
+            break;
+          case 'TERMINATE':
+            dashboard.log('ERROR', 'Terminating bot system...');
+            process.exit(1);
+            break;
+          case 'EXPORT_DATA':
+            dashboard.log('INFO', 'Exporting session logs...');
+            // Logic for export could go here
+            break;
+        }
+      }
+    } catch (err) {
+      console.error('Dashboard command failed', err);
+      dashboard.log('ERROR', 'Failed to execute dashboard command');
+      dashboard.setConnectionStatus('DISCONNECTED');
+    }
+  });
+
+  dashboard.setConnectionStatus('DISCONNECTED');
+  dashboard.log('INFO', 'Backend ready. Waiting for START_CONNECTION command from dashboard.');
+}
+
+startBot().catch((err) => {
+  console.error('CRITICAL: Failed to start WXATA system', err);
+});
