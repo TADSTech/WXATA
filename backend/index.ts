@@ -11,6 +11,7 @@ interface BotScript {
   trigger: string;
   response: string;
   target: string;
+  code?: string;
   defaultArgument?: string;
   arguments?: Record<string, BotScriptArgument>;
 }
@@ -690,6 +691,21 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
                 await sendTrackedMessage(sock, remoteJid, summary);
               }
               dashboard.log('SUCCESS', `Permission ${parsedPermArgs.mode} applied by ${remoteJid}`);
+              break;
+            }
+
+            if (script.code && script.code.trim()) {
+              try {
+                const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+                const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', script.code);
+                await executor(sock, msg, botInfo, remoteJid, argumentName, sendTrackedMessage, dashboard);
+                dashboard.log('SUCCESS', `${scriptName} JS executed by ${remoteJid}`);
+              } catch (err: any) {
+                dashboard.log('ERROR', `JS Extension Error (${scriptName}): ${err.message}`);
+                if (remoteJid && hasPermission) {
+                  await sendTrackedMessage(sock, remoteJid, `[Extension Error] ${scriptName}:\n${err.message}`);
+                }
+              }
               break;
             }
 

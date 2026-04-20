@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, where } from 'firebase/firestore';
 
 interface UserCode {
   id: string;
@@ -11,11 +11,27 @@ interface UserCode {
   usedAt?: string;
 }
 
+interface Extension {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  response: string;
+  code?: string;
+  author: string;
+  authorUid: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  downloads: number;
+}
+
 export default function Admin() {
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [codesList, setCodesList] = useState<UserCode[]>([]);
+  const [extensionsList, setExtensionsList] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
+  const [extLoading, setExtLoading] = useState(true);
 
   // Simplified protection for the admin panel demonstration
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -37,11 +53,37 @@ export default function Admin() {
     }
   };
 
+  const fetchExtensions = async () => {
+    try {
+      const q = query(collection(db, 'extensions'), where('status', '==', 'pending'));
+      const querySnapshot = await getDocs(q);
+      const fetched: Extension[] = [];
+      querySnapshot.forEach((doc) => {
+        fetched.push({ id: doc.id, ...doc.data() } as Extension);
+      });
+      setExtensionsList(fetched);
+    } catch (err) {
+      console.error('Failed to fetch extensions', err);
+    } finally {
+      setExtLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAdminUnlocked) {
       fetchCodes();
+      fetchExtensions();
     }
   }, [isAdminUnlocked]);
+
+  const handleExtStatus = async (id: string, status: 'approved' | 'rejected') => {
+     try {
+        await updateDoc(doc(db, 'extensions', id), { status });
+        fetchExtensions(); // Refresh the list
+     } catch(e) {
+        console.error(e);
+     }
+  };
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +209,54 @@ export default function Admin() {
                       </td>
                       <td className="py-3 px-2 text-gray-400 font-mono text-xs">{c.usedBy || '-'}</td>
                       <td className="py-3 px-2 text-gray-500">{new Date(c.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Pending Extensions List */}
+        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-lg">
+          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-gray-800 pb-2">Pending Marketplace Extensions</h2>
+          {extLoading ? (
+            <p className="text-gray-500">Loading extensions database...</p>
+          ) : extensionsList.length === 0 ? (
+            <p className="text-gray-500">No pending extensions awaiting approval.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-800">
+                    <th className="py-3 px-2">Name / Desc</th>
+                    <th className="py-3 px-2">Trigger & Response</th>
+                    <th className="py-3 px-2">Author (UID)</th>
+                    <th className="py-3 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extensionsList.map(ext => (
+                    <tr key={ext.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-3 px-2">
+                        <div className="font-bold text-blue-400">{ext.name}</div>
+                        <div className="text-gray-500 text-xs truncate max-w-xs">{ext.description}</div>
+                      </td>
+                      <td className="py-3 px-2">
+                         <div className="text-xs">
+                           <span className="text-gray-500">Trigger:</span> <span className="font-mono text-blue-300 px-1">!{ext.trigger}</span><br/>
+                           <span className="text-gray-500">Resp:</span> <span className="font-mono text-gray-300">{ext.response || '<script>'}</span>
+                         </div>
+                         {ext.code && <div className="text-green-500 text-[10px] mt-1">Contains JS Code</div>}
+                      </td>
+                      <td className="py-3 px-2 text-gray-400">
+                        {ext.author}<br/>
+                        <span className="font-mono text-[10px] opacity-50">{ext.authorUid}</span>
+                      </td>
+                      <td className="py-3 px-2 text-right space-x-2">
+                         <button onClick={() => handleExtStatus(ext.id, 'approved')} className="text-xs bg-green-900/30 hover:bg-green-800/50 border border-green-500/50 text-green-400 px-3 py-1 rounded">Approve</button>
+                         <button onClick={() => handleExtStatus(ext.id, 'rejected')} className="text-xs bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-3 py-1 rounded">Reject</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

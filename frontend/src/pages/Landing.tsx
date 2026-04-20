@@ -42,11 +42,11 @@ const Landing = () => {
             animate={{ letterSpacing: "0.5em", opacity: 1 }}
             transition={{ duration: 1.5, delay: 0.5 }}
           >
-            Coming Soon
+            The Ultimate WhatsApp Engine is Here
           </motion.p>
           <div className="flex gap-4 justify-center mt-6">
             <button onClick={() => navigate('/login')} className="px-6 py-2 border border-primary text-primary hover:bg-primary hover:text-white rounded transition-colors z-20 cursor-pointer">Login</button>
-            <button onClick={() => navigate('/register')} className="px-6 py-2 border border-accent text-accent hover:bg-accent hover:text-white rounded transition-colors z-20 cursor-pointer">Register</button>
+            <button onClick={() => navigate('/extensions')} className="px-6 py-2 bg-primary text-black hover:bg-primary/80 font-bold rounded transition-colors z-20 cursor-pointer">Marketplace</button>
           </div>
           <div className="h-1 w-24 bg-primary mx-auto rounded-full mt-4" /></div>        
 

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Admin from './pages/Admin';
+import Marketplace from './pages/Marketplace';
 import './index.css';
 
 // Simple protected route helper
@@ -22,7 +23,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/admin" element={<Admin />} />
-        
+        <Route path="/extensions" element={<Marketplace />} />
+
         {/* Dynamic user dashboard */}
         <Route path="/dashboard/:username" element={
           <PrivateRoute>
