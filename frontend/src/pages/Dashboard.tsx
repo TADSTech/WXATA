@@ -116,7 +116,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const socket = new WebSocket('ws://localhost:4000');
+      const wsUrl = window.location.hostname === 'localhost' ? 'ws://localhost:4000' : 'wss://wxata.onrender.com';
+      const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onmessage = (event) => {

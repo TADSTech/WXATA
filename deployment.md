@@ -1,39 +1,55 @@
-# Deployment Guide (Free 24/7 Uptime)
+# Deployment Guide (Free Tier Alternatives)
 
-This guide outlines how to host your WXATA backend for free with 24/7 uptime using Koyeb and UptimeRobot. 
-Other free tiers (like Render or Railway) put your server to sleep, but this combination bypasses that.
+Since Koyeb no longer offers a purely free tier suitable for long-running scripts without a credit card, you can use a combination of **Render** (for the backend) and **Cloudflare Pages / Vercel** (for the frontend).
 
-## 1. Prepare for Deployment
-1. Ensure your bot data is pushed to a GitHub repository (excluding `botinfo.json` if it contains sensitive info, although Koyeb handles volumes).
-2. Change your start script in `backend/package.json` to properly initialize the Bun process, e.g., `bun run index.ts`.
+## Important Warning: Ephemeral Storage
+Free hosts like Render or Railway use **ephemeral filesystems**. When your server goes to sleep (after 15 minutes of inactivity) or deploys a new update, the local files are reset. 
 
-## 2. Deploy to Koyeb
-[Koyeb](https://www.koyeb.com/) offers a free tier (1 service) with Docker natively.
-1. Sign up for Koyeb using your GitHub account.
-2. Go to the dashboard and create a new Web Service.
-3. Choose **GitHub** and select your WXATA repository.
-4. Set the builder to **Dockerfile** (if you have one) or **Buildpack**. Bun works out-of-the-box with Node buildpacks or a simple Dockerfile.
-5. In the Environment Variables, add any necessary overrides (if you extract configs from `botinfo.json`).
-6. Complete the setup. Note your assigned Koyeb domain (e.g., `wxata-bot-xyz.koyeb.app`).
+* **What this means for WXATA:** Your WhatsApp connection data (`backend/auth_info`) mapping your bot to your phone might be erased on restart, requiring you to scan the QR code or use the pairing code again. 
+* **Fix (Future):** You can update the Baileys auth state to save directly to Firebase Firestore instead of local files.
 
-## 3. Keep it Alive 24/7 (UptimeRobot)
-To ensure the backend does not sleep from inactivity:
+---
+
+## 1. Frontend Deployment (Cloudflare Pages)
+For your React/Vite dashboard, **Cloudflare Pages** is entirely free, incredibly fast, and doesn't sleep.
+
+1. Push your code to GitHub.
+2. Go to the [Cloudflare Dashboard](https://dash.cloudflare.com/) -> **Workers & Pages** -> **Create application** -> **Pages**.
+3. **Connect to Git** and select your WXATA repository.
+4. **Build Settings:**
+   - Framework preset: `Vite`
+   - Build command: `bun run build` (or `npm run build`)
+   - Build output directory: `dist`
+   - Root directory: `frontend`
+5. Click **Save and Deploy**.
+
+---
+
+## 2. Backend Deployment (Render)
+[Render](https://render.com/) offers a robust free tier for Web Services capable of running Bun/Node backends.
+
+1. Go to your Render Dashboard and click **New +** -> **Web Service**.
+2. Connect your GitHub repository.
+3. **Settings:**
+   - Root Directory: `backend`
+   - Environment: `Node` (or `Docker` if you add a Dockerfile for Bun)
+   - Build Command: `bun install`
+   - Start Command: `bun run index.ts`
+4. **Free Tier:** Select the Free instance type.
+5. Click **Create Web Service**.
+
+> **Note:** Render needs an HTTP port bound to pass health checks. If WXATA is currently pure WebSocket/Baileys, ensure a fake HTTP listener is running on `process.env.PORT || 3000` to appease Render's deployment check.
+
+---
+
+## 3. Keeping the Backend Awake (UptimeRobot)
+Render's free tier sleeps after 15 minutes of receiving no inbound traffic.
+
 1. Sign up at [UptimeRobot](https://uptimerobot.com/).
 2. Create a new Monitor.
-3. Type: `HTTP(s)`
-4. Name: `WXATA Bot`
-5. URL: `<Your Koyeb URL>` (e.g., `https://wxata-bot-xyz.koyeb.app`)
-6. Monitoring Interval: `5 minutes`
-7. Click **Create Monitor**.
+3. **Type:** `HTTP(s)`
+4. **URL:** `https://wxata.onrender.com`
+5. **Interval:** `5 minutes`
+6. Click **Create Monitor**.
 
-## 4. Frontend Deployment (Vercel)
-For the frontend, the best free host is [Vercel](https://vercel.com/):
-1. Import your GitHub repository to Vercel.
-2. Set the Root Directory to `frontend`.
-3. Vercel automatically detects Vite and sets the build command to `npm run build`.
-4. Deploy.
-
-Your frontend is now live and can connect to your deployed backend URL.
-
-
-
+This will ping your backend every 5 minutes, preventing Render from putting the WhatsApp bot to sleep.
