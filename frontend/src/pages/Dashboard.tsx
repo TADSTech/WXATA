@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Shield, Activity, Lock, QrCode, Phone, Wifi, RefreshCw, LogOut } from 'lucide-react';
+import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
@@ -46,7 +46,6 @@ const Dashboard = () => {
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState({
     connection: 'DISCONNECTED',
@@ -100,8 +99,10 @@ const Dashboard = () => {
         getDoc(doc(db, 'users', username || '')).then(snap => {
           if (snap.exists() && snap.data().uid === user.uid) {
             setUserData(snap.data());
+            setIsAuthenticated(true);
           } else if (username === 'user') { // Generic fallback
              setUserData({ name: user.email, username: username });
+             setIsAuthenticated(true);
           } else {
             navigate('/login');
           }
@@ -273,40 +274,13 @@ const Dashboard = () => {
     setConfigStatus('Saving...');
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'wxata-admin') {
-      setIsAuthenticated(true);
-    } else {
-      alert('Unauthorized access');
-    }
-  };
-
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center font-mono">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-gray-900 p-8 border border-green-500/30 rounded-lg shadow-[0_0_30px_rgba(34,197,94,0.1)] w-full max-w-md"
-        >
-          <div className="flex flex-col items-center gap-4 mb-8">
-            <Lock className="text-green-500 w-12 h-12" />
-            <h2 className="text-green-500 text-xl font-bold tracking-widest uppercase">System Auth</h2>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input 
-              type="password" 
-              placeholder="ENTER ADMIN KEY"
-              className="w-full bg-black border border-green-500/50 p-3 text-green-500 focus:outline-none focus:border-green-400 placeholder:text-green-900"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button className="w-full bg-green-600 hover:bg-green-500 text-black font-bold p-3 transition-colors uppercase tracking-widest">
-              Unlock Console
-            </button>
-          </form>
-        </motion.div>
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center font-mono">
+        <div className="flex flex-col items-center gap-4">
+          <Activity className="text-green-500 w-8 h-8 animate-pulse" />
+          <h2 className="text-green-500 text-lg tracking-widest">AUTHENTICATING...</h2>
+        </div>
       </div>
     );
   }
