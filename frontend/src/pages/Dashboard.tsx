@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Shield, Activity, Lock, QrCode, Phone, Wifi, RefreshCw } from 'lucide-react';
+import { Terminal, Shield, Activity, Lock, QrCode, Phone, Wifi, RefreshCw, LogOut } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { auth, db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface BotInfo {
   prefix: string;
@@ -33,6 +36,15 @@ interface BotRoot {
 }
 
 const Dashboard = () => {
+  const { username } = useParams<{ username: string }>();
+  const navigate = useNavigate();
+  const [userData, setUserData] = useState<any>(null);
+
+  const handleSignOut = () => {
+    auth.signOut();
+    navigate('/');
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
@@ -69,13 +81,35 @@ const Dashboard = () => {
       target: 'self'
     },
     welcome: {
-      enabled: true,
-      text: '╔════════════════════════════╗\n║   WELCOME TO WXATA         ║\n║   SYSTEM ONLINE            ║\n╚════════════════════════════╝'
+      enabled: false,
+      text: ''
     }
   });
+
   const [configStatus, setConfigStatus] = useState('');
-  
+
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Check auth & fetch user data
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(user => {
+      if (!user) {
+        navigate('/login');
+      } else {
+        // Verify username matched params (skip full check for speed but robust enough)
+        getDoc(doc(db, 'users', username || '')).then(snap => {
+          if (snap.exists() && snap.data().uid === user.uid) {
+            setUserData(snap.data());
+          } else if (username === 'user') { // Generic fallback
+             setUserData({ name: user.email, username: username });
+          } else {
+            navigate('/login');
+          }
+        });
+      }
+    });
+    return unsub;
+  }, [username, navigate]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -284,6 +318,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-3">
           <Terminal className="w-6 h-6" />
           <h1 className="text-xl font-bold tracking-tighter">WXATA_DASHBOARD v1.0.0</h1>
+          {userData && <span className="ml-4 text-sm text-green-500/50">Welcome, {userData.name || userData.username}</span>}
         </div>
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
@@ -576,9 +611,15 @@ const Dashboard = () => {
               </button>
               <button 
                 onClick={() => handleQuickAction('EXPORT_DATA')}
-                className="border border-green-500/30 hover:bg-green-500/10 p-2 text-xs transition-colors"
+                className="border border-primary/30 hover:bg-primary/10 p-2 text-xs transition-colors"
               >
                 EXPORT DATA
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="border border-red-500/50 hover:bg-red-500/20 text-red-500 p-2 text-xs transition-colors flex items-center justify-center gap-2 mt-4 w-full"
+              >
+                <LogOut size={14} /> SIGN OUT
               </button>
             </div>
           </div>

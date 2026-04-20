@@ -1,14 +1,38 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Admin from './pages/Admin';
 import './index.css';
+
+// Simple protected route helper
+function PrivateRoute({ children }: { children: React.ReactElement }) {
+  // In a real app, use auth state to verify login. 
+  // We'll rely on Dashboard's logic for full data loading for now.
+  return children;
+}
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/admin" element={<Admin />} />
+        
+        {/* Dynamic user dashboard */}
+        <Route path="/dashboard/:username" element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } />
+        
+        {/* Fallback route */}
+        <Route path="/dashboard" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

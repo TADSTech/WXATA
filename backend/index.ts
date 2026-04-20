@@ -267,7 +267,8 @@ function buildMenuResponse(botInfo: BotInfo): string {
     lines.push(`  command : ${baseCommand}${argsSuffix}${defaultArgSuffix}`);
     lines.push(`  desc    : ${script.desc}`);
     if (key === 'perm') {
-      lines.push(`  grants  : ${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber`);
+      lines.push(`  grant   : ${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber`);
+      lines.push(`  revoke  : ${botInfo.prefix}${script.trigger} revoke chat | all | +countrycodeNumber`);
     }
     lines.push('');
   }
@@ -394,12 +395,17 @@ function isCommandPermitted(botInfo: BotInfo, msg: { key?: { remoteJid?: string 
   return chatAllowed || numberAllowed;
 }
 
-function applyPermissionGrant(botInfo: BotInfo, grantArg: string | undefined, remoteJid: string | undefined): BotPermissions | null {
-  if (!grantArg) {
+function applyPermissionMutation(
+  botInfo: BotInfo,
+  mode: 'grant' | 'revoke',
+  targetArg: string | undefined,
+  remoteJid: string | undefined
+): BotPermissions | null {
+  if (!targetArg) {
     return null;
   }
 
-  const normalizedArg = grantArg.trim().toLowerCase();
+  const normalizedArg = targetArg.trim().toLowerCase();
   const next: BotPermissions = {
     allowAll: botInfo.permissions.allowAll,
     chats: [...botInfo.permissions.chats],
@@ -407,7 +413,7 @@ function applyPermissionGrant(botInfo: BotInfo, grantArg: string | undefined, re
   };
 
   if (normalizedArg === 'all') {
-    next.allowAll = true;
+    next.allowAll = mode === 'grant';
     return sanitizePermissions(next);
   }
 
@@ -416,16 +422,37 @@ function applyPermissionGrant(botInfo: BotInfo, grantArg: string | undefined, re
     if (!chatId) {
       return null;
     }
-    next.chats.push(chatId);
+    if (mode === 'grant') {
+      next.chats.push(chatId);
+    } else {
+      next.chats = next.chats.filter((entry) => entry !== chatId);
+    }
     return sanitizePermissions(next);
   }
 
   if (/^\+?\d{7,20}$/.test(normalizedArg)) {
-    next.numbers.push(normalizedArg.replace(/\D/g, ''));
+    const normalizedNumber = normalizedArg.replace(/\D/g, '');
+    if (mode === 'grant') {
+      next.numbers.push(normalizedNumber);
+    } else {
+      next.numbers = next.numbers.filter((entry) => entry !== normalizedNumber);
+    }
     return sanitizePermissions(next);
   }
 
   return null;
+}
+
+function parsePermArgs(primaryArg: string | undefined, secondaryArg: string | undefined): {
+  mode: 'grant' | 'revoke';
+  targetArg: string | undefined;
+} {
+  const normalizedPrimary = primaryArg?.trim().toLowerCase();
+  if (normalizedPrimary && ['revoke', 'remove', 'rm', 'del', 'deny'].includes(normalizedPrimary)) {
+    return { mode: 'revoke', targetArg: secondaryArg };
+  }
+
+  return { mode: 'grant', targetArg: primaryArg };
 }
 
 type OutboundMessageRecord = {
@@ -634,20 +661,35 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
                 break;
               }
 
-              const nextPermissions = applyPermissionGrant(botInfo, argumentName, remoteJid ?? undefined);
+              const permArgRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?(?:\\s+(\\S+))?$`, 'i');
+              const permArgMatch = normalizedText.match(permArgRegex);
+              const primaryArg = permArgMatch?.[1];
+              const secondaryArg = permArgMatch?.[2];
+              const parsedPermArgs = parsePermArgs(primaryArg, secondaryArg);
+
+              const nextPermissions = applyPermissionMutation(
+                botInfo,
+                parsedPermArgs.mode,
+                parsedPermArgs.targetArg,
+                remoteJid ?? undefined
+              );
               if (!nextPermissions) {
                 if (remoteJid) {
-                  await sendTrackedMessage(sock, remoteJid, `Usage: ${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber`);
+                  await sendTrackedMessage(
+                    sock,
+                    remoteJid,
+                    `Usage:\n${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber\n${botInfo.prefix}${script.trigger} revoke chat | all | +countrycodeNumber`
+                  );
                 }
                 break;
               }
 
               const updated = await updateBotInfo({ permissions: nextPermissions });
-              const summary = `Permissions updated. all=${updated.permissions.allowAll} chats=${updated.permissions.chats.length} numbers=${updated.permissions.numbers.length}`;
+              const summary = `Permissions ${parsedPermArgs.mode} complete. all=${updated.permissions.allowAll} chats=${updated.permissions.chats.length} numbers=${updated.permissions.numbers.length}`;
               if (remoteJid) {
                 await sendTrackedMessage(sock, remoteJid, summary);
               }
-              dashboard.log('SUCCESS', `Permission grant applied by ${remoteJid}`);
+              dashboard.log('SUCCESS', `Permission ${parsedPermArgs.mode} applied by ${remoteJid}`);
               break;
             }
 

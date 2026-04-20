@@ -1,4 +1,4 @@
-# WXATA 🟢⛓️
+﻿# WXATA 🟢🚧
 
 WXATA is a high-performance WhatsApp bot platform built with **Baileys** and powered by **Bun**. Designed for speed, reliability, and extensibility, it allows you to run interactive games, code-based utilities, and advanced chat automations on a VPS.
 
@@ -6,8 +6,9 @@ WXATA is a high-performance WhatsApp bot platform built with **Baileys** and pow
 
 - **High Performance**: Powered by the Bun runtime for minimal latency.
 - **Robust Auth**: Reliable session management and multi-device support via Baileys.
-- **Modular Design**: Easy-to-expand command and game modules.
-- **Cyberpunk UI**: A sleek black and green "Coming Soon" frontend built with React and Framer Motion.
+- **Dynamic Configuration**: otinfo.json acts as a hot-reloadable schema for commands, permissions, and routing.
+- **Access Control**: Built-in permission modules allowing per-chat, global, or per-number script invocation.
+- **React Dashboard**: Configure arguments, commands, and target overrides via a rich web interface.
 - **VPS Ready**: Optimized for 24/7 background operation.
 
 ## 🛠️ Tech Stack
@@ -17,15 +18,17 @@ WXATA is a high-performance WhatsApp bot platform built with **Baileys** and pow
 - **Frontend**: Vite, React, Tailwind CSS, Framer Motion
 - **Language**: TypeScript
 
-## � Project Structure
+## 📁 Project Structure
 
-```text
+`	ext
 WXATA/
-├── frontend/        # React + Vite "Coming Soon" page
-├── backend/         # WhatsApp bot logic (Baileys + Bun)
+├── frontend/        # React + Vite visual dashboard interface
+├── backend/         # WhatsApp bot core (Baileys + Bun)
 ├── BOTPLAN.md       # Technical roadmap and features
+├── botinfo.json     # Dynamic operational state and script registry
+├── deployment.md    # Guide for deploying for free
 └── README.md        # Project documentation
-```
+`
 
 ## 🚦 Getting Started
 
@@ -37,7 +40,7 @@ WXATA/
 
 1. Clone the repository.
 2. Install dependencies for both frontend and backend:
-   ```bash
+   `ash
    # Install frontend deps
    cd frontend
    bun install
@@ -45,21 +48,23 @@ WXATA/
    # Install backend deps
    cd ../backend
    bun install
-   ```
+   `
 
 ### Running the Project
 
-- **Frontend**: `cd frontend && bun dev`
-- **Backend**: `cd backend && bun start`
+- **Frontend**: cd frontend && bun run dev
+- **Backend**: cd backend && bun run start
 
-## 📝 Roadmap
+## 📈 Roadmap
 
 - [x] Initial Plan & Design
-- [x] "Coming Soon" Frontend
-- [ ] Backend Authentication Flow
-- [ ] Command Handler System
+- [x] React Dashboard
+- [x] Backend Configuration Flow
+- [x] Command Handler System
+- [x] Authorization & Permission System
+- [x] Production Deployment Guide
+- [ ] User Account System / Firebase Integration
 - [ ] Interactive Game Modules
-- [ ] Production Deployment Guide
 
 ---
 *Built with 💚 by TADS Tech*

@@ -21,22 +21,22 @@ const Landing = () => {
         transition={{ duration: 1 }}
       >
         <motion.h1 
-          className="text-8xl font-black tracking-tighter text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)] cursor-pointer"
-          onClick={() => navigate('/dashboard')}
-          animate={{ 
+          className="text-8xl font-black tracking-tighter text-primary drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] cursor-pointer"
+          onClick={() => navigate('/login')}
+          animate={{
             textShadow: [
-              "0 0 15px rgba(34,197,94,0.5)",
-              "0 0 30px rgba(34,197,94,0.8)",
-              "0 0 15px rgba(34,197,94,0.5)"
+              "0 0 15px rgba(59,130,246,0.5)",
+              "0 0 30px rgba(59,130,246,0.8)",
+              "0 0 15px rgba(59,130,246,0.5)"
             ]
           }}
           transition={{ duration: 2, repeat: Infinity }}
         >
           WXATA
         </motion.h1>
-        
-        <div className="space-y-2">
-          <motion.p 
+
+        <div className="space-y-4">
+          <motion.p
             className="text-2xl font-light tracking-[0.5em] uppercase text-gray-400"
             initial={{ letterSpacing: "0.2em", opacity: 0 }}
             animate={{ letterSpacing: "0.5em", opacity: 1 }}
@@ -44,8 +44,11 @@ const Landing = () => {
           >
             Coming Soon
           </motion.p>
-          <div className="h-1 w-24 bg-green-500 mx-auto rounded-full" />
-        </div>
+          <div className="flex gap-4 justify-center mt-6">
+            <button onClick={() => navigate('/login')} className="px-6 py-2 border border-primary text-primary hover:bg-primary hover:text-white rounded transition-colors z-20 cursor-pointer">Login</button>
+            <button onClick={() => navigate('/register')} className="px-6 py-2 border border-accent text-accent hover:bg-accent hover:text-white rounded transition-colors z-20 cursor-pointer">Register</button>
+          </div>
+          <div className="h-1 w-24 bg-primary mx-auto rounded-full mt-4" /></div>        
 
         <motion.div 
           className="pt-12 text-sm text-gray-500 font-mono"
@@ -63,3 +66,5 @@ const Landing = () => {
 };
 
 export default Landing;
+
+
