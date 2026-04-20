@@ -78,6 +78,113 @@ const DEFAULT_BOT_INFO: BotInfo = {
           target: 'self'
         }
       }
+    },
+    extractor: {
+      name: 'extractor',
+      desc: 'Extract view once message and send to self, here, or number',
+      trigger: 'extract',
+      response: '',
+      target: 'chat',
+      code: `const bail = require('@whiskeysockets/baileys');
+const extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to a View Once message.");
+
+let viewOnce = extractFrom.viewOnceMessage?.message || extractFrom.viewOnceMessageV2?.message || extractFrom.viewOnceMessageV2Extension?.message;
+if (!viewOnce) return sendTrackedMessage(sock, remoteJid, "The replied message is not a View Once message.");
+
+const mediaMsg = viewOnce.imageMessage || viewOnce.videoMessage || viewOnce.audioMessage;
+const mediaType = viewOnce.imageMessage ? 'image' : (viewOnce.videoMessage ? 'video' : 'audio');
+
+if (mediaMsg) {
+  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
+  let buffer = Buffer.from([]);
+  for await(const chunk of stream) {
+      buffer = Buffer.concat([buffer, chunk]);
+  }
+  
+  let target = remoteJid; // 'here' default
+  if (argumentName === 'self' || argumentName === 'me') {
+     target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  } else if (argumentName && argumentName.match(/^\\d+$/)) {
+     target = argumentName + '@s.whatsapp.net';
+  }
+  
+  const payload = {};
+  payload[mediaType] = buffer;
+  if (mediaMsg.caption) payload.caption = mediaMsg.caption;
+
+  await sock.sendMessage(target, payload);
+  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, \`Extracted and sent successfully.\`);
+}`
+    },
+    saver: {
+      name: 'saver',
+      desc: 'Save any status media to your own chat',
+      trigger: 'save',
+      response: '',
+      target: 'chat',
+      code: `const bail = require('@whiskeysockets/baileys');
+const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+const extractFrom = contextInfo?.quotedMessage;
+if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to a message.");
+
+const mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;
+const mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');
+
+if (mediaMsg) {
+  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
+  let buffer = Buffer.from([]);
+  for await(const chunk of stream) {
+      buffer = Buffer.concat([buffer, chunk]);
+  }
+  
+  let target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  const payload = {};
+  payload[mediaType] = buffer;
+  if (mediaMsg.caption) payload.caption = mediaMsg.caption;
+
+  await sock.sendMessage(target, payload);
+  await sendTrackedMessage(sock, remoteJid, "Media saved to your own chat successfully!");
+} else {
+  return sendTrackedMessage(sock, remoteJid, "No media found in the quoted message.");
+}`
+    },
+    tagall: {
+      name: 'tagall',
+      desc: 'Tag all members in a group',
+      trigger: 'tagall',
+      response: '',
+      target: 'chat',
+      code: `if (!remoteJid.endsWith('@g.us')) {
+  return sendTrackedMessage(sock, remoteJid, "This command can only be used in groups.");
+}
+const groupMetadata = await sock.groupMetadata(remoteJid);
+const participants = groupMetadata.participants;
+let text = "✨ Calling all members ✨\\n\\n";
+const mentions = [];
+for (let mem of participants) {
+  text += \`@\${mem.id.split('@')[0]} \`;
+  mentions.push(mem.id);
+}
+await sock.sendMessage(remoteJid, { text, mentions });`
+    },
+    joke: {
+      name: 'joke',
+      desc: 'Tells a programming joke',
+      trigger: 'joke',
+      response: '',
+      target: 'chat',
+      code: `const jokes = [
+  "There are 10 types of people in the world: those who understand binary, and those who don't.",
+  "Why do programmers prefer dark mode? Because light attracts bugs.",
+  "How many programmers does it take to change a light bulb? None. It's a hardware problem.",
+  "A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'",
+  "To understand what recursion is, you must first understand recursion.",
+  "If at first you don't succeed; call it version 1.0",
+  "I would love to change the world, but they won't give me the source code."
+];
+const joke = jokes[Math.floor(Math.random() * jokes.length)];
+await sendTrackedMessage(sock, remoteJid, joke);`
     }
   },
   root: {
@@ -130,8 +237,9 @@ function sanitizeBotScript(input: Partial<BotScript> | undefined, fallbackName: 
     name,
     desc,
     trigger: typeof input?.trigger === 'string' && input.trigger.trim() ? input.trigger.trim() : fallbackName,
-    response: typeof input?.response === 'string' && input.response.trim() ? input.response.trim() : 'WXATA summoned successfully.',
+    response: typeof input?.response === 'string' ? input.response : 'WXATA summoned successfully.',
     target: typeof input?.target === 'string' && input.target.trim() ? input.target.trim() : 'self',
+    code: typeof input?.code === 'string' && input.code.trim() ? input.code.trim() : undefined,
     defaultArgument,
     arguments: Object.keys(argumentsMap).length ? argumentsMap : undefined
   };
@@ -697,8 +805,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
             if (script.code && script.code.trim()) {
               try {
                 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', script.code);
-                await executor(sock, msg, botInfo, remoteJid, argumentName, sendTrackedMessage, dashboard);
+                const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', 'require', script.code);
+                await executor(sock, msg, botInfo, remoteJid, argumentName, sendTrackedMessage, dashboard, require);
                 dashboard.log('SUCCESS', `${scriptName} JS executed by ${remoteJid}`);
               } catch (err: any) {
                 dashboard.log('ERROR', `JS Extension Error (${scriptName}): ${err.message}`);
@@ -746,7 +854,13 @@ async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection['crea
     return;
   }
 
-  await sendTrackedMessage(sock, targetJid, botInfo.welcome.text);
+  // Interpolate variables in welcome message
+  const interpolatedText = botInfo.welcome.text
+    .replace(/{prefix}/g, botInfo.prefix)
+    .replace(/{bot}/g, botInfo.scripts.summoner?.trigger || 'bot')
+    .replace(/{menu}/g, botInfo.scripts.menu?.trigger || 'menu');
+
+  await sendTrackedMessage(sock, targetJid, interpolatedText);
   dashboard.log('SUCCESS', `Welcome message sent to ${targetJid}`);
 }
 
@@ -776,15 +890,15 @@ async function startBot() {
           },
           onOpen: () => {
             dashboard.log('SUCCESS', 'Bot is now fully operational');
-            const socketForWelcome = activeSocket;
-            if (socketForWelcome) {
-              setTimeout(() => {
+            setTimeout(() => {
+              const socketForWelcome = connectionManager?.getSocket();        
+              if (socketForWelcome) {
                 sendWelcomeMessage(socketForWelcome).catch((err) => {
-                  console.error('Failed to send welcome message', err);
-                  dashboard.log('ERROR', 'Failed to send welcome message');
+                  console.error('Failed to send welcome message', err);       
+                  dashboard.log('ERROR', 'Failed to send welcome message');   
                 });
-              }, 1500);
-            }
+              }
+            }, 5000); // Increased timeout to ensure socket is fully stabilized before querying URLs/messages
           }
         });
 

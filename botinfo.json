@@ -1,5 +1,5 @@
 {
-  "prefix": "!",
+  "prefix": "+",
   "scripts": {
     "menu": {
       "name": "menu",
@@ -33,6 +33,61 @@
           "target": "self"
         }
       }
+    },
+    "extractor": {
+      "name": "extractor",
+      "desc": "Extract view once message and send to self, here, or number",
+      "trigger": "extract",
+      "response": "",
+      "target": "chat",
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a View Once message.\");\n\n// Check different ViewOnce wrappers\nlet viewOnce = extractFrom?.viewOnceMessage?.message || extractFrom?.viewOnceMessageV2?.message || extractFrom?.viewOnceMessageV2Extension?.message || extractFrom;\n\nconst mediaMsg = viewOnce?.imageMessage || viewOnce?.videoMessage || viewOnce?.audioMessage;\nconst mediaType = viewOnce?.imageMessage ? 'image' : (viewOnce?.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = remoteJid; // 'here' default\n  if (argumentName === 'self' || argumentName === 'me') {\n     target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  } else if (argumentName && argumentName.match(/^\\d+$/)) {\n     target = argumentName + '@s.whatsapp.net';\n  }\n  \n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, `Extracted and sent successfully.`);\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"Could not find valid media in the quoted View Once message.\");\n}"
+    },
+    "saver": {
+      "name": "saver",
+      "desc": "Save any status media to your own chat",
+      "trigger": "save",
+      "response": "",
+      "target": "chat",
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a message.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  await sendTrackedMessage(sock, remoteJid, \"Media saved to your own chat successfully!\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No media found in the quoted message.\");\n}"
+    },
+    "tagall": {
+      "name": "tagall",
+      "desc": "Tag all members in a group",
+      "trigger": "tagall",
+      "response": "",
+      "target": "chat",
+      "code": "if (!remoteJid.endsWith('@g.us')) {\n  return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\n}\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst participants = groupMetadata.participants;\nlet text = \"✨ Calling all members ✨\\n\\n\";\nconst mentions = [];\nfor (let mem of participants) {\n  text += `@${mem.id.split('@')[0]} `;\n  mentions.push(mem.id);\n}\nawait sock.sendMessage(remoteJid, { text, mentions });"
+    },
+    "joke": {
+      "name": "joke",
+      "desc": "Tells a programming joke",
+      "trigger": "joke",
+      "response": "",
+      "target": "chat",
+      "code": "const jokes = [\n  \"There are 10 types of people in the world: those who understand binary, and those who don't.\",\n  \"Why do programmers prefer dark mode? Because light attracts bugs.\",\n  \"How many programmers does it take to change a light bulb? None. It's a hardware problem.\",\n  \"A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'\",\n  \"To understand what recursion is, you must first understand recursion.\",\n  \"If at first you don't succeed; call it version 1.0\",\n  \"I would love to change the world, but they won't give me the source code.\"\n];\nconst joke = jokes[Math.floor(Math.random() * jokes.length)];\nawait sendTrackedMessage(sock, remoteJid, joke);"
+    },
+    "feltch": {
+      "name": "feltch",
+      "desc": "Fetcheing",
+      "trigger": "fetch",
+      "response": "Would you rather get feltched or do the feltching?",
+      "target": "chat"
+    },
+    "warn": {
+      "name": "warn",
+      "desc": "Warns a user 3 times then kicks them out",
+      "trigger": "warn",
+      "response": "",
+      "target": "chat",
+      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\n  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\n  const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\n  \n  if (!targetUser) return sendTrackedMessage(sock, remoteJid, \"Please reply to a user's message or tag them to warn.\");\n  \n  const fs = require('fs');\n  const path = require('path');\n  const warnsFile = path.resolve(process.cwd(), 'warns.json');\n  \n  let warns = {};\n  if (fs.existsSync(warnsFile)) {\n      warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8'));\n  }\n  if (!warns[remoteJid]) warns[remoteJid] = {};\n  \n  warns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;\n  fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n  \n  const warnCount = warns[remoteJid][targetUser];\n  if (warnCount >= 3) {\n      await sock.sendMessage(remoteJid, { text: `@${targetUser.split('@')[0]} has reached 3 warnings and is being removed.`, mentions: [targetUser] });\n      await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');\n      warns[remoteJid][targetUser] = 0;\n      fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n  } else {\n      await sock.sendMessage(remoteJid, { text: `âš ï¸ @${targetUser.split('@')[0]} you have been warned! (${warnCount}/3)`, mentions: [targetUser] });\n  }"
+    },
+    "owner": {
+      "name": "owner",
+      "desc": "Sends the bot owner VCard",
+      "trigger": "owner",
+      "response": "",
+      "target": "chat",
+      "code": "const ownerNum = botInfo.permissions.numbers && botInfo.permissions.numbers.length > 0 ? botInfo.permissions.numbers[0] : sock.user.id.split(':')[0];\nconst name = \"WXATA Owner\";\nconst vcard = 'BEGIN:VCARD\\n' +\n    'VERSION:3.0\\n' +\n    `FN:${name}\\n` +\n    `ORG:${name};\\n` +\n    `TEL;type=CELL;type=VOICE;waid=${ownerNum}:+${ownerNum}\\n` +\n    'END:VCARD';\n\nawait sock.sendMessage(remoteJid, {\n    contacts: {\n        displayName: name,\n        contacts: [{ vcard }]\n    }\n});"
     }
   },
   "root": {
@@ -40,7 +95,7 @@
   },
   "welcome": {
     "enabled": true,
-    "text": "==============================\n   WELCOME TO WXATA\n   WhatsApp Automation Core\n==============================\nStatus  : ONLINE\nMode    : Protocol Link Active\nPrefix  : !\nCommand : !bot here\n\nContacts\n- WA    : +2347041029093\n- TG GC : https://t.me/+dR5zABepmkNhYjQ0\n- X     : https://x.com/tads_tech\n\nNotes\n- Edit config in botinfo.json\n- root.target = self or a number\n- Use !menu to view scripts\n=============================="
+    "text": "==============================\n   WELCOME TO WXATA\n   WhatsApp Automation Core\n==============================\nStatus  : ONLINE\nMode    : Protocol Link Active\nPrefix  : {prefix}\nCommand : {prefix}{bot} here\n\nContacts\n- WA    : +2347041029093\n- TG GC : https://t.me/+dR5zABepmkNhYjQ0\n- X     : https://x.com/tads_tech\n\nNotes\n- Edit config in botinfo.json\n- root.target = self or a number\n- Use {prefix}{menu} to view scripts\n=============================="
   },
   "permissions": {
     "allowAll": false,

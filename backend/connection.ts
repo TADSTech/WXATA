@@ -62,7 +62,7 @@ export class WXATAConnection {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 0,
       keepAliveIntervalMs: 15000,
-      generateHighQualityLinkPreview: true,
+      generateHighQualityLinkPreview: false,
       syncFullHistory: false,
       markOnlineOnConnect: true,
       // Fix for Bun's websocket implementation
