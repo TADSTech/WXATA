@@ -906,9 +906,15 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
          const botInfo = await readBotInfo();
          if (botInfo.scripts.antidel) {
              const cfgPath = rPath.resolve(process.cwd(), 'antidel.json');
-             let cfg = { enabled: true, target: (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || sock.user?.id.split(':')[0] + '@s.whatsapp.net' };
+             const selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
+             const defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;
+             let cfg = { enabled: true, target: defaultTarget };
              try {
-                if (fs.existsSync(cfgPath)) Object.assign(cfg, JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+                if (fs.existsSync(cfgPath)) {
+                  const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+                  cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;
+                  if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;
+                }
              } catch(e) {}
              
              if (cfg.enabled) {
