@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,10 +13,17 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Ideally redirect to the correct dashboard based on their username.
-      // For now, redirecting to a generic dashboard which can read the user's username.
-      navigate('/dashboard/user');
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      // Look up the username tied to this uid so we can route to the correct dashboard
+      const q = query(collection(db, 'users'), where('uid', '==', credential.user.uid));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const username = snap.docs[0]!.data().username as string;
+        navigate(`/dashboard/${username}`);
+      } else {
+        // Fallback: uid-based generic route (handles legacy accounts without a users doc)
+        navigate('/dashboard/user');
+      }
     } catch (err: any) {
       setError(err.message);
     }

@@ -1,19 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut } from 'lucide-react';
+import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X, Package, Download, ExternalLink } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
 interface BotInfo {
   prefix: string;
   scripts: Record<string, BotScript>;
   root: BotRoot;
   welcome: BotWelcome;
+  permissions: BotPermissions;
 }
 
 interface BotScript {
+  name?: string;
+  desc?: string;
   trigger: string;
   response: string;
   target: string;
@@ -36,10 +39,304 @@ interface BotRoot {
   target: string;
 }
 
+interface BotPermissions {
+  allowAll: boolean;
+  chats: string[];
+  numbers: string[];
+}
+
+// ─── MiniMarketplace sub-component ───────────────────────────────────────────
+interface MarketplaceExtension {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  response: string;
+  code?: string;
+  author: string;
+  downloads: number;
+}
+
+interface MiniMarketplaceProps {
+  installedKeys: string[];
+  onInstall: (ext: MarketplaceExtension) => void;
+  navigate: (path: string) => void;
+}
+
+function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplaceProps) {
+  const [extensions, setExtensions] = useState<MarketplaceExtension[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const [installed, setInstalled] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const q = query(collection(db, 'extensions'), where('status', '==', 'approved'));
+        const snap = await getDocs(q);
+        const list: MarketplaceExtension[] = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() } as MarketplaceExtension));
+        list.sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
+        setExtensions(list);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetch();
+  }, []);
+
+  const handleInstall = async (ext: MarketplaceExtension) => {
+    setInstalling(ext.id);
+    try {
+      await updateDoc(doc(db, 'extensions', ext.id), { downloads: (ext.downloads || 0) + 1 });
+      onInstall(ext);
+      setInstalled(prev => new Set(prev).add(ext.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const keyFor = (ext: MarketplaceExtension) => ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  const isAlreadyInstalled = (ext: MarketplaceExtension) =>
+    installedKeys.includes(keyFor(ext)) || installed.has(ext.id);
+
+  return (
+    <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-3">
+      <div className="flex justify-between items-center border-b border-emerald-500/10 pb-2">
+        <div className="flex items-center gap-2">
+          <Package className="w-3.5 h-3.5 text-blue-400" />
+          <h3 className="text-xs uppercase tracking-widest opacity-50">Marketplace</h3>
+        </div>
+        <button onClick={() => navigate('/extensions')} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
+          <ExternalLink className="w-3 h-3" /> Full page
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-xs text-slate-600 italic py-3 text-center">Loading extensions...</div>
+      ) : extensions.length === 0 ? (
+        <div className="text-xs text-slate-600 italic py-3 text-center border border-dashed border-slate-800 rounded">
+          No approved extensions yet.
+        </div>
+      ) : (
+        <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+          {extensions.map(ext => {
+            const alreadyIn = isAlreadyInstalled(ext);
+            return (
+              <div key={ext.id} className="border border-emerald-500/10 rounded p-2.5 flex items-start justify-between gap-2 hover:bg-emerald-500/3 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-emerald-300">{ext.name}</span>
+                    <span className="text-[10px] font-mono text-slate-600">!{ext.trigger}</span>
+                    {ext.code && <span className="text-[9px] text-purple-400 border border-purple-500/30 px-1 rounded">JS</span>}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{ext.description}</p>
+                  <span className="text-[9px] text-slate-700">by {ext.author} · {ext.downloads || 0} installs</span>
+                </div>
+                <button
+                  onClick={() => !alreadyIn && handleInstall(ext)}
+                  disabled={alreadyIn || installing === ext.id}
+                  className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                    alreadyIn
+                      ? 'border-emerald-500/20 text-emerald-700 cursor-default'
+                      : 'border-blue-500/40 text-blue-400 hover:bg-blue-500/10 disabled:opacity-50'
+                  }`}
+                >
+                  {alreadyIn ? '✓ Added' : installing === ext.id ? '...' : <><Download className="w-2.5 h-2.5" /> Add</>}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ScriptManager sub-component ─────────────────────────────────────────────
+interface ScriptManagerProps {
+  botInfo: BotInfo;
+  configStatus: string;
+  expandedScript: string | null;
+  setExpandedScript: (k: string | null) => void;
+  addingScript: boolean;
+  setAddingScript: (v: boolean) => void;
+  newScriptKey: string;
+  setNewScriptKey: (v: string) => void;
+  newScriptDraft: BotScript;
+  setNewScriptDraft: (fn: (d: BotScript) => BotScript) => void;
+  handleScriptFieldChange: (key: string, field: keyof BotScript, value: string) => void;
+  handleScriptArgumentChange: (argName: string, field: keyof BotScriptArgument, value: string) => void;
+  handleDeleteScript: (key: string) => void;
+  handleAddScript: () => void;
+}
+
+function ScriptManager({
+  botInfo, expandedScript, setExpandedScript,
+  addingScript, setAddingScript, newScriptKey, setNewScriptKey,
+  newScriptDraft, setNewScriptDraft,
+  handleScriptFieldChange, handleScriptArgumentChange,
+  handleDeleteScript, handleAddScript
+}: ScriptManagerProps) {
+  const prefix = botInfo.prefix;
+  return (
+    <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-3">
+      <div className="flex justify-between items-center border-b border-emerald-500/10 pb-2">
+        <h3 className="text-xs uppercase tracking-widest opacity-50">Scripts ({Object.keys(botInfo.scripts).length})</h3>
+        <button onClick={() => { setAddingScript(true); setExpandedScript(null); }} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded">
+          <Plus className="w-3 h-3" /> New Script
+        </button>
+      </div>
+
+      {/* Add new script form */}
+      <AnimatePresence>
+        {addingScript && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="border border-emerald-500/30 rounded p-3 space-y-2 text-xs bg-emerald-900/5">
+              <div className="text-emerald-400 font-bold uppercase tracking-wider text-[10px] mb-1">New Script</div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block space-y-1">
+                  <span className="text-slate-400">Script Key</span>
+                  <input value={newScriptKey} onChange={e => setNewScriptKey(e.target.value)} placeholder="e.g. weather" className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-slate-400">Trigger</span>
+                  <input value={newScriptDraft.trigger} onChange={e => setNewScriptDraft(d => ({ ...d, trigger: e.target.value }))} placeholder="e.g. weather" className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                </label>
+              </div>
+              <label className="block space-y-1">
+                <span className="text-slate-400">Description</span>
+                <input value={newScriptDraft.desc} onChange={e => setNewScriptDraft(d => ({ ...d, desc: e.target.value }))} placeholder="What does this script do?" className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block space-y-1">
+                  <span className="text-slate-400">Target</span>
+                  <select value={newScriptDraft.target} onChange={e => setNewScriptDraft(d => ({ ...d, target: e.target.value }))} className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500">
+                    <option value="chat">chat</option>
+                    <option value="self">self</option>
+                  </select>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-slate-400">Response</span>
+                  <input value={newScriptDraft.response} onChange={e => setNewScriptDraft(d => ({ ...d, response: e.target.value }))} placeholder="or use JS below" className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                </label>
+              </div>
+              <label className="block space-y-1">
+                <span className="text-slate-400">JS Code (optional)</span>
+                <textarea rows={3} value={newScriptDraft.code} onChange={e => setNewScriptDraft(d => ({ ...d, code: e.target.value }))} placeholder="await sendTrackedMessage(sock, remoteJid, 'Hello!');" className="w-full bg-slate-900 border border-emerald-500/30 p-1.5 text-emerald-400 outline-none focus:border-emerald-500 font-mono text-[11px]" />
+              </label>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleAddScript} disabled={!newScriptKey.trim() || !newScriptDraft.trigger.trim()} className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-black px-3 py-1.5 rounded font-bold text-xs">
+                  <Save className="w-3 h-3" /> Add
+                </button>
+                <button onClick={() => setAddingScript(false)} className="flex items-center gap-1 border border-slate-600 hover:border-slate-400 text-slate-400 px-3 py-1.5 rounded text-xs">
+                  <X className="w-3 h-3" /> Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Script list */}
+      <div className="space-y-1">
+        {Object.entries(botInfo.scripts).map(([key, script]) => {
+          const isCore = ['menu', 'perm'].includes(key);
+          const isExpanded = expandedScript === key;
+          return (
+            <div key={key} className="border border-emerald-500/15 rounded overflow-hidden">
+              <button onClick={() => setExpandedScript(isExpanded ? null : key)} className="w-full flex items-center justify-between p-2.5 hover:bg-emerald-500/5 transition-colors text-left">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Edit3 className="w-3 h-3 text-emerald-700 shrink-0" />
+                  <span className="text-emerald-300 font-bold text-xs capitalize truncate">{script.name || key}</span>
+                  <span className="text-slate-600 text-[10px] font-mono shrink-0">{prefix}{script.trigger}</span>
+                  {script.code && <span className="text-[9px] text-purple-400 border border-purple-500/30 px-1 rounded shrink-0">JS</span>}
+                  {isCore && <span className="text-[9px] text-yellow-600 border border-yellow-600/30 px-1 rounded shrink-0">core</span>}
+                </div>
+                {isExpanded ? <ChevronUp className="w-3 h-3 text-slate-500 shrink-0" /> : <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />}
+              </button>
+
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="p-3 border-t border-emerald-500/10 space-y-2 text-xs bg-slate-950/50">
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block space-y-1">
+                          <span className="text-slate-500 uppercase tracking-wider text-[10px]">Display Name</span>
+                          <input value={script.name || key} onChange={e => handleScriptFieldChange(key, 'name', e.target.value)} className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-slate-500 uppercase tracking-wider text-[10px]">Trigger</span>
+                          <input value={script.trigger} onChange={e => handleScriptFieldChange(key, 'trigger', e.target.value)} className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                        </label>
+                      </div>
+                      <label className="block space-y-1">
+                        <span className="text-slate-500 uppercase tracking-wider text-[10px]">Description</span>
+                        <input value={script.desc || ''} onChange={e => handleScriptFieldChange(key, 'desc', e.target.value)} placeholder="Shows in !menu" className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block space-y-1">
+                          <span className="text-slate-500 uppercase tracking-wider text-[10px]">Target</span>
+                          <select value={script.target} onChange={e => handleScriptFieldChange(key, 'target', e.target.value)} className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500">
+                            <option value="chat">chat</option>
+                            <option value="self">self</option>
+                          </select>
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-slate-500 uppercase tracking-wider text-[10px]">Default Arg</span>
+                          <input value={script.defaultArgument || ''} onChange={e => handleScriptFieldChange(key, 'defaultArgument', e.target.value)} placeholder="self" className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                        </label>
+                      </div>
+                      <label className="block space-y-1">
+                        <span className="text-slate-500 uppercase tracking-wider text-[10px]">Response Text</span>
+                        <input value={script.response} onChange={e => handleScriptFieldChange(key, 'response', e.target.value)} placeholder="Leave blank if using JS code" className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                      </label>
+                      <label className="block space-y-1">
+                        <span className="text-slate-500 uppercase tracking-wider text-[10px]">JS Code</span>
+                        <textarea rows={6} value={script.code || ''} onChange={e => handleScriptFieldChange(key, 'code', e.target.value)} placeholder="await sendTrackedMessage(sock, remoteJid, 'Hello!');" className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500 font-mono text-[11px] resize-y" />
+                      </label>
+                      {key === 'summoner' && (
+                        <div className="border border-emerald-500/15 rounded p-2 space-y-2">
+                          <div className="text-slate-500 uppercase tracking-wider text-[10px]">Named Arguments</div>
+                          {['here', 'self'].map(argName => (
+                            <div key={argName} className="grid grid-cols-2 gap-2">
+                              <label className="block space-y-1">
+                                <span className="text-slate-600 text-[10px]">{argName}.target</span>
+                                <input value={script.arguments?.[argName]?.target ?? ''} onChange={e => handleScriptArgumentChange(argName, 'target', e.target.value)} className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500" />
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-slate-600 text-[10px]">{argName}.response</span>
+                                <input value={script.arguments?.[argName]?.response ?? ''} onChange={e => handleScriptArgumentChange(argName, 'response', e.target.value)} placeholder="optional" className="w-full bg-slate-900 border border-emerald-500/20 p-1.5 text-emerald-400 outline-none focus:border-emerald-500 placeholder:text-emerald-900" />
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!isCore && (
+                        <button onClick={() => handleDeleteScript(key)} className="flex items-center gap-1 text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-400/50 px-2 py-1 rounded text-[10px] transition-colors">
+                          <Trash2 className="w-3 h-3" /> Delete Script
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [userData, setUserData] = useState<any>(null);
 
   const handleSignOut = () => {
@@ -68,26 +365,22 @@ const Dashboard = () => {
         response: 'WXATA summoned successfully.',
         target: 'self',
         defaultArgument: 'self',
-        arguments: {
-          here: {
-            target: 'chat'
-          },
-          self: {
-            target: 'self'
-          }
-        }
+        arguments: { here: { target: 'chat' }, self: { target: 'self' } }
       }
     },
-    root: {
-      target: 'self'
-    },
-    welcome: {
-      enabled: false,
-      text: ''
-    }
+    root: { target: 'self' },
+    welcome: { enabled: false, text: '' },
+    permissions: { allowAll: false, chats: [], numbers: [] }
   });
 
   const [configStatus, setConfigStatus] = useState('');
+  // Script editor state
+  const [expandedScript, setExpandedScript] = useState<string | null>(null);
+  const [addingScript, setAddingScript] = useState(false);
+  const [newScriptKey, setNewScriptKey] = useState('');
+  const [newScriptDraft, setNewScriptDraft] = useState<BotScript>({
+    name: '', desc: '', trigger: '', response: '', target: 'chat', code: '', defaultArgument: ''
+  });
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -150,33 +443,8 @@ const Dashboard = () => {
         }
 
         if (payload.event === 'bot-info') {
-          // If we arrived to dashboard with an extension to install
-          let updatedBotInfo = payload.data;
-          const extToInstall = location.state?.installExtension;
-          
-          if (extToInstall) {
-             const keyName = extToInstall.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-             updatedBotInfo = {
-                ...updatedBotInfo,
-                scripts: {
-                  ...updatedBotInfo.scripts,
-                  [keyName]: {
-                    trigger: extToInstall.trigger,
-                    response: extToInstall.response,
-                    code: extToInstall.code,
-                    target: 'chat',
-                    defaultArgument: 'self',
-                    desc: extToInstall.description || `Installed extension: ${extToInstall.name}`
-                  }
-                }
-             };
-             // Clear state so we don't install it again incorrectly
-             navigate(location.pathname, { replace: true, state: {} });
-             setConfigStatus('New extension added - Unsaved changes');
-          } else {
-             setConfigStatus('Config synced');
-          }
-          setBotInfo(updatedBotInfo);
+          setBotInfo(payload.data);
+          setConfigStatus('Config synced');
         }
       };
 
@@ -220,26 +488,66 @@ const Dashboard = () => {
   };
 
   const handlePrefixChange = (value: string) => {
-    setBotInfo((prev) => ({
-      ...prev,
-      prefix: value
-    }));
+    setBotInfo((prev) => ({ ...prev, prefix: value }));
     setConfigStatus('Unsaved changes');
   };
 
-  const handleScriptChange = (field: keyof BotScript, value: string) => {
+  // Generic: update any field on any script by key
+  const handleScriptFieldChange = (scriptKey: string, field: keyof BotScript, value: string) => {
     setBotInfo((prev) => ({
       ...prev,
       scripts: {
         ...prev.scripts,
-        summoner: {
-          ...prev.scripts.summoner,
-          [field]: value
-        }
+        [scriptKey]: { ...prev.scripts[scriptKey]!, [field]: value }
       }
     }));
     setConfigStatus('Unsaved changes');
   };
+
+  const handleDeleteScript = (scriptKey: string) => {
+    const next = { ...botInfo.scripts };
+    delete next[scriptKey];
+    setBotInfo((prev) => ({ ...prev, scripts: next }));
+    setExpandedScript(null);
+    setConfigStatus('Unsaved changes');
+  };
+
+  const handleMarketplaceInstall = (ext: MarketplaceExtension) => {
+    const key = ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    setBotInfo((prev) => ({
+      ...prev,
+      scripts: {
+        ...prev.scripts,
+        [key]: {
+          name: ext.name,
+          desc: ext.description || `Installed: ${ext.name}`,
+          trigger: ext.trigger,
+          response: ext.response || '',
+          code: ext.code || '',
+          target: 'chat',
+          defaultArgument: 'self'
+        }
+      }
+    }));
+    setConfigStatus(`"${ext.name}" added — remember to Save Config`);
+  };
+
+  const handleAddScript = () => {
+    const key = newScriptKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (!key || botInfo.scripts[key]) return;
+    setBotInfo((prev) => ({
+      ...prev,
+      scripts: { ...prev.scripts, [key]: { ...newScriptDraft, name: newScriptDraft.name || key } }
+    }));
+    setNewScriptKey('');
+    setNewScriptDraft({ name: '', desc: '', trigger: '', response: '', target: 'chat', code: '', defaultArgument: '' });
+    setAddingScript(false);
+    setExpandedScript(key);
+    setConfigStatus('Unsaved changes');
+  };
+
+  // Legacy handlers kept for the summoner-specific argument UI
+  const handleScriptChange = (field: keyof BotScript, value: string) => handleScriptFieldChange('summoner', field, value);
 
   const handleScriptArgumentChange = (argumentName: string, field: keyof BotScriptArgument, value: string) => {
     setBotInfo((prev) => ({
@@ -247,13 +555,10 @@ const Dashboard = () => {
       scripts: {
         ...prev.scripts,
         summoner: {
-          ...prev.scripts.summoner,
+          ...prev.scripts.summoner!,
           arguments: {
-            ...prev.scripts.summoner.arguments,
-            [argumentName]: {
-              ...prev.scripts.summoner.arguments?.[argumentName],
-              [field]: value
-            }
+            ...prev.scripts.summoner?.arguments,
+            [argumentName]: { ...prev.scripts.summoner?.arguments?.[argumentName], [field]: value }
           }
         }
       }
@@ -261,19 +566,7 @@ const Dashboard = () => {
     setConfigStatus('Unsaved changes');
   };
 
-  const handleDefaultArgumentChange = (value: string) => {
-    setBotInfo((prev) => ({
-      ...prev,
-      scripts: {
-        ...prev.scripts,
-        summoner: {
-          ...prev.scripts.summoner,
-          defaultArgument: value
-        }
-      }
-    }));
-    setConfigStatus('Unsaved changes');
-  };
+  const handleDefaultArgumentChange = (value: string) => handleScriptFieldChange('summoner', 'defaultArgument', value);
 
   const handleWelcomeChange = (field: keyof BotWelcome, value: string | boolean) => {
     setBotInfo((prev) => ({
@@ -448,153 +741,44 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-4">
-            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-emerald-500/10 pb-2">Bot Summoner</h3>
-            <div className="space-y-3 text-xs">
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Prefix (emoji or punctuation)</span>
-                <input
-                  type="text"
-                  value={botInfo.prefix}
-                  onChange={(e) => handlePrefixChange(e.currentTarget.value)}
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Script name</span>
-                <input
-                  type="text"
-                  value="summoner"
-                  disabled
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-slate-400 outline-none opacity-70"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Trigger word</span>
-                <input
-                  type="text"
-                  value={botInfo.scripts.summoner.trigger}
-                  onChange={(e) => handleScriptChange('trigger', e.currentTarget.value)}
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Target (self or phone number)</span>
-                <input
-                  type="text"
-                  value={botInfo.scripts.summoner.target}
-                  onChange={(e) => handleScriptChange('target', e.currentTarget.value)}
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Response</span>
-                <input
-                  type="text"
-                  value={botInfo.scripts.summoner.response}
-                  onChange={(e) => handleScriptChange('response', e.currentTarget.value)}
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-slate-400 uppercase tracking-wider">Default argument</span>
-                <input
-                  type="text"
-                  value={botInfo.scripts.summoner.defaultArgument ?? 'self'}
-                  onChange={(e) => handleDefaultArgumentChange(e.currentTarget.value)}
-                  className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                />
-              </label>
-              <div className="grid grid-cols-1 gap-3 rounded border border-emerald-500/20 p-3">
-                <div className="text-slate-400 uppercase tracking-wider text-[10px]">Arguments</div>
-                <label className="block space-y-1">
-                  <span className="text-slate-400 uppercase tracking-wider">here.target</span>
-                  <input
-                    type="text"
-                    value={botInfo.scripts.summoner.arguments?.here?.target ?? 'chat'}
-                    onChange={(e) => handleScriptArgumentChange('here', 'target', e.currentTarget.value)}
-                    className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-slate-400 uppercase tracking-wider">self.target</span>
-                  <input
-                    type="text"
-                    value={botInfo.scripts.summoner.arguments?.self?.target ?? 'self'}
-                    onChange={(e) => handleScriptArgumentChange('self', 'target', e.currentTarget.value)}
-                    className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500"
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-slate-400 uppercase tracking-wider">here.response override</span>
-                  <input
-                    type="text"
-                    value={botInfo.scripts.summoner.arguments?.here?.response ?? ''}
-                    onChange={(e) => handleScriptArgumentChange('here', 'response', e.currentTarget.value)}
-                    placeholder="optional"
-                    className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500 placeholder:text-emerald-700/50"
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-slate-400 uppercase tracking-wider">self.response override</span>
-                  <input
-                    type="text"
-                    value={botInfo.scripts.summoner.arguments?.self?.response ?? ''}
-                    onChange={(e) => handleScriptArgumentChange('self', 'response', e.currentTarget.value)}
-                    placeholder="optional"
-                    className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500 placeholder:text-emerald-700/50"
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-emerald-500/20">
+          {/* ── Global Config ── */}
+          <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-3 text-xs">
+            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-emerald-500/10 pb-2">Global Config</h3>
+            <label className="block space-y-1">
+              <span className="text-slate-400 uppercase tracking-wider">Command Prefix</span>
+              <input type="text" value={botInfo.prefix} onChange={(e) => handlePrefixChange(e.currentTarget.value)} className="w-full bg-slate-900 border border-emerald-500/30 p-2 text-emerald-400 outline-none focus:border-emerald-500" />
+            </label>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-emerald-500/10">
               <span className="text-[10px] text-emerald-700 uppercase tracking-wider">{configStatus || 'Ready'}</span>
-              <button
-                onClick={saveBotInfo}
-                className="border border-emerald-500/30 bg-green-900/20 hover:bg-emerald-500/10 px-4 py-2 text-sm font-bold transition-colors shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-              >
-                SAVE CONFIG
-              </button>
+              <button onClick={saveBotInfo} className="border border-emerald-500/30 bg-green-900/20 hover:bg-emerald-500/10 px-4 py-2 text-sm font-bold transition-colors shadow-[0_0_10px_rgba(34,197,94,0.1)]">SAVE CONFIG</button>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-4">
-            <div className="flex justify-between items-center border-b border-emerald-500/10 pb-2">
-              <h3 className="text-xs uppercase tracking-widest opacity-50">Installed Extensions</h3>
-              <button onClick={() => navigate('/extensions')} className="text-xs text-blue-400 hover:text-blue-300">Browse Marketplace</button>
-            </div>
-            
-            {Object.entries(botInfo.scripts || {}).filter(([k]) => !['summoner', 'menu', 'perm'].includes(k)).length === 0 ? (
-               <div className="text-xs text-gray-600 italic py-4 text-center border border-dashed border-gray-800 rounded">
-                 No custom extensions installed. Go to the Marketplace to add new capabilities!
-               </div>
-            ) : (
-               <div className="space-y-3">
-                 {Object.entries(botInfo.scripts || {})
-                   .filter(([k]) => !['summoner', 'menu', 'perm'].includes(k))
-                   .map(([key, script]) => (
-                      <div key={key} className="border border-emerald-500/20 p-3 rounded bg-green-900/5 text-xs flex justify-between items-center">
-                         <div>
-                            <div className="font-bold text-emerald-300 capitalize">{key}</div>
-                            <div className="text-slate-400 mt-1">Trigger: <span className="text-green-300">!{script.trigger}</span></div>
-                            <div className="text-slate-400 truncate w-48 sm:w-auto">Response: <span className="text-green-300">{script.response}</span></div>
-                         </div>
-                         <button 
-                           onClick={() => {
-                             const newScripts = { ...botInfo.scripts };
-                             delete newScripts[key];
-                             setBotInfo({ ...botInfo, scripts: newScripts });
-                             setConfigStatus('Removed extension - Unsaved changes');
-                           }}
-                           className="text-red-500 hover:text-red-400 border border-red-500/30 p-1 rounded"
-                         >
-                           Remove
-                         </button>
-                      </div>
-                 ))}
-               </div>
-            )}
-          </div>
+          {/* ── Script Manager ── */}
+          <ScriptManager
+            botInfo={botInfo}
+            configStatus={configStatus}
+            expandedScript={expandedScript}
+            setExpandedScript={setExpandedScript}
+            addingScript={addingScript}
+            setAddingScript={setAddingScript}
+            newScriptKey={newScriptKey}
+            setNewScriptKey={setNewScriptKey}
+            newScriptDraft={newScriptDraft}
+            setNewScriptDraft={setNewScriptDraft}
+            handleScriptFieldChange={handleScriptFieldChange}
+            handleScriptArgumentChange={handleScriptArgumentChange}
+            handleDeleteScript={handleDeleteScript}
+            handleAddScript={handleAddScript}
+            navigate={navigate}
+          />
+
+          {/* ── Mini Marketplace ── */}
+          <MiniMarketplace
+            installedKeys={Object.keys(botInfo.scripts)}
+            onInstall={handleMarketplaceInstall}
+            navigate={navigate}
+          />
 
           <div className="bg-slate-900 border border-emerald-500/20 rounded p-4 space-y-4">
             <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-emerald-500/10 pb-2">Welcome On Connect</h3>

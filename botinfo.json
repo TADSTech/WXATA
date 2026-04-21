@@ -18,21 +18,13 @@
       "defaultArgument": "self"
     },
     "summoner": {
-      "name": "summoner",
-      "desc": "Send summon response to root or current chat",
-      "trigger": "bot",
-      "response": "WXATA summoned successfully. ⚡🤖",
-      "target": "here",
-      "defaultArgument": "here",
-      "arguments": {
-        "here": {
-          "target": "chat",
-          "response": "Present, Good Sir. ⚡🤖"
-        },
-        "self": {
-          "target": "self"
-        }
-      }
+      "name": "ping",
+      "desc": "Check bot network speed and status",
+      "trigger": "ping",
+      "response": "I have been pinged",
+      "target": "chat",
+      "code": "const start = Date.now();\nawait sendTrackedMessage(sock, remoteJid, \"Pong! 🟢 Calculating speed...\");\nconst end = Date.now();\nawait sendTrackedMessage(sock, remoteJid, `🚀 Speed: ${end - start}ms\n🤖 WXATA is ONLINE`);",
+      "defaultArgument": "self"
     },
     "extractor": {
       "name": "extractor",
@@ -40,7 +32,8 @@
       "trigger": "extract",
       "response": "",
       "target": "chat",
-      "code": "const bail = require('@whiskeysockets/baileys');\nconst extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a View Once message.\");\n\n// Check different ViewOnce wrappers\nlet viewOnce = extractFrom?.viewOnceMessage?.message || extractFrom?.viewOnceMessageV2?.message || extractFrom?.viewOnceMessageV2Extension?.message || extractFrom;\n\nconst mediaMsg = viewOnce?.imageMessage || viewOnce?.videoMessage || viewOnce?.audioMessage;\nconst mediaType = viewOnce?.imageMessage ? 'image' : (viewOnce?.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = remoteJid; // 'here' default\n  if (argumentName === 'self' || argumentName === 'me') {\n     target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  } else if (argumentName && argumentName.match(/^\\d+$/)) {\n     target = argumentName + '@s.whatsapp.net';\n  }\n  \n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, `Extracted and sent successfully.`);\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"Could not find valid media in the quoted View Once message.\");\n}"
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a View Once message.\");\n\n// Check different ViewOnce wrappers\nlet viewOnce = extractFrom?.viewOnceMessage?.message || extractFrom?.viewOnceMessageV2?.message || extractFrom?.viewOnceMessageV2Extension?.message || extractFrom;\n\nconst mediaMsg = viewOnce?.imageMessage || viewOnce?.videoMessage || viewOnce?.audioMessage;\nconst mediaType = viewOnce?.imageMessage ? 'image' : (viewOnce?.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = remoteJid; // 'here' default\n  if (argumentName === 'self' || argumentName === 'me') {\n     target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  } else if (argumentName && argumentName.match(/^\\d+$/)) {\n     target = argumentName + '@s.whatsapp.net';\n  }\n  \n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, `Extracted and sent successfully.`);\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"Could not find valid media in the quoted View Once message.\");\n}",
+      "defaultArgument": "self"
     },
     "saver": {
       "name": "saver",
@@ -48,7 +41,8 @@
       "trigger": "save",
       "response": "",
       "target": "chat",
-      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a message.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  await sendTrackedMessage(sock, remoteJid, \"Media saved to your own chat successfully!\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No media found in the quoted message.\");\n}"
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a message.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) {\n      buffer = Buffer.concat([buffer, chunk]);\n  }\n  \n  let target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  await sendTrackedMessage(sock, remoteJid, \"Media saved to your own chat successfully!\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No media found in the quoted message.\");\n}",
+      "defaultArgument": "self"
     },
     "tagall": {
       "name": "tagall",
@@ -56,7 +50,8 @@
       "trigger": "tagall",
       "response": "",
       "target": "chat",
-      "code": "if (!remoteJid.endsWith('@g.us')) {\n  return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\n}\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst participants = groupMetadata.participants;\nlet text = \"✨ Calling all members ✨\\n\\n\";\nconst mentions = [];\nfor (let mem of participants) {\n  text += `@${mem.id.split('@')[0]} `;\n  mentions.push(mem.id);\n}\nawait sock.sendMessage(remoteJid, { text, mentions });"
+      "code": "if (!remoteJid.endsWith('@g.us')) {\n  return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\n}\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst participants = groupMetadata.participants;\nlet text = \"✨ Calling all members ✨\\n\\n\";\nconst mentions = [];\nfor (let mem of participants) {\n  text += `@${mem.id.split('@')[0]} `;\n  mentions.push(mem.id);\n}\nawait sock.sendMessage(remoteJid, { text, mentions });",
+      "defaultArgument": "self"
     },
     "joke": {
       "name": "joke",
@@ -64,14 +59,17 @@
       "trigger": "joke",
       "response": "",
       "target": "chat",
-      "code": "const jokes = [\n  \"There are 10 types of people in the world: those who understand binary, and those who don't.\",\n  \"Why do programmers prefer dark mode? Because light attracts bugs.\",\n  \"How many programmers does it take to change a light bulb? None. It's a hardware problem.\",\n  \"A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'\",\n  \"To understand what recursion is, you must first understand recursion.\",\n  \"If at first you don't succeed; call it version 1.0\",\n  \"I would love to change the world, but they won't give me the source code.\"\n];\nconst joke = jokes[Math.floor(Math.random() * jokes.length)];\nawait sendTrackedMessage(sock, remoteJid, joke);"
+      "code": "const jokes = [\n  \"There are 10 types of people in the world: those who understand binary, and those who don't.\",\n  \"Why do programmers prefer dark mode? Because light attracts bugs.\",\n  \"How many programmers does it take to change a light bulb? None. It's a hardware problem.\",\n  \"A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'\",\n  \"To understand what recursion is, you must first understand recursion.\",\n  \"If at first you don't succeed; call it version 1.0\",\n  \"I would love to change the world, but they won't give me the source code.\"\n];\nconst joke = jokes[Math.floor(Math.random() * jokes.length)];\nawait sendTrackedMessage(sock, remoteJid, joke);",
+      "defaultArgument": "self"
     },
     "feltch": {
       "name": "feltch",
-      "desc": "Fetcheing",
-      "trigger": "fetch",
-      "response": "Would you rather get feltched or do the feltching?",
-      "target": "chat"
+      "desc": "Feltching question with tracking",
+      "trigger": "feltch",
+      "response": "",
+      "target": "chat",
+      "code": "const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\n\nlet text = \"Would you rather get feltched or do the feltching?\";\nlet mentions = [];\n\nif (targetUser) {\n    text = `@${targetUser.split('@')[0]} Would you rather get feltched or do the feltching?`;\n    mentions = [targetUser];\n}\n\nawait sock.sendMessage(remoteJid, { text, mentions });",
+      "defaultArgument": "self"
     },
     "warn": {
       "name": "warn",
@@ -79,7 +77,8 @@
       "trigger": "warn",
       "response": "",
       "target": "chat",
-      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\n  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\n  const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\n  \n  if (!targetUser) return sendTrackedMessage(sock, remoteJid, \"Please reply to a user's message or tag them to warn.\");\n  \n  const fs = require('fs');\n  const path = require('path');\n  const warnsFile = path.resolve(process.cwd(), 'warns.json');\n  \n  let warns = {};\n  if (fs.existsSync(warnsFile)) {\n      warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8'));\n  }\n  if (!warns[remoteJid]) warns[remoteJid] = {};\n  \n  warns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;\n  fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n  \n  const warnCount = warns[remoteJid][targetUser];\n  if (warnCount >= 3) {\n      await sock.sendMessage(remoteJid, { text: `@${targetUser.split('@')[0]} has reached 3 warnings and is being removed.`, mentions: [targetUser] });\n      await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');\n      warns[remoteJid][targetUser] = 0;\n      fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n  } else {\n      await sock.sendMessage(remoteJid, { text: `âš ï¸ @${targetUser.split('@')[0]} you have been warned! (${warnCount}/3)`, mentions: [targetUser] });\n  }"
+      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\n\nif (!targetUser) return sendTrackedMessage(sock, remoteJid, \"⚠️ Please reply to a user's message or tag them to warn.\");\n\nconst fs = require('fs');\nconst path = require('path');\nconst warnsFile = path.resolve(process.cwd(), 'warns.json');\n\nlet warns = {};\nif (fs.existsSync(warnsFile)) {\n    warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8'));\n}\nif (!warns[remoteJid]) warns[remoteJid] = {};\n\nwarns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;\nfs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n\nconst warnCount = warns[remoteJid][targetUser];\nif (warnCount >= 3) {\n    await sock.sendMessage(remoteJid, { text: `🚨 @${targetUser.split('@')[0]} has reached 3 warnings and is being permanently removed from the group!`, mentions: [targetUser] });\n    try {\n        await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');\n    } catch (e) {\n        await sock.sendMessage(remoteJid, { text: \"❌ I don't have Admin permissions to remove them!\" });\n    }\n    warns[remoteJid][targetUser] = 0;\n    fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n} else {\n    await sock.sendMessage(remoteJid, { text: `⚠️ @${targetUser.split('@')[0]} you have been warned! (${warnCount}/3) Behave or you will be kicked.`, mentions: [targetUser] });\n}",
+      "defaultArgument": "self"
     },
     "owner": {
       "name": "owner",
@@ -87,7 +86,52 @@
       "trigger": "owner",
       "response": "",
       "target": "chat",
-      "code": "const ownerNum = botInfo.permissions.numbers && botInfo.permissions.numbers.length > 0 ? botInfo.permissions.numbers[0] : sock.user.id.split(':')[0];\nconst name = \"WXATA Owner\";\nconst vcard = 'BEGIN:VCARD\\n' +\n    'VERSION:3.0\\n' +\n    `FN:${name}\\n` +\n    `ORG:${name};\\n` +\n    `TEL;type=CELL;type=VOICE;waid=${ownerNum}:+${ownerNum}\\n` +\n    'END:VCARD';\n\nawait sock.sendMessage(remoteJid, {\n    contacts: {\n        displayName: name,\n        contacts: [{ vcard }]\n    }\n});"
+      "code": "const ownerNum = botInfo.permissions.numbers && botInfo.permissions.numbers.length > 0 ? botInfo.permissions.numbers[0] : sock.user.id.split(':')[0];\nconst name = \"WXATA Owner\";\nconst vcard = 'BEGIN:VCARD\\n' +\n    'VERSION:3.0\\n' +\n    `FN:${name}\\n` +\n    `ORG:${name};\\n` +\n    `TEL;type=CELL;type=VOICE;waid=${ownerNum}:+${ownerNum}\\n` +\n    'END:VCARD';\n\nawait sock.sendMessage(remoteJid, {\n    contacts: {\n        displayName: name,\n        contacts: [{ vcard }]\n    }\n});",
+      "defaultArgument": "self"
+    },
+    "antibc": {
+      "name": "antibroadcast",
+      "desc": "Sets the anti-broadcast message (or run with no args for default behavior)",
+      "trigger": "antibc",
+      "response": "",
+      "target": "chat",
+      "code": "const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst isSetting = argumentName;\n\nconst fs = require('fs');\nconst path = require('path');\nconst configPath = path.resolve(process.cwd(), 'antibc.json');\n\nlet config = { message: 'remove me from broadcast' };\nif (fs.existsSync(configPath)) {\n    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));\n}\n\n// Intercepting an actual broadcast message via the script engine \n// (WXATA automatically forwards context if we bypass the prefix inside our engine logic if rigged right, \n// but since WXATA requires a prefix to trigger scripts, let's actually just register this as a config setter)\nif (isSetting && isSetting !== \"on\" && isSetting !== \"off\") {\n    // If user passed a full string (argumentName only captures first word due to regex in index.ts, so we read raw message text)\n    const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || \"\";\n    const newMsg = rawText.substring(rawText.indexOf(argumentName)); // Grab everything after the command\n    \n    config.message = newMsg;\n    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));\n    return await sendTrackedMessage(sock, remoteJid, `_new var ANTI_BROADCAST_MSG added as: ${newMsg}_`);\n} else if (isSetting === \"off\") {\n    config.enabled = false;\n    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));\n    return await sendTrackedMessage(sock, remoteJid, `_Anti-Broadcast disabled_`);\n} else if (isSetting === \"on\") {\n    config.enabled = true;\n    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));\n    return await sendTrackedMessage(sock, remoteJid, `_Anti-Broadcast enabled_`);\n}\n\nawait sendTrackedMessage(sock, remoteJid, `*Example :* ${botInfo.prefix}antibc dont send broadcast please!`);",
+      "defaultArgument": "self"
+    },
+    "ss": {
+      "name": "ss",
+      "desc": "Take web page screenshot",
+      "trigger": "ss",
+      "response": "",
+      "target": "chat",
+      "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, \"*Example :* !ss https://google.com\");\nlet url = argumentName;\nif (!url.startsWith('http')) url = 'https://' + url;\n\nawait sendTrackedMessage(sock, remoteJid, \"📸 Taking screenshot...\");\ntry {\n  // Using thum.io safe public screenshot API\n  const ssUrl = `https://image.thum.io/get/${url}`;\n  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: `Screenshot of ${url}` });\n} catch(e) {\n  await sendTrackedMessage(sock, remoteJid, \"❌ Failed to take screenshot.\");\n}",
+      "defaultArgument": "self"
+    },
+    "vars": {
+      "name": "vars",
+      "desc": "Manage global configuration variables (Sudo only)",
+      "trigger": "vars",
+      "response": "",
+      "target": "chat",
+      "code": "const fs = require('fs');\nconst path = require('path');\nconst varsFile = path.resolve(process.cwd(), 'vars.json');\n\n// Check Sudo\nconst isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;\nif (!isSudo) return sendTrackedMessage(sock, remoteJid, \"❌ Permission Denied. Sudo only.\");\n\nlet configVars = {};\nif (fs.existsSync(varsFile)) {\n    configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8'));\n}\n\nconst rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || \"\";\nconst args = rawText.split(' ').slice(1); // everything after !vars\n\nif (args.length === 0) {\n    if (Object.keys(configVars).length === 0) return sendTrackedMessage(sock, remoteJid, \"No variables set.\");\n    let text = \"🛠️ *Global Variables* 🛠️\\n\\n\";\n    for (const [k, v] of Object.entries(configVars)) {\n        text += `🔹 *${k}*: ${v}\\n`;\n    }\n    return sendTrackedMessage(sock, remoteJid, text);\n}\n\nif (args[0] === 'set' && args.length >= 3) {\n    const key = args[1].toUpperCase();\n    const value = args.slice(2).join(' ');\n    configVars[key] = value;\n    fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));\n    return sendTrackedMessage(sock, remoteJid, `✅ Variable *${key}* set to: ${value}`);\n}\n\nif (args[0] === 'del' && args.length >= 2) {\n    const key = args[1].toUpperCase();\n    delete configVars[key];\n    fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));\n    return sendTrackedMessage(sock, remoteJid, `🗑️ Variable *${key}* deleted.`);\n}\n\nreturn sendTrackedMessage(sock, remoteJid, \"Usage:\\n!vars\\n!vars set <KEY> <VALUE>\\n!vars del <KEY>\");",
+      "defaultArgument": "self"
+    },
+    "antidel": {
+      "name": "antidelete",
+      "desc": "Auto-forwards deleted messages to root number",
+      "trigger": "antidel",
+      "response": "",
+      "target": "chat",
+      "code": "const arg = argumentName ? argumentName.toLowerCase() : \"\";\nconst fs = require('fs');\nconst rPath = require('path');\nconst cfgPath = rPath.resolve(process.cwd(), 'antidel.json');\n\nlet cfg = { enabled: true, target: (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || sock.user?.id.split(':')[0] + '@s.whatsapp.net' };\ntry { if (fs.existsSync(cfgPath)) Object.assign(cfg, JSON.parse(fs.readFileSync(cfgPath, 'utf8'))); } catch(e) {}\n\nif (arg === 'on') {\n    cfg.enabled = true;\n    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n    return sendTrackedMessage(sock, remoteJid, \"✅ Anti-Delete Enabled.\");\n} else if (arg === 'off') {\n    cfg.enabled = false;\n    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n    return sendTrackedMessage(sock, remoteJid, \"❌ Anti-Delete Disabled.\");\n} else {\n    return sendTrackedMessage(sock, remoteJid, `Current status: ${cfg.enabled ? \"ON\" : \"OFF\"}\\nUsage: !antidel on | off`);\n}",
+      "defaultArgument": "self"
+    },
+    "first_marketplace_mod": {
+      "name": "First Marketplace Mod",
+      "desc": "this is just a test",
+      "trigger": "boo",
+      "response": "you got booed",
+      "target": "chat",
+      "defaultArgument": "self"
     }
   },
   "root": {

@@ -59,9 +59,9 @@ export class WXATAConnection {
       },
       // Fingerprinting: Use a more stable, standard browser string
       browser: ['Mac OS', 'Chrome', '121.0.0.0'],
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 0,
-      keepAliveIntervalMs: 15000,
+        connectTimeoutMs: 120000,
+        defaultQueryTimeoutMs: 0,
+        keepAliveIntervalMs: 30000,
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
       markOnlineOnConnect: true,

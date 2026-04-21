@@ -4,6 +4,7 @@ import * as qrcode from 'qrcode-terminal';
 import { dashboard } from './DashboardServer';
 import fs from 'fs/promises';
 import path from 'path';
+import { storeMessage, getMessage, pruneOldMessages } from './db';
 
 interface BotScript {
   name: string;
@@ -638,8 +639,23 @@ function senderMatchesRoot(
   const normalizedRootTarget = rootTarget.trim().toLowerCase();
   const isSelfRoot = ['self', 'root', 'me', 'myself'].includes(normalizedRootTarget);
 
+  // fromMe=true always means it's us — trust it when root is self
   if (isSelfRoot && msg.key?.fromMe) {
     return true;
+  }
+
+  // Also treat any fromMe message as root when root.target resolves to our own JID
+  if (msg.key?.fromMe) {
+    const selfJid = resolveSelfJid(sock);
+    if (!selfJid) {
+      // Can't resolve self yet — treat fromMe as root to avoid blocking commands on startup
+      return true;
+    }
+    const rootJid = resolveTargetJid(sock, rootTarget);
+    if (!rootJid) return true; // Same: can't resolve, don't block
+    const selfNum = selfJid.split('@')[0]?.replace(/\D/g, '');
+    const rootNum = rootJid.split('@')[0]?.replace(/\D/g, '');
+    if (selfNum && rootNum && selfNum === rootNum) return true;
   }
 
   const senderJid = normalizeWhatsAppJid(msg.key?.participant ?? msg.key?.remoteJid ?? undefined);
@@ -722,7 +738,9 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         continue;
       }
 
-      const remoteJid = msg.key?.remoteJid;
+      const remoteJid = msg.key?.remoteJid;        
+        // Cache every incoming message for anti-delete to pick it up later if someone deletes it
+        storeMessage(msg);
       const text = extractMessageText(msg.message);
       const selfJid = resolveSelfJid(sock);
       const isSelfChat = typeof remoteJid === 'string' && typeof selfJid === 'string' && remoteJid === selfJid;
@@ -738,12 +756,36 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         `INBOUND type=${m.type} fromMe=${String(msg.key?.fromMe)} jid=${remoteJid ?? '-'} participant=${participant} text=${textPreview || '<none>'}`
       );
 
-      if (!isRootSender && msg.key?.fromMe && !isSelfChat) {
+      // Drop outbound messages from other devices that aren't commands directed at us.
+      // Only skip if we're confident this is a non-self chat AND we can confirm the sender
+      // is not root. If selfJid is unresolvable, let the message through so commands work.
+      if (selfJid && !isRootSender && msg.key?.fromMe && !isSelfChat) {
         continue;
       }
 
       if (isBotEcho) {
         continue;
+      }
+
+      if (remoteJid?.endsWith('@broadcast') && botInfo.scripts.antibc && !msg.key?.fromMe) {
+         try {
+           const fs = require('fs');
+           const path = require('path');
+           const configPath = path.resolve(process.cwd(), 'antibc.json');
+           let cfgEnabled = true;
+           let cfgMsg = 'remove me from broadcast';
+           if (fs.existsSync(configPath)) {
+             try {
+               const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+               if (typeof parsed.enabled === 'boolean') cfgEnabled = parsed.enabled;
+               if (typeof parsed.message === 'string') cfgMsg = parsed.message;
+             } catch(e) {}
+           }
+           if (cfgEnabled && msg.key?.participant) {
+             await sendTrackedMessage(sock, msg.key.participant, cfgMsg);
+             dashboard.log('SUCCESS', `Anti-broadcast replied to ${msg.key.participant}`);
+           }
+         } catch(e) {}
       }
 
       if (text) {
@@ -759,7 +801,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
             const argumentName = triggerMatch[1];
 
             if (!hasPermission) {
-              continue;
+              dashboard.log('WARN', `Blocked unpermitted command "${scriptName}" from ${remoteJid}`);
+              break;
             }
 
             if (scriptName === 'perm') {
@@ -839,6 +882,46 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       console.log(`[MSG] ${logMsg}`);
       dashboard.log('MSG', logMsg);
     }
+    
+    // Prune sqlite DB so it never bloats disk space
+    if (Math.random() < 0.05) pruneOldMessages(); 
+  });
+
+  sock.ev.on('messages.update', async (messageUpdates) => {
+    const fs = require('fs');
+    const rPath = require('path');
+    
+    for (const update of messageUpdates) {
+      // messageStubType 68 = REVOKE (message deleted). Checking message === null alone is too
+      // broad — edits also produce updates — so we require the stub type as the primary signal.
+      const isRevoke = update.update?.messageStubType === 68 ||
+        (update.update?.message === null && update.update?.messageStubType === undefined && update.key?.id !== undefined);
+
+      if (isRevoke) {
+         const targetId = update.key.id;
+         if (!targetId) continue;
+         const originalMsg = getMessage(targetId);
+         if (!originalMsg) continue;
+         
+         const botInfo = await readBotInfo();
+         if (botInfo.scripts.antidel) {
+             const cfgPath = rPath.resolve(process.cwd(), 'antidel.json');
+             let cfg = { enabled: true, target: (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || sock.user?.id.split(':')[0] + '@s.whatsapp.net' };
+             try {
+                if (fs.existsSync(cfgPath)) Object.assign(cfg, JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+             } catch(e) {}
+             
+             if (cfg.enabled) {
+               try {
+                 await sock.sendMessage(cfg.target, { forward: originalMsg });
+                 dashboard.log('SUCCESS', `Recovered deleted message from ${originalMsg.key.participant || originalMsg.key.remoteJid}`);
+               } catch(ex) {
+                 await sock.sendMessage(cfg.target, { text: `[Anti-Delete] Recovered text from ${originalMsg.key.participant || originalMsg.key.remoteJid}:\n\n${originalMsg.message?.conversation || originalMsg.message?.extendedTextMessage?.text}` });
+               }
+             }
+         }
+      }
+    }
   });
 }
 
@@ -864,9 +947,38 @@ async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection['crea
   dashboard.log('SUCCESS', `Welcome message sent to ${targetJid}`);
 }
 
+async function ensureConfigFiles(): Promise<void> {
+  const cwd = process.cwd();
+
+  const antidelPath = path.resolve(cwd, 'antidel.json');
+  try { await fs.access(antidelPath); } catch {
+    await fs.writeFile(antidelPath, JSON.stringify({ enabled: true, target: null }, null, 2), 'utf-8');
+    dashboard.log('INFO', 'Created default antidel.json');
+  }
+
+  const antibcPath = path.resolve(cwd, 'antibc.json');
+  try { await fs.access(antibcPath); } catch {
+    await fs.writeFile(antibcPath, JSON.stringify({ enabled: false, message: 'remove me from broadcast' }, null, 2), 'utf-8');
+    dashboard.log('INFO', 'Created default antibc.json');
+  }
+
+  const warnsPath = path.resolve(cwd, 'warns.json');
+  try { await fs.access(warnsPath); } catch {
+    await fs.writeFile(warnsPath, JSON.stringify({}, null, 2), 'utf-8');
+    dashboard.log('INFO', 'Created default warns.json');
+  }
+
+  const varsPath = path.resolve(cwd, 'vars.json');
+  try { await fs.access(varsPath); } catch {
+    await fs.writeFile(varsPath, JSON.stringify({}, null, 2), 'utf-8');
+    dashboard.log('INFO', 'Created default vars.json');
+  }
+}
+
 async function startBot() {
   dashboard.log('INFO', 'Initializing WXATA Backend System...');
   console.log('🚀 Initializing WXATA Backend...');
+  await ensureConfigFiles();
 
   let connectionManager: WXATAConnection | null = null;
   let activeSocket: Awaited<ReturnType<WXATAConnection['createConnection']>> | null = null;
