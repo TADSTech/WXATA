@@ -132,6 +132,37 @@ Everything persists on a real VPS — no disk wipes, no sleep.
 
 ---
 
+## Backend — Docker PaaS Deployment (Alternative)
+
+If you prefer to deploy the backend to a Platform as a Service (PaaS) like Render, Railway, or Fly.io, you can use the provided `Dockerfile`. Most PaaS providers support deploying directly from a `Dockerfile` without needing `docker-compose`.
+
+### 1. Connecting your Repo
+Most platforms allow you to connect your GitHub repository directly. They will automatically detect the `Dockerfile` in the root of the repository and build the image.
+
+### 2. Configuration Settings
+When configuring the deployment on your PaaS provider, use the following settings:
+- **Build Command**: Not required (handled by the Dockerfile)
+- **Start Command**: Not required (handled by the Dockerfile's `CMD`)
+- **Port**: `4000` (Make sure the platform exposes this port for the WebSocket connection)
+- **Environment Variables**: Add any environment variables you need (e.g., `DB_RETENTION_DAYS=3`)
+
+### 3. Data Persistence Note
+Since this deployment method relies on the container's ephemeral filesystem (without mounted volumes), **any data stored locally inside the container will be lost if the container spins down, restarts, or redeploys.**
+- **Plugins**: Your marketplace plugins are safely stored in Firestore and will not be affected.
+- **WhatsApp Session (`auth_info`)**: If the container restarts, you will need to re-scan the QR code to re-authenticate the bot.
+- **SQLite DB**: The local SQLite database containing chat history for commands will be wiped on restart.
+
+If your PaaS provider supports persistent disks (like Render's `/data` disk), the application is already configured to prioritize it automatically to prevent data loss.
+
+### 4. Deploying Manually (Local/VPS)
+If you just want to run the Docker image manually on your own server without `docker-compose`:
+```bash
+docker build -t wxata-backend .
+docker run -d -p 4000:4000 --name wxata-backend wxata-backend
+```
+
+---
+
 ## Frontend — Vercel (already live)
 
 Already deployed at `https://wxata.vercel.app`.
