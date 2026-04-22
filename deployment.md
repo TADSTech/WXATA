@@ -3,125 +3,170 @@
 ## Architecture
 
 ```
-Frontend (Vercel)          Backend (Render)
-https://wxata.vercel.app ──WebSocket──► wss://your-app.onrender.com:4000
+Frontend (Vercel)           Backend (VPS)
+https://wxata.vercel.app ──WebSocket──► ws://YOUR_VPS_IP:4000
                                         HTTP health ► :3000/health
-                                        Persistent disk ► /data/
+                                        Filesystem  ► persistent ✅
 ```
 
 ---
 
-## Your Personal Deployment (Quick Start)
+## Backend — VPS Setup (freevps.edu.pl or any Linux VPS)
 
-### 1. Fork / Clone
+### 1. SSH into your VPS
 
 ```bash
-git clone https://github.com/your-username/wxata.git
+ssh root@YOUR_VPS_IP
+```
+
+### 2. Install Bun
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc   # or restart the shell
+bun --version      # confirm it works
+```
+
+### 3. Install Git
+
+```bash
+apt update && apt install -y git
+```
+
+### 4. Clone your repo
+
+```bash
+cd /root
+git clone https://github.com/TADSTech/WXATA.git wxata
 cd wxata
 ```
 
-### 2. Seed your config
+### 5. Seed your config
 
 ```bash
 cp botinfo.example.json botinfo.json
-# Edit botinfo.json — set your prefix, welcome message, etc.
+# Edit if needed — prefix, welcome message, etc.
+nano botinfo.json
 ```
 
-### 3. Deploy Backend on Render
+### 6. Install backend dependencies
 
-1. Go to [render.com](https://render.com) → **New +** → **Web Service**
-2. Connect your GitHub repo
-3. Settings:
-   | Field | Value |
-   |---|---|
-   | Root Directory | `backend` |
-   | Runtime | `Node` |
-   | Build Command | `npm install -g bun && bun install` |
-   | Start Command | `bun run index.ts` |
-   | Health Check Path | `/health` |
-4. Add a **Disk** (under Advanced):
-   | Field | Value |
-   |---|---|
-   | Name | `wxata-data` |
-   | Mount Path | `/data` |
-   | Size | 1 GB |
-5. Add **Environment Variables**:
-   | Key | Value |
-   |---|---|
-   | `PORT` | `3000` |
-   | `WS_PORT` | `4000` |
-   | `RENDER_EXTERNAL_URL` | `https://your-app.onrender.com` (fill after first deploy) |
-   | `DB_RETENTION_DAYS` | `7` |
-6. Click **Create Web Service**
+```bash
+cd backend
+bun install
+cd ..
+```
 
-> The persistent disk at `/data` stores your WhatsApp session (`auth_info/`), `botinfo.json`, SQLite DB, and all config files. They survive restarts and redeployments.
+### 7. Run the bot with PM2 (keeps it alive after SSH disconnect)
 
-> The backend self-pings `/health` every 10 minutes via `RENDER_EXTERNAL_URL` to prevent Render's free tier from sleeping.
+```bash
+# Install PM2
+bun add -g pm2
 
-### 4. Update Frontend WebSocket URL
+# Start the bot
+pm2 start backend/index.ts --name wxata --interpreter bun
 
-In `frontend/src/pages/Dashboard.tsx`, the WS URL is already environment-aware:
+# Save so it restarts on VPS reboot
+pm2 save
+pm2 startup   # run the command it outputs
+```
+
+### 8. Check it's running
+
+```bash
+pm2 logs wxata        # live logs
+pm2 status            # process list
+```
+
+### 9. Update the WebSocket URL in the frontend
+
+In `frontend/src/pages/Dashboard.tsx`:
 ```ts
 const wsUrl = window.location.hostname === 'localhost'
   ? 'ws://localhost:4000'
-  : 'wss://wxata.onrender.com';  // ← update this to your Render URL
+  : 'ws://YOUR_VPS_IP:4000';   // ← put your VPS IP here
 ```
 
-Change `wxata.onrender.com` to your actual Render service URL, then redeploy the frontend.
+Commit and push, Vercel will auto-redeploy.
 
-### 5. Deploy Frontend on Vercel
+---
 
-Already live at `https://wxata.vercel.app`. To deploy your own:
+## Useful PM2 Commands
 
-1. Go to [vercel.com](https://vercel.com) → **New Project** → import your repo
-2. Settings:
-   | Field | Value |
-   |---|---|
-   | Framework | `Vite` |
-   | Root Directory | `frontend` |
-   | Build Command | `bun run build` |
-   | Output Directory | `dist` |
-3. Deploy
+```bash
+pm2 restart wxata     # restart bot
+pm2 stop wxata        # stop bot
+pm2 logs wxata        # tail logs
+pm2 logs wxata --lines 100   # last 100 lines
+pm2 monit             # live CPU/memory dashboard
+```
+
+---
+
+## Updating the Bot
+
+```bash
+cd /root/wxata
+git pull
+cd backend && bun install   # only if package.json changed
+pm2 restart wxata
+```
+
+---
+
+## File Locations on VPS
+
+```
+/root/wxata/
+├── botinfo.json          ← your bot config (persistent ✅)
+├── warns.json            ← auto-created on first run
+├── vars.json             ← auto-created on first run
+└── backend/
+    ├── auth_info/        ← WhatsApp session (persistent ✅)
+    ├── antidel.json      ← auto-created on first run
+    ├── antibc.json       ← auto-created on first run
+    └── db/               ← SQLite database (persistent ✅)
+```
+
+Everything persists on a real VPS — no disk wipes, no sleep.
+
+---
+
+## Frontend — Vercel (already live)
+
+Already deployed at `https://wxata.vercel.app`.
+
+To redeploy after changing the WS URL:
+```bash
+git add frontend/src/pages/Dashboard.tsx
+git commit -m "fix: update WS URL to VPS IP"
+git push
+```
+
+Vercel picks it up automatically.
 
 ---
 
 ## For Other Developers (Self-Hosting)
 
-Each developer runs their own backend instance. They do **not** share your Render instance.
-
-### What they need
-
-1. Their own Render account (free tier works)
-2. Fork of this repo
-3. Their own `botinfo.json` (copy from `botinfo.example.json`)
-
-### Steps
+Each dev runs their own VPS instance. They do **not** share yours.
 
 ```bash
 # 1. Fork the repo on GitHub
-
-# 2. Clone their fork
-git clone https://github.com/their-username/wxata.git
-cd wxata
-
-# 3. Seed config
-cp botinfo.example.json botinfo.json
-
-# 4. Deploy backend on their own Render account (same steps as above)
-
-# 5. Update the WS URL in Dashboard.tsx to point to their Render URL
-
-# 6. Deploy frontend on their own Vercel account (or use the shared one)
+# 2. Get their own VPS (freevps.edu.pl or similar)
+# 3. SSH in and follow steps 2–8 above
+# 4. Update WS URL in Dashboard.tsx to their own VPS IP
+# 5. Deploy their own frontend fork on Vercel
 ```
 
-### What's shared vs. per-instance
+What's shared vs per-instance:
 
 | Resource | Shared | Per-instance |
 |---|---|---|
 | Frontend (Vercel) | ✅ Can share | Each can deploy their own |
 | Firebase Auth/Firestore | ✅ Shared | — |
 | Extension Marketplace | ✅ Shared | — |
-| Backend (Render) | ❌ Each needs their own | ✅ |
+| VPS / Backend process | ❌ | ✅ Each needs their own |
 | WhatsApp session | ❌ | ✅ |
 | `botinfo.json` | ❌ | ✅ |
 | SQLite DB | ❌ | ✅ |
@@ -131,57 +176,27 @@ cp botinfo.example.json botinfo.json
 ## Local Development
 
 ```bash
-# Install all deps
-bun run install:all
-
-# Run both frontend and backend
-bun run all
-
-# Backend only
-bun run backend
-
-# Frontend only
-bun run frontend
+bun run install:all   # install all deps
+bun run all           # frontend + backend together
 ```
-
-Local data files live in the workspace root (`botinfo.json`, `warns.json`, etc.) and `backend/db/` for SQLite. These are gitignored.
-
----
-
-## File Structure (gitignored per-instance files)
-
-```
-wxata/
-├── botinfo.json          ← your bot config (gitignored, seed from botinfo.example.json)
-├── botinfo.example.json  ← committed template
-├── warns.json            ← warn counts (auto-created)
-├── vars.json             ← custom variables (auto-created)
-├── backend/
-│   ├── auth_info/        ← WhatsApp session (gitignored, NEVER commit)
-│   ├── antidel.json      ← anti-delete config (auto-created)
-│   ├── antibc.json       ← anti-broadcast config (auto-created)
-│   └── db/               ← SQLite database (gitignored)
-```
-
-On Render, all of the above live under `/data/` on the persistent disk instead.
 
 ---
 
 ## Troubleshooting
 
-**Bot disconnects after a while on Render free tier**
-- Make sure `RENDER_EXTERNAL_URL` is set correctly — this enables the self-ping keep-alive
-- Render free tier has a 750 hour/month limit — upgrade to Starter ($7/mo) for 24/7 uptime
+**Dashboard can't connect to backend**
+- Make sure port 4000 is open on your VPS firewall: `ufw allow 4000`
+- Check the WS URL in Dashboard.tsx matches your VPS IP
+- Check PM2 is running: `pm2 status`
 
-**QR code required on every restart**
-- You don't have a persistent disk configured — add the `/data` disk in Render settings
-- Without it, `auth_info/` is wiped on every deploy/restart
+**Bot disconnects / crashes**
+- Check logs: `pm2 logs wxata`
+- PM2 auto-restarts on crash — check restart count in `pm2 status`
 
-**WebSocket not connecting from dashboard**
-- Check the WS URL in `Dashboard.tsx` matches your Render service URL
-- Render free tier only exposes port 443 (HTTPS/WSS) externally — use `wss://` not `ws://`
-- Make sure port 4000 is the WS port and Render's external port 443 proxies to it
+**QR code needed after VPS reboot**
+- Session is in `backend/auth_info/` — it persists across reboots on a real VPS
+- Only need to re-scan if you manually deleted auth_info or the VPS was wiped
 
-**Commands not working after deploy**
-- Check `botinfo.json` exists on the persistent disk — it's auto-created from `botinfo.example.json` on first run
-- Check the dashboard logs for permission errors
+**Commands not working**
+- Check `botinfo.json` exists: `cat /root/wxata/botinfo.json`
+- Check permissions in botinfo.json — run `+perm grant all` from your number

@@ -46,3 +46,6 @@ db/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+
+root.env

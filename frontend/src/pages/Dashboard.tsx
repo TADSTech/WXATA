@@ -547,8 +547,6 @@ const Dashboard = () => {
   };
 
   // Legacy handlers kept for the summoner-specific argument UI
-  const handleScriptChange = (field: keyof BotScript, value: string) => handleScriptFieldChange('summoner', field, value);
-
   const handleScriptArgumentChange = (argumentName: string, field: keyof BotScriptArgument, value: string) => {
     setBotInfo((prev) => ({
       ...prev,
@@ -565,8 +563,6 @@ const Dashboard = () => {
     }));
     setConfigStatus('Unsaved changes');
   };
-
-  const handleDefaultArgumentChange = (value: string) => handleScriptFieldChange('summoner', 'defaultArgument', value);
 
   const handleWelcomeChange = (field: keyof BotWelcome, value: string | boolean) => {
     setBotInfo((prev) => ({
@@ -770,7 +766,6 @@ const Dashboard = () => {
             handleScriptArgumentChange={handleScriptArgumentChange}
             handleDeleteScript={handleDeleteScript}
             handleAddScript={handleAddScript}
-            navigate={navigate}
           />
 
           {/* ── Mini Marketplace ── */}

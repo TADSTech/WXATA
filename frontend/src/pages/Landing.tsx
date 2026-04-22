@@ -1,10 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
-import { motion, useMotionValue, useSpring } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Chain, Mist } from '../components/Visuals';
 import { useNavigate } from 'react-router-dom';
 import {
   Terminal, Shield, Zap, Package, ChevronRight, ChevronLeft,
-  Eye, Trash2, Radio, Tag, Code2, MessageSquare
+  Eye, Radio, Tag, Code2, MessageSquare
 } from 'lucide-react';
 
 // ── Horizontal scroll container ───────────────────────────────────────────────

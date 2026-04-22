@@ -48,8 +48,8 @@ class DashboardServer {
     });
 
     // ── Self-ping keep-alive ──────────────────────────────────────────────────
-    // Render free tier sleeps after 15min of no inbound HTTP traffic.
-    // Ping our own health endpoint every 10 minutes to stay awake.
+    // Only needed on platforms that sleep (Render free tier).
+    // On a real VPS with PM2, this is not needed.
     const selfUrl = process.env.RENDER_EXTERNAL_URL
       ? `${process.env.RENDER_EXTERNAL_URL}/health`
       : null;
@@ -61,7 +61,7 @@ class DashboardServer {
         }).on('error', (err) => {
           logger.warn({ err }, 'Self-ping failed');
         });
-      }, 10 * 60 * 1000); // every 10 minutes
+      }, 10 * 60 * 1000);
       console.log(`🔁 Self-ping keep-alive active → ${selfUrl}`);
     }
 
