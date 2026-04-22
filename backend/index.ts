@@ -870,7 +870,9 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
           const prefixPattern = escapeRegex(botInfo.prefix.trim());
           const triggerPattern = escapeRegex(script.trigger.trim());
-          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?$`, 'i');
+          // Match prefix+trigger followed by optional arguments (any trailing content)
+          // Only capture the first word argument for simple scripts; perm uses its own regex
+          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?(?:\\s+\\S+)*$`, 'i');
           const triggerMatch = normalizedText.match(triggerRegex);
 
           if (triggerMatch) {
