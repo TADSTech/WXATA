@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import http from 'http';
 import pino from 'pino';
 
 const logger = pino({ level: 'warn' });
@@ -23,13 +24,54 @@ class DashboardServer {
   private startTime: number = Date.now();
   private currentConnection: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' = 'DISCONNECTED';
 
-  constructor(port: number = 4000) {
-    this.wss = new WebSocketServer({ port });
-    
+  constructor(wsPort: number = 4000) {
+    // ── HTTP health server ────────────────────────────────────────────────────
+    // Render requires an HTTP server bound to PORT for health checks.
+    // Also used by the self-ping keep-alive mechanism.
+    const httpPort = parseInt(process.env.PORT || '3000', 10);
+    const httpServer = http.createServer((req, res) => {
+      if (req.url === '/health' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          connection: this.currentConnection,
+          uptime: this.getUptime(),
+          memory: this.getMemoryUsage()
+        }));
+      } else {
+        res.writeHead(404);
+        res.end('Not found');
+      }
+    });
+    httpServer.listen(httpPort, () => {
+      console.log(`🌐 Health server listening on port ${httpPort}`);
+    });
+
+    // ── Self-ping keep-alive ──────────────────────────────────────────────────
+    // Render free tier sleeps after 15min of no inbound HTTP traffic.
+    // Ping our own health endpoint every 10 minutes to stay awake.
+    const selfUrl = process.env.RENDER_EXTERNAL_URL
+      ? `${process.env.RENDER_EXTERNAL_URL}/health`
+      : null;
+
+    if (selfUrl) {
+      setInterval(() => {
+        http.get(selfUrl, (res) => {
+          logger.debug(`Self-ping: ${res.statusCode}`);
+        }).on('error', (err) => {
+          logger.warn({ err }, 'Self-ping failed');
+        });
+      }, 10 * 60 * 1000); // every 10 minutes
+      console.log(`🔁 Self-ping keep-alive active → ${selfUrl}`);
+    }
+
+    // ── WebSocket server ──────────────────────────────────────────────────────
+    this.wss = new WebSocketServer({ port: wsPort });
+
     this.wss.on('connection', (ws) => {
       this.clients.add(ws);
       console.log('🖥️  Dashboard: Frontend client connected');
-      
+
       ws.on('message', (message) => {
         try {
           const payload = JSON.parse(message.toString());
@@ -44,11 +86,9 @@ class DashboardServer {
         console.log('🖥️  Dashboard: Frontend client disconnected');
       });
 
-      // Send initial status
       this.sendStatus();
     });
 
-    // Periodically send status updates
     setInterval(() => this.sendStatus(), 5000);
   }
 
@@ -118,4 +158,4 @@ class DashboardServer {
   }
 }
 
-export const dashboard = new DashboardServer();
+export const dashboard = new DashboardServer(parseInt(process.env.WS_PORT || '4000', 10));

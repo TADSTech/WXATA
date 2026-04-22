@@ -1,0 +1,42 @@
+{
+  "prefix": "+",
+  "scripts": {
+    "menu": {
+      "name": "menu",
+      "desc": "List all scripts and usage",
+      "trigger": "menu",
+      "response": "Available scripts listed below.",
+      "target": "chat",
+      "defaultArgument": "self"
+    },
+    "perm": {
+      "name": "perm",
+      "desc": "Grant bot permissions: chat | all | +number",
+      "trigger": "perm",
+      "response": "Permission updated.",
+      "target": "chat",
+      "defaultArgument": "self"
+    },
+    "summoner": {
+      "name": "ping",
+      "desc": "Check bot network speed and status",
+      "trigger": "ping",
+      "response": "",
+      "target": "chat",
+      "code": "const start = Date.now();\nawait sendTrackedMessage(sock, remoteJid, 'Pong! 🟢 Calculating speed...');\nconst end = Date.now();\nawait sendTrackedMessage(sock, remoteJid, `🚀 Speed: ${end - start}ms\\n🤖 WXATA is ONLINE`);",
+      "defaultArgument": "self"
+    }
+  },
+  "root": {
+    "target": "self"
+  },
+  "welcome": {
+    "enabled": true,
+    "text": "==============================\n   WELCOME TO WXATA\n   WhatsApp Automation Core\n==============================\nStatus  : ONLINE\nPrefix  : {prefix}\nCommand : {prefix}{bot} here\n\n- Use {prefix}{menu} to view scripts\n=============================="
+  },
+  "permissions": {
+    "allowAll": false,
+    "chats": [],
+    "numbers": []
+  }
+}

@@ -4,7 +4,7 @@ import * as qrcode from 'qrcode-terminal';
 import { dashboard } from './DashboardServer';
 import fs from 'fs/promises';
 import path from 'path';
-import { storeMessage, getMessage, pruneOldMessages } from './db';
+import { storeMessage, getMessage, pruneOldMessages, getRetentionDays, setRetentionDays, getMessageCount } from './db';
 
 interface BotScript {
   name: string;
@@ -45,7 +45,9 @@ interface BotPermissions {
   numbers: string[];
 }
 
-const BOT_INFO_PATH = path.resolve(__dirname, '..', 'botinfo.json');
+// Use Render's persistent disk at /data if available, otherwise workspace root
+const DATA_DIR = require('fs').existsSync('/data') ? '/data' : path.resolve(__dirname, '..');
+const BOT_INFO_PATH = path.resolve(DATA_DIR, 'botinfo.json');
 const OUTBOUND_MESSAGE_TTL_MS = 15_000;
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
@@ -547,7 +549,8 @@ function normalizePermissionChatId(jid: string | undefined | null): string | nul
 }
 
 function extractSenderNumber(msg: { key?: { participant?: string | null; remoteJid?: string | null } }): string | null {
-  const raw = msg.key?.participant ?? msg.key?.remoteJid ?? undefined;
+  // participant can be empty string — treat same as null
+  const raw = (msg.key?.participant || msg.key?.remoteJid) ?? undefined;
   if (!raw) return null;
 
   // If it's a LID, try to resolve to real number first
@@ -568,13 +571,20 @@ function isCommandPermitted(botInfo: BotInfo, msg: { key?: { remoteJid?: string 
     return true;
   }
 
-  const chatId = normalizePermissionChatId(msg.key?.remoteJid ?? undefined);
+  const remoteJid = msg.key?.remoteJid ?? undefined;
+  const chatId = normalizePermissionChatId(remoteJid);
   const senderNumber = extractSenderNumber(msg);
 
   const chatAllowed = !!chatId && botInfo.permissions.chats.includes(chatId);
   const numberAllowed = !!senderNumber && botInfo.permissions.numbers.includes(senderNumber);
 
-  return chatAllowed || numberAllowed;
+  // Extra: if remoteJid is a @lid (DM from linked device), resolve it and check numbers
+  const lidNumber = remoteJid?.endsWith('@lid')
+    ? resolveLidToNumber(remoteJid)?.split('@')[0]?.replace(/\D/g, '') ?? null
+    : null;
+  const lidAllowed = !!lidNumber && botInfo.permissions.numbers.includes(lidNumber);
+
+  return chatAllowed || numberAllowed || lidAllowed;
 }
 
 function applyPermissionMutation(
@@ -733,7 +743,14 @@ function senderMatchesRoot(
     if (selfNum && rootNum && selfNum === rootNum) return true;
   }
 
-  const senderJid = normalizeWhatsAppJid(msg.key?.participant ?? msg.key?.remoteJid ?? undefined);
+  // participant can be empty string — use || not ??
+  const rawSender = (msg.key?.participant || msg.key?.remoteJid) ?? undefined;
+
+  // If sender is a @lid, resolve to real number for comparison
+  const senderJid = rawSender?.endsWith('@lid')
+    ? (resolveLidToNumber(rawSender) ?? normalizeWhatsAppJid(rawSender))
+    : normalizeWhatsAppJid(rawSender);
+
   if (!senderJid) {
     return false;
   }
@@ -846,9 +863,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       if (remoteJid?.endsWith('@broadcast') && botInfo.scripts.antibc && !msg.key?.fromMe) {
          try {
            const fs = require('fs');
-           const path = require('path');
-           const configPath = path.resolve(process.cwd(), 'antibc.json');
-           let cfgEnabled = true;
+           const configPath = path.resolve(DATA_DIR, 'antibc.json');
+           let cfgEnabled = false;
            let cfgMsg = 'remove me from broadcast';
            if (fs.existsSync(configPath)) {
              try {
@@ -924,10 +940,12 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
             if (script.code && script.code.trim()) {
               try {
                 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', 'require', script.code);
+                const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', 'require', '__rootdir', script.code);
                 // Pass resolved JID so scripts can reply even when remoteJid is a @lid
                 const execJid = resolveReplyJid(remoteJid) ?? remoteJid;
-                await executor(sock, msg, botInfo, execJid, argumentName, sendTrackedMessage, dashboard, require);
+                // __rootdir = data directory (persistent disk on Render, workspace root locally)
+                const __rootdir = DATA_DIR;
+                await executor(sock, msg, botInfo, execJid, argumentName, sendTrackedMessage, dashboard, require, __rootdir);
                 dashboard.log('SUCCESS', `${scriptName} JS executed by ${remoteJid}`);
               } catch (err: any) {
                 dashboard.log('ERROR', `JS Extension Error (${scriptName}): ${err.message}`);
@@ -961,9 +979,6 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       console.log(`[MSG] ${logMsg}`);
       dashboard.log('MSG', logMsg);
     }
-    
-    // Prune sqlite DB so it never bloats disk space
-    if (Math.random() < 0.05) pruneOldMessages(); 
   });
 
   sock.ev.on('messages.update', async (messageUpdates) => {
@@ -988,7 +1003,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       const botInfo = await readBotInfo();
       if (!botInfo.scripts.antidel) continue;
 
-      const cfgPath = rPath.resolve(process.cwd(), 'antidel.json');
+      const cfgPath = rPath.resolve(DATA_DIR, 'antidel.json');
       const selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
       const defaultTarget = (botInfo.permissions.numbers[0]
         ? botInfo.permissions.numbers[0] + '@s.whatsapp.net'
@@ -1069,27 +1084,41 @@ async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection['crea
 }
 
 async function ensureConfigFiles(): Promise<void> {
-  const cwd = process.cwd();
+  // DATA_DIR is defined at module level — /data on Render, workspace root locally
+  const dir = DATA_DIR;
 
-  const antidelPath = path.resolve(cwd, 'antidel.json');
+  // Also seed botinfo.json from example if missing
+  try { await fs.access(BOT_INFO_PATH); } catch {
+    const examplePath = path.resolve(__dirname, '..', 'botinfo.example.json');
+    try {
+      const example = await fs.readFile(examplePath, 'utf-8');
+      await fs.writeFile(BOT_INFO_PATH, example, 'utf-8');
+      dashboard.log('INFO', 'Created botinfo.json from botinfo.example.json');
+    } catch {
+      await fs.writeFile(BOT_INFO_PATH, JSON.stringify(DEFAULT_BOT_INFO, null, 2), 'utf-8');
+      dashboard.log('INFO', 'Created default botinfo.json');
+    }
+  }
+
+  const antidelPath = path.resolve(dir, 'antidel.json');
   try { await fs.access(antidelPath); } catch {
     await fs.writeFile(antidelPath, JSON.stringify({ enabled: true, target: null }, null, 2), 'utf-8');
     dashboard.log('INFO', 'Created default antidel.json');
   }
 
-  const antibcPath = path.resolve(cwd, 'antibc.json');
+  const antibcPath = path.resolve(dir, 'antibc.json');
   try { await fs.access(antibcPath); } catch {
     await fs.writeFile(antibcPath, JSON.stringify({ enabled: false, message: 'remove me from broadcast' }, null, 2), 'utf-8');
     dashboard.log('INFO', 'Created default antibc.json');
   }
 
-  const warnsPath = path.resolve(cwd, 'warns.json');
+  const warnsPath = path.resolve(dir, 'warns.json');
   try { await fs.access(warnsPath); } catch {
     await fs.writeFile(warnsPath, JSON.stringify({}, null, 2), 'utf-8');
     dashboard.log('INFO', 'Created default warns.json');
   }
 
-  const varsPath = path.resolve(cwd, 'vars.json');
+  const varsPath = path.resolve(dir, 'vars.json');
   try { await fs.access(varsPath); } catch {
     await fs.writeFile(varsPath, JSON.stringify({}, null, 2), 'utf-8');
     dashboard.log('INFO', 'Created default vars.json');
@@ -1100,6 +1129,16 @@ async function startBot() {
   dashboard.log('INFO', 'Initializing WXATA Backend System...');
   console.log('🚀 Initializing WXATA Backend...');
   await ensureConfigFiles();
+
+  // Load persisted vars (e.g. DB_RETENTION_DAYS set via +vars)
+  try {
+    const varsPath = path.resolve(DATA_DIR, 'vars.json');
+    const savedVars = JSON.parse(await fs.readFile(varsPath, 'utf-8'));
+    if (savedVars.DB_RETENTION_DAYS) {
+      setRetentionDays(+savedVars.DB_RETENTION_DAYS);
+      dashboard.log('INFO', `DB retention loaded: ${savedVars.DB_RETENTION_DAYS} days`);
+    }
+  } catch { /* vars.json missing or empty — use default */ }
 
   let connectionManager: WXATAConnection | null = null;
   let activeSocket: Awaited<ReturnType<WXATAConnection['createConnection']>> | null = null;

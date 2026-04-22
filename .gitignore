@@ -12,24 +12,37 @@ coverage
 
 # logs
 logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# dotenv environment variable files
+# dotenv
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+.env.*
+!.env.example
 
 # caches
 .eslintcache
 .cache
 *.tsbuildinfo
 
-# IntelliJ based IDEs
+# IDE
 .idea
-
-# Finder (MacOS) folder config
 .DS_Store
-auth_info
+
+# ── WXATA: per-instance files (each deployment has its own) ──────────────────
+# WhatsApp session — never share, never commit
+auth_info/
+backend/auth_info/
+
+# Runtime data files — generated on first run from *.example.json templates
+botinfo.json
+backend/antidel.json
+backend/antibc.json
+warns.json
+vars.json
+db/
+
+# SQLite database
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

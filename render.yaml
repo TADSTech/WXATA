@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: wxata-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install -g bun && bun install
+    startCommand: bun run index.ts
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: WS_PORT
+        value: 4000
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          type: web
+          name: wxata-backend
+          property: host
+      - key: DB_RETENTION_DAYS
+        value: 7
+    disk:
+      name: wxata-data
+      mountPath: /data
+      sizeGB: 1

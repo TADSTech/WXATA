@@ -1,4 +1,4 @@
-# dependencies (bun install)
+# dependencies
 node_modules
 
 # output
@@ -6,29 +6,31 @@ out
 dist
 *.tgz
 
-# code coverage
-coverage
-*.lcov
-
 # logs
 logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+*.log
 
-# dotenv environment variable files
+# dotenv
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+.env.*
+!.env.example
 
 # caches
 .eslintcache
 .cache
 *.tsbuildinfo
 
-# IntelliJ based IDEs
+# IDE
 .idea
-
-# Finder (MacOS) folder config
 .DS_Store
+
+# ── WXATA: per-instance files ─────────────────────────────────────────────────
+auth_info/
+antidel.json
+antibc.json
+warns.json
+vars.json
+db/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

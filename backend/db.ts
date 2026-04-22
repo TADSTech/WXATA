@@ -2,14 +2,27 @@ import { Database } from 'bun:sqlite';
 import path from 'path';
 import fs from 'fs';
 
-const DB_DIR = path.resolve(process.cwd(), 'db');
+// Use Render's persistent disk at /data if available, otherwise local db/
+const DB_DIR = fs.existsSync('/data')
+  ? '/data'
+  : path.resolve(process.cwd(), 'db');
+
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 
 const db = new Database(path.join(DB_DIR, 'messages.sqlite'));
-// Retention period for stored messages (default 3 days)
-const EXTIRPATION_DAYS = +(process.env.DB_RETENTION_DAYS || 3);
 
-// init — bun:sqlite uses db.run() for DDL, not db.exec()
+// Retention period — default 3 days, overridable via env or +vars set DB_RETENTION_DAYS
+let retentionDays = +(process.env.DB_RETENTION_DAYS || 3);
+
+export function getRetentionDays(): number {
+  return retentionDays;
+}
+
+export function setRetentionDays(days: number): void {
+  if (days > 0) retentionDays = days;
+}
+
+// init
 db.run(`
   CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
@@ -58,7 +71,21 @@ export function getMessage(id: string): any | null {
   }
 }
 
-export function pruneOldMessages() {
-  const cutoff = Date.now() - (EXTIRPATION_DAYS * 24 * 60 * 60 * 1000);
-  db.prepare('DELETE FROM messages WHERE timestamp < ?').run(cutoff);
+export function pruneOldMessages(): number {
+  const cutoff = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+  const result = db.prepare('DELETE FROM messages WHERE timestamp < ?').run(cutoff);
+  return (result as any).changes ?? 0;
 }
+
+export function getMessageCount(): number {
+  const row = db.prepare('SELECT COUNT(*) as count FROM messages').get() as any;
+  return row?.count ?? 0;
+}
+
+// Scheduled prune — runs once every 24 hours automatically
+setInterval(() => {
+  const deleted = pruneOldMessages();
+  if (deleted > 0) {
+    console.log(`[DB] Scheduled prune: removed ${deleted} messages older than ${retentionDays} days`);
+  }
+}, 24 * 60 * 60 * 1000);

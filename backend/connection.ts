@@ -19,8 +19,13 @@ import { dashboard } from './DashboardServer';
 
 const logger = pino({ level: 'warn' });
 
+import fsSync from 'fs';
+
 // Configuration constants
-const AUTH_DIR = path.resolve(__dirname, 'auth_info');
+// Use Render's persistent disk at /data if available so auth survives restarts
+const AUTH_DIR = fsSync.existsSync('/data')
+  ? '/data/auth_info'
+  : path.resolve(__dirname, 'auth_info');
 const RECONNECT_INTERVALS = [5000, 15000, 30000, 60000]; // Exponential backoff
 
 interface ConnectionOptions {

@@ -1,70 +1,112 @@
-﻿# WXATA 🟢🚧
+﻿# WXATA 🟢
 
-WXATA is a high-performance WhatsApp bot platform built with **Baileys** and powered by **Bun**. Designed for speed, reliability, and extensibility, it allows you to run interactive games, code-based utilities, and advanced chat automations on a VPS.
+A high-performance WhatsApp automation platform built with **Baileys** and **Bun**. Run interactive scripts, manage permissions, and configure everything from a live web dashboard.
 
-## 🚀 Features
-
-- **High Performance**: Powered by the Bun runtime for minimal latency.
-- **Robust Auth**: Reliable session management and multi-device support via Baileys.
-- **Dynamic Configuration**: otinfo.json acts as a hot-reloadable schema for commands, permissions, and routing.
-- **Access Control**: Built-in permission modules allowing per-chat, global, or per-number script invocation.
-- **React Dashboard**: Configure arguments, commands, and target overrides via a rich web interface.
-- **VPS Ready**: Optimized for 24/7 background operation.
-
-## 🛠️ Tech Stack
-
-- **Runtime**: [Bun](https://bun.sh/)
-- **WhatsApp Library**: [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys)
-- **Frontend**: Vite, React, Tailwind CSS, Framer Motion
-- **Language**: TypeScript
-
-## 📁 Project Structure
-
-`	ext
-WXATA/
-├── frontend/        # React + Vite visual dashboard interface
-├── backend/         # WhatsApp bot core (Baileys + Bun)
-├── BOTPLAN.md       # Technical roadmap and features
-├── botinfo.json     # Dynamic operational state and script registry
-├── deployment.md    # Guide for deploying for free
-└── README.md        # Project documentation
-`
-
-## 🚦 Getting Started
-
-### Prerequisites
-
-- [Bun](https://bun.sh/) installed on your system.
-
-### Installation
-
-1. Clone the repository.
-2. Install dependencies for both frontend and backend:
-   `ash
-   # Install frontend deps
-   cd frontend
-   bun install
-
-   # Install backend deps
-   cd ../backend
-   bun install
-   `
-
-### Running the Project
-
-- **Frontend**: cd frontend && bun run dev
-- **Backend**: cd backend && bun run start
-
-## 📈 Roadmap
-
-- [x] Initial Plan & Design
-- [x] React Dashboard
-- [x] Backend Configuration Flow
-- [x] Command Handler System
-- [x] Authorization & Permission System
-- [x] Production Deployment Guide
-- [ ] User Account System / Firebase Integration
-- [ ] Interactive Game Modules
+**Live frontend:** [wxata.vercel.app](https://wxata.vercel.app)
 
 ---
-*Built with 💚 by TADS Tech*
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Runtime | [Bun](https://bun.sh/) |
+| WhatsApp | [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) |
+| Frontend | Vite + React + Tailwind + Framer Motion |
+| Auth/DB | Firebase (Auth + Firestore) |
+| Local DB | bun:sqlite (message cache for anti-delete) |
+| Deploy | Render (backend) + Vercel (frontend) |
+
+---
+
+## Quick Start (Local)
+
+```bash
+# 1. Clone
+git clone https://github.com/your-username/wxata.git
+cd wxata
+
+# 2. Seed config
+cp botinfo.example.json botinfo.json
+
+# 3. Install deps
+bun run install:all
+
+# 4. Run
+bun run all
+# Frontend → http://localhost:5173
+# Backend  → ws://localhost:4000
+```
+
+---
+
+## Deployment
+
+See **[deployment.md](./deployment.md)** for full instructions covering:
+- Deploying your own backend on Render with a persistent disk
+- Keeping the bot alive on the free tier (built-in self-ping)
+- Deploying the frontend on Vercel
+- How other developers can self-host their own instance
+
+---
+
+## Built-in Commands
+
+| Command | Description |
+|---|---|
+| `+menu` | List all scripts |
+| `+ping` | Check bot latency |
+| `+perm [grant\|revoke] chat\|all\|+number` | Manage permissions |
+| `+vars` | View/set config variables |
+| `+extract` | Reveal view-once media |
+| `+save` | Save quoted media to your chat |
+| `+tagall` | Mention all group members |
+| `+warn` | Warn a user (3 strikes = kick) |
+| `+antidel [on\|off\|target +number]` | Anti-delete toggle |
+| `+antibc [on\|off\|message]` | Anti-broadcast toggle |
+| `+ss <url>` | Screenshot a webpage |
+| `+owner` | Send owner vCard |
+| `+joke` | Random programming joke |
+
+All commands are editable from the dashboard. Add custom JS scripts without restarting.
+
+---
+
+## Per-Instance Files (gitignored)
+
+These are generated automatically on first run — never commit them:
+
+```
+botinfo.json        ← bot config  (seed: botinfo.example.json)
+warns.json          ← warn counts (auto-created)
+vars.json           ← custom vars (auto-created)
+backend/auth_info/  ← WhatsApp session (NEVER share)
+backend/antidel.json
+backend/antibc.json
+backend/db/
+```
+
+---
+
+## Project Structure
+
+```
+wxata/
+├── frontend/          # React dashboard (Vite)
+│   └── src/
+│       ├── pages/     # Dashboard, Landing, Login, Register, Marketplace, Admin
+│       └── components/
+├── backend/           # WhatsApp bot core
+│   ├── index.ts       # Main bot + command engine
+│   ├── connection.ts  # Baileys connection manager
+│   ├── DashboardServer.ts  # WebSocket + HTTP health server
+│   ├── db.ts          # SQLite message cache
+│   └── commands/      # Typed command module system (future)
+├── botinfo.example.json   # Config template
+├── render.yaml            # Render one-click deploy config
+└── deployment.md          # Full deployment guide
+```
+
+---
+
+*Built by [TADS Tech](https://x.com/tads_tech)*

@@ -1,55 +1,187 @@
-# Deployment Guide (Free Tier Alternatives)
+# WXATA Deployment Guide
 
-Since Koyeb no longer offers a purely free tier suitable for long-running scripts without a credit card, you can use a combination of **Render** (for the backend) and **Cloudflare Pages / Vercel** (for the frontend).
+## Architecture
 
-## Important Warning: Ephemeral Storage
-Free hosts like Render or Railway use **ephemeral filesystems**. When your server goes to sleep (after 15 minutes of inactivity) or deploys a new update, the local files are reset. 
-
-* **What this means for WXATA:** Your WhatsApp connection data (`backend/auth_info`) mapping your bot to your phone might be erased on restart, requiring you to scan the QR code or use the pairing code again. 
-* **Fix (Future):** You can update the Baileys auth state to save directly to Firebase Firestore instead of local files.
-
----
-
-## 1. Frontend Deployment (Cloudflare Pages)
-For your React/Vite dashboard, **Cloudflare Pages** is entirely free, incredibly fast, and doesn't sleep.
-
-1. Push your code to GitHub.
-2. Go to the [Cloudflare Dashboard](https://dash.cloudflare.com/) -> **Workers & Pages** -> **Create application** -> **Pages**.
-3. **Connect to Git** and select your WXATA repository.
-4. **Build Settings:**
-   - Framework preset: `Vite`
-   - Build command: `bun run build` (or `npm run build`)
-   - Build output directory: `dist`
-   - Root directory: `frontend`
-5. Click **Save and Deploy**.
+```
+Frontend (Vercel)          Backend (Render)
+https://wxata.vercel.app ──WebSocket──► wss://your-app.onrender.com:4000
+                                        HTTP health ► :3000/health
+                                        Persistent disk ► /data/
+```
 
 ---
 
-## 2. Backend Deployment (Render)
-[Render](https://render.com/) offers a robust free tier for Web Services capable of running Bun/Node backends.
+## Your Personal Deployment (Quick Start)
 
-1. Go to your Render Dashboard and click **New +** -> **Web Service**.
-2. Connect your GitHub repository.
-3. **Settings:**
-   - Root Directory: `backend`
-   - Environment: `Node` (or `Docker` if you add a Dockerfile for Bun)
-   - Build Command: `bun install`
-   - Start Command: `bun run index.ts`
-4. **Free Tier:** Select the Free instance type.
-5. Click **Create Web Service**.
+### 1. Fork / Clone
 
-> **Note:** Render needs an HTTP port bound to pass health checks. If WXATA is currently pure WebSocket/Baileys, ensure a fake HTTP listener is running on `process.env.PORT || 3000` to appease Render's deployment check.
+```bash
+git clone https://github.com/your-username/wxata.git
+cd wxata
+```
+
+### 2. Seed your config
+
+```bash
+cp botinfo.example.json botinfo.json
+# Edit botinfo.json — set your prefix, welcome message, etc.
+```
+
+### 3. Deploy Backend on Render
+
+1. Go to [render.com](https://render.com) → **New +** → **Web Service**
+2. Connect your GitHub repo
+3. Settings:
+   | Field | Value |
+   |---|---|
+   | Root Directory | `backend` |
+   | Runtime | `Node` |
+   | Build Command | `npm install -g bun && bun install` |
+   | Start Command | `bun run index.ts` |
+   | Health Check Path | `/health` |
+4. Add a **Disk** (under Advanced):
+   | Field | Value |
+   |---|---|
+   | Name | `wxata-data` |
+   | Mount Path | `/data` |
+   | Size | 1 GB |
+5. Add **Environment Variables**:
+   | Key | Value |
+   |---|---|
+   | `PORT` | `3000` |
+   | `WS_PORT` | `4000` |
+   | `RENDER_EXTERNAL_URL` | `https://your-app.onrender.com` (fill after first deploy) |
+   | `DB_RETENTION_DAYS` | `7` |
+6. Click **Create Web Service**
+
+> The persistent disk at `/data` stores your WhatsApp session (`auth_info/`), `botinfo.json`, SQLite DB, and all config files. They survive restarts and redeployments.
+
+> The backend self-pings `/health` every 10 minutes via `RENDER_EXTERNAL_URL` to prevent Render's free tier from sleeping.
+
+### 4. Update Frontend WebSocket URL
+
+In `frontend/src/pages/Dashboard.tsx`, the WS URL is already environment-aware:
+```ts
+const wsUrl = window.location.hostname === 'localhost'
+  ? 'ws://localhost:4000'
+  : 'wss://wxata.onrender.com';  // ← update this to your Render URL
+```
+
+Change `wxata.onrender.com` to your actual Render service URL, then redeploy the frontend.
+
+### 5. Deploy Frontend on Vercel
+
+Already live at `https://wxata.vercel.app`. To deploy your own:
+
+1. Go to [vercel.com](https://vercel.com) → **New Project** → import your repo
+2. Settings:
+   | Field | Value |
+   |---|---|
+   | Framework | `Vite` |
+   | Root Directory | `frontend` |
+   | Build Command | `bun run build` |
+   | Output Directory | `dist` |
+3. Deploy
 
 ---
 
-## 3. Keeping the Backend Awake (UptimeRobot)
-Render's free tier sleeps after 15 minutes of receiving no inbound traffic.
+## For Other Developers (Self-Hosting)
 
-1. Sign up at [UptimeRobot](https://uptimerobot.com/).
-2. Create a new Monitor.
-3. **Type:** `HTTP(s)`
-4. **URL:** `https://wxata.onrender.com`
-5. **Interval:** `5 minutes`
-6. Click **Create Monitor**.
+Each developer runs their own backend instance. They do **not** share your Render instance.
 
-This will ping your backend every 5 minutes, preventing Render from putting the WhatsApp bot to sleep.
+### What they need
+
+1. Their own Render account (free tier works)
+2. Fork of this repo
+3. Their own `botinfo.json` (copy from `botinfo.example.json`)
+
+### Steps
+
+```bash
+# 1. Fork the repo on GitHub
+
+# 2. Clone their fork
+git clone https://github.com/their-username/wxata.git
+cd wxata
+
+# 3. Seed config
+cp botinfo.example.json botinfo.json
+
+# 4. Deploy backend on their own Render account (same steps as above)
+
+# 5. Update the WS URL in Dashboard.tsx to point to their Render URL
+
+# 6. Deploy frontend on their own Vercel account (or use the shared one)
+```
+
+### What's shared vs. per-instance
+
+| Resource | Shared | Per-instance |
+|---|---|---|
+| Frontend (Vercel) | ✅ Can share | Each can deploy their own |
+| Firebase Auth/Firestore | ✅ Shared | — |
+| Extension Marketplace | ✅ Shared | — |
+| Backend (Render) | ❌ Each needs their own | ✅ |
+| WhatsApp session | ❌ | ✅ |
+| `botinfo.json` | ❌ | ✅ |
+| SQLite DB | ❌ | ✅ |
+
+---
+
+## Local Development
+
+```bash
+# Install all deps
+bun run install:all
+
+# Run both frontend and backend
+bun run all
+
+# Backend only
+bun run backend
+
+# Frontend only
+bun run frontend
+```
+
+Local data files live in the workspace root (`botinfo.json`, `warns.json`, etc.) and `backend/db/` for SQLite. These are gitignored.
+
+---
+
+## File Structure (gitignored per-instance files)
+
+```
+wxata/
+├── botinfo.json          ← your bot config (gitignored, seed from botinfo.example.json)
+├── botinfo.example.json  ← committed template
+├── warns.json            ← warn counts (auto-created)
+├── vars.json             ← custom variables (auto-created)
+├── backend/
+│   ├── auth_info/        ← WhatsApp session (gitignored, NEVER commit)
+│   ├── antidel.json      ← anti-delete config (auto-created)
+│   ├── antibc.json       ← anti-broadcast config (auto-created)
+│   └── db/               ← SQLite database (gitignored)
+```
+
+On Render, all of the above live under `/data/` on the persistent disk instead.
+
+---
+
+## Troubleshooting
+
+**Bot disconnects after a while on Render free tier**
+- Make sure `RENDER_EXTERNAL_URL` is set correctly — this enables the self-ping keep-alive
+- Render free tier has a 750 hour/month limit — upgrade to Starter ($7/mo) for 24/7 uptime
+
+**QR code required on every restart**
+- You don't have a persistent disk configured — add the `/data` disk in Render settings
+- Without it, `auth_info/` is wiped on every deploy/restart
+
+**WebSocket not connecting from dashboard**
+- Check the WS URL in `Dashboard.tsx` matches your Render service URL
+- Render free tier only exposes port 443 (HTTPS/WSS) externally — use `wss://` not `ws://`
+- Make sure port 4000 is the WS port and Render's external port 443 proxies to it
+
+**Commands not working after deploy**
+- Check `botinfo.json` exists on the persistent disk — it's auto-created from `botinfo.example.json` on first run
+- Check the dashboard logs for permission errors
