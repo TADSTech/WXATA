@@ -460,13 +460,72 @@ function normalizeWhatsAppJid(value: string | undefined | null): string | null {
   }
 
   const trimmedValue = value.trim();
+
+  // LID JIDs (@lid) are WhatsApp's linked device IDs — pass through as-is,
+  // they are resolved to real numbers separately via resolveLidToNumber
+  if (trimmedValue.endsWith('@lid')) {
+    return trimmedValue;
+  }
+
   if (trimmedValue.includes('@s.whatsapp.net')) {
     const baseNumber = trimmedValue.split(':')[0]?.replace(/\D/g, '');
     return baseNumber ? `${baseNumber}@s.whatsapp.net` : trimmedValue;
   }
 
+  if (trimmedValue.endsWith('@g.us')) {
+    return trimmedValue;
+  }
+
   const number = trimmedValue.replace(/\D/g, '');
   return number ? `${number}@s.whatsapp.net` : null;
+}
+
+/**
+ * Resolve a @lid JID to a real @s.whatsapp.net JID using the auth_info lid-mapping files.
+ * Files are named lid-mapping-{LID}_reverse.json and contain the phone number as a plain string.
+ * Returns null if no mapping found.
+ */
+function resolveLidToNumber(lidJid: string): string | null {
+  if (!lidJid.endsWith('@lid')) return null;
+  try {
+    const lidId = lidJid.replace('@lid', '');
+    const fsSync = require('fs');
+    // Primary: reverse mapping file named by LID → contains phone number
+    const reversePath = path.resolve(__dirname, 'auth_info', `lid-mapping-${lidId}_reverse.json`);
+    if (fsSync.existsSync(reversePath)) {
+      const raw = fsSync.readFileSync(reversePath, 'utf-8').trim().replace(/^"|"$/g, '');
+      if (raw && /^\d+$/.test(raw)) return `${raw}@s.whatsapp.net`;
+    }
+    // Fallback: scan non-reverse files whose content matches this LID
+    const dir = path.resolve(__dirname, 'auth_info');
+    const files = fsSync.readdirSync(dir) as string[];
+    for (const file of files) {
+      if (!file.startsWith('lid-mapping-') || file.endsWith('_reverse.json')) continue;
+      const content = fsSync.readFileSync(path.join(dir, file), 'utf-8').trim().replace(/^"|"$/g, '');
+      if (content === lidId) {
+        // filename is lid-mapping-{PHONENUMBER}.json
+        const phone = file.replace('lid-mapping-', '').replace('.json', '');
+        if (/^\d+$/.test(phone)) return `${phone}@s.whatsapp.net`;
+      }
+    }
+  } catch {
+    // mapping not found or unreadable
+  }
+  return null;
+}
+
+/**
+ * Resolve a remoteJid that may be a @lid to a usable JID for sending messages.
+ * Always returns a non-null value — falls back to the original JID if resolution fails,
+ * since Baileys can often send to @lid JIDs directly.
+ */
+function resolveReplyJid(remoteJid: string | null | undefined): string | null {
+  if (!remoteJid) return null;
+  if (remoteJid.endsWith('@lid')) {
+    // Try to resolve to real number, but fall back to @lid — Baileys handles it
+    return resolveLidToNumber(remoteJid) ?? remoteJid;
+  }
+  return remoteJid;
 }
 
 function normalizePermissionChatId(jid: string | undefined | null): string | null {
@@ -479,15 +538,28 @@ function normalizePermissionChatId(jid: string | undefined | null): string | nul
     return trimmed;
   }
 
+  // LID JIDs are not valid chat permission targets — resolve to real number
+  if (trimmed.endsWith('@lid')) {
+    return resolveLidToNumber(trimmed);
+  }
+
   return normalizeWhatsAppJid(trimmed);
 }
 
 function extractSenderNumber(msg: { key?: { participant?: string | null; remoteJid?: string | null } }): string | null {
-  const senderJid = normalizeWhatsAppJid(msg.key?.participant ?? msg.key?.remoteJid ?? undefined);
-  if (!senderJid) {
-    return null;
+  const raw = msg.key?.participant ?? msg.key?.remoteJid ?? undefined;
+  if (!raw) return null;
+
+  // If it's a LID, try to resolve to real number first
+  if (raw.endsWith('@lid')) {
+    const resolved = resolveLidToNumber(raw);
+    if (resolved) return resolved.split('@')[0]?.replace(/\D/g, '') || null;
+    // Can't resolve LID — extract the numeric part as fallback
+    return raw.replace('@lid', '').replace(/\D/g, '') || null;
   }
 
+  const senderJid = normalizeWhatsAppJid(raw);
+  if (!senderJid) return null;
   return senderJid.split('@')[0]?.replace(/\D/g, '') || null;
 }
 
@@ -558,10 +630,13 @@ function parsePermArgs(primaryArg: string | undefined, secondaryArg: string | un
   targetArg: string | undefined;
 } {
   const normalizedPrimary = primaryArg?.trim().toLowerCase();
-  if (normalizedPrimary && ['revoke', 'remove', 'rm', 'del', 'deny'].includes(normalizedPrimary)) {
+  if (normalizedPrimary && ['revoke', 'remove', 'rm', 'del', 'deny', 'block'].includes(normalizedPrimary)) {
     return { mode: 'revoke', targetArg: secondaryArg };
   }
-
+  // Explicit grant keyword — shift target to secondaryArg
+  if (normalizedPrimary && ['grant', 'add', 'allow'].includes(normalizedPrimary)) {
+    return { mode: 'grant', targetArg: secondaryArg };
+  }
   return { mode: 'grant', targetArg: primaryArg };
 }
 
@@ -734,13 +809,14 @@ function resolveScriptResponse(script: BotScript, argumentName: string | undefin
 function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
   sock.ev.on('messages.upsert', async (m) => {
     for (const msg of m.messages) {
+      // Always cache every message for anti-delete, regardless of type
+      if (msg?.key?.id) storeMessage(msg);
+
       if (!msg || (m.type !== 'notify' && m.type !== 'append')) {
         continue;
       }
 
-      const remoteJid = msg.key?.remoteJid;        
-        // Cache every incoming message for anti-delete to pick it up later if someone deletes it
-        storeMessage(msg);
+      const remoteJid = msg.key?.remoteJid;
       const text = extractMessageText(msg.message);
       const selfJid = resolveSelfJid(sock);
       const isSelfChat = typeof remoteJid === 'string' && typeof selfJid === 'string' && remoteJid === selfJid;
@@ -807,9 +883,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
 
             if (scriptName === 'perm') {
               if (!isRootSender) {
-                if (remoteJid) {
-                  await sendTrackedMessage(sock, remoteJid, 'Permission denied. Root only.');
-                }
+                const replyJid = resolveReplyJid(remoteJid);
+                if (replyJid) await sendTrackedMessage(sock, replyJid, 'Permission denied. Root only.');
                 break;
               }
 
@@ -825,22 +900,21 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
                 parsedPermArgs.targetArg,
                 remoteJid ?? undefined
               );
+              const replyJid = resolveReplyJid(remoteJid);
               if (!nextPermissions) {
-                if (remoteJid) {
+                if (replyJid) {
                   await sendTrackedMessage(
                     sock,
-                    remoteJid,
-                    `Usage:\n${botInfo.prefix}${script.trigger} chat | all | +countrycodeNumber\n${botInfo.prefix}${script.trigger} revoke chat | all | +countrycodeNumber`
+                    replyJid,
+                    `Usage:\n${botInfo.prefix}${script.trigger} [grant|revoke] chat | all | +countrycodeNumber\n\nExamples:\n${botInfo.prefix}perm chat\n${botInfo.prefix}perm grant +2347041029093\n${botInfo.prefix}perm revoke chat`
                   );
                 }
                 break;
               }
 
               const updated = await updateBotInfo({ permissions: nextPermissions });
-              const summary = `Permissions ${parsedPermArgs.mode} complete. all=${updated.permissions.allowAll} chats=${updated.permissions.chats.length} numbers=${updated.permissions.numbers.length}`;
-              if (remoteJid) {
-                await sendTrackedMessage(sock, remoteJid, summary);
-              }
+              const summary = `✅ Permissions ${parsedPermArgs.mode} complete.\nallowAll=${updated.permissions.allowAll}\nchats=${updated.permissions.chats.length}\nnumbers=${updated.permissions.numbers.length}`;
+              if (replyJid) await sendTrackedMessage(sock, replyJid, summary);
               dashboard.log('SUCCESS', `Permission ${parsedPermArgs.mode} applied by ${remoteJid}`);
               break;
             }
@@ -849,18 +923,21 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
               try {
                 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
                 const executor = new AsyncFunction('sock', 'msg', 'botInfo', 'remoteJid', 'argumentName', 'sendTrackedMessage', 'dashboard', 'require', script.code);
-                await executor(sock, msg, botInfo, remoteJid, argumentName, sendTrackedMessage, dashboard, require);
+                // Pass resolved JID so scripts can reply even when remoteJid is a @lid
+                const execJid = resolveReplyJid(remoteJid) ?? remoteJid;
+                await executor(sock, msg, botInfo, execJid, argumentName, sendTrackedMessage, dashboard, require);
                 dashboard.log('SUCCESS', `${scriptName} JS executed by ${remoteJid}`);
               } catch (err: any) {
                 dashboard.log('ERROR', `JS Extension Error (${scriptName}): ${err.message}`);
-                if (remoteJid && hasPermission) {
-                  await sendTrackedMessage(sock, remoteJid, `[Extension Error] ${scriptName}:\n${err.message}`);
+                const errReplyJid = resolveReplyJid(remoteJid);
+                if (errReplyJid && hasPermission) {
+                  await sendTrackedMessage(sock, errReplyJid, `[Extension Error] ${scriptName}:\n${err.message}`);
                 }
               }
               break;
             }
 
-            const targetJid = resolveScriptTarget(sock, botInfo, script, argumentName, remoteJid ?? undefined);
+            const targetJid = resolveScriptTarget(sock, botInfo, script, argumentName, resolveReplyJid(remoteJid) ?? remoteJid ?? undefined);
             if (targetJid) {
               const responseText = scriptName === 'menu' ? buildMenuResponse(botInfo) : resolveScriptResponse(script, argumentName);
               await sendTrackedMessage(sock, targetJid, responseText);
@@ -892,40 +969,76 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
     const rPath = require('path');
     
     for (const update of messageUpdates) {
-      // messageStubType 68 = REVOKE (message deleted). Checking message === null alone is too
-      // broad — edits also produce updates — so we require the stub type as the primary signal.
-      const isRevoke = update.update?.messageStubType === 68 ||
-        (update.update?.message === null && update.update?.messageStubType === undefined && update.key?.id !== undefined);
+      // A revoke/delete sets message to null. messageStubType may be 0, undefined, or absent.
+      // The reliable signal is message === null on the update patch.
+      const isRevoke = update.update?.message === null;
+      if (!isRevoke) continue;
 
-      if (isRevoke) {
-         const targetId = update.key.id;
-         if (!targetId) continue;
-         const originalMsg = getMessage(targetId);
-         if (!originalMsg) continue;
-         
-         const botInfo = await readBotInfo();
-         if (botInfo.scripts.antidel) {
-             const cfgPath = rPath.resolve(process.cwd(), 'antidel.json');
-             const selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
-             const defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;
-             let cfg = { enabled: true, target: defaultTarget };
-             try {
-                if (fs.existsSync(cfgPath)) {
-                  const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-                  cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;
-                  if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;
-                }
-             } catch(e) {}
-             
-             if (cfg.enabled) {
-               try {
-                 await sock.sendMessage(cfg.target, { forward: originalMsg });
-                 dashboard.log('SUCCESS', `Recovered deleted message from ${originalMsg.key.participant || originalMsg.key.remoteJid}`);
-               } catch(ex) {
-                 await sock.sendMessage(cfg.target, { text: `[Anti-Delete] Recovered text from ${originalMsg.key.participant || originalMsg.key.remoteJid}:\n\n${originalMsg.message?.conversation || originalMsg.message?.extendedTextMessage?.text}` });
-               }
-             }
-         }
+      const targetId = update.key?.id;
+      if (!targetId) continue;
+
+      const originalMsg = getMessage(targetId);
+      if (!originalMsg) {
+        dashboard.log('DEBUG', `Anti-delete: message ${targetId} not in DB (too old or never cached)`);
+        continue;
+      }
+
+      const botInfo = await readBotInfo();
+      if (!botInfo.scripts.antidel) continue;
+
+      const cfgPath = rPath.resolve(process.cwd(), 'antidel.json');
+      const selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
+      const defaultTarget = (botInfo.permissions.numbers[0]
+        ? botInfo.permissions.numbers[0] + '@s.whatsapp.net'
+        : null) || selfJid;
+
+      let cfg = { enabled: true, target: defaultTarget };
+      try {
+        if (fs.existsSync(cfgPath)) {
+          const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+          cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;
+          if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;
+        }
+      } catch(e) {}
+
+      if (!cfg.enabled) continue;
+
+      const sender = originalMsg.key?.participant || originalMsg.key?.remoteJid || 'unknown';
+      const chatJid = originalMsg.key?.remoteJid || 'unknown';
+      dashboard.log('INFO', `Anti-delete triggered: msg from ${sender} in ${chatJid}`);
+
+      try {
+        // Try forwarding the full message object
+        await sock.sendMessage(cfg.target, { forward: originalMsg, force: true } as any);
+        dashboard.log('SUCCESS', `Anti-delete: forwarded message from ${sender}`);
+      } catch(forwardErr: any) {
+        // Forward failed — extract whatever content we can and send as text
+        dashboard.log('WARN', `Anti-delete forward failed (${forwardErr.message}), falling back to text`);
+        try {
+          const msgContent = originalMsg.message;
+          const text = msgContent?.conversation
+            || msgContent?.extendedTextMessage?.text
+            || msgContent?.imageMessage?.caption
+            || msgContent?.videoMessage?.caption
+            || null;
+
+          let fallback = `🗑️ *Deleted Message*\n👤 From: @${sender.split('@')[0]}\n💬 Chat: ${chatJid}\n`;
+          if (text) {
+            fallback += `\n📝 Content:\n${text}`;
+          } else {
+            const mediaType = msgContent?.imageMessage ? '🖼️ Image'
+              : msgContent?.videoMessage ? '🎥 Video'
+              : msgContent?.audioMessage ? '🎵 Audio'
+              : msgContent?.stickerMessage ? '🎭 Sticker'
+              : msgContent?.documentMessage ? '📄 Document'
+              : '❓ Unknown media';
+            fallback += `\n📎 Type: ${mediaType} (media not recoverable)`;
+          }
+          await sock.sendMessage(cfg.target, { text: fallback });
+          dashboard.log('SUCCESS', `Anti-delete: sent fallback text for ${sender}`);
+        } catch(textErr: any) {
+          dashboard.log('ERROR', `Anti-delete: complete failure — ${textErr.message}`);
+        }
       }
     }
   });

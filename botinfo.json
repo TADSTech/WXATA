@@ -124,14 +124,6 @@
       "target": "chat",
       "code": "const arg = argumentName ? argumentName.toLowerCase() : '';\nconst fs = require('fs');\nconst rPath = require('path');\nconst cfgPath = rPath.resolve(process.cwd(), 'antidel.json');\n\nconst selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';\nconst defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;\n\nlet cfg = { enabled: true, target: defaultTarget };\ntry {\n  if (fs.existsSync(cfgPath)) {\n    const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));\n    // Only apply target from file if it's a valid non-null string\n    cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;\n    if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;\n  }\n} catch(e) {}\n\nif (arg === 'on') {\n  cfg.enabled = true;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, `✅ Anti-Delete *ON* — forwarding to ${cfg.target}`);\n} else if (arg === 'off') {\n  cfg.enabled = false;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, '❌ Anti-Delete *OFF*');\n} else if (arg === 'target' || arg === 'set') {\n  // +antidel target +2347041029093\n  const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';\n  const parts = rawText.trim().split(/\\s+/);\n  const numArg = parts[2];\n  if (numArg) {\n    const num = numArg.replace(/\\D/g, '');\n    cfg.target = num + '@s.whatsapp.net';\n    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n    return sendTrackedMessage(sock, remoteJid, `✅ Anti-Delete target set to *+${num}*`);\n  }\n}\n\nreturn sendTrackedMessage(sock, remoteJid, `*Anti-Delete Status*\\nEnabled: ${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\\nTarget: ${cfg.target}\\n\\nUsage:\\n${botInfo.prefix}antidel on | off\\n${botInfo.prefix}antidel target +countrycodeNumber`);",
       "defaultArgument": "self"
-    },
-    "first_marketplace_mod": {
-      "name": "First Marketplace Mod",
-      "desc": "this is just a test",
-      "trigger": "boo",
-      "response": "you got booed",
-      "target": "chat",
-      "defaultArgument": "self"
     }
   },
   "root": {
