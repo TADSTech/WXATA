@@ -409,7 +409,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const wsUrl = window.location.hostname === 'localhost' ? 'ws://localhost:4000' : 'wss://wxata.onrender.com';
+      const wsUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' ? 'ws://localhost:5000' : 'wss://wxata.onrender.com');
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 

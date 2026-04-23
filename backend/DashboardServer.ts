@@ -24,11 +24,10 @@ class DashboardServer {
   private startTime: number = Date.now();
   private currentConnection: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' = 'DISCONNECTED';
 
-  constructor(wsPort: number = 4000) {
-    // ── HTTP health server ────────────────────────────────────────────────────
-    // Render requires an HTTP server bound to PORT for health checks.
-    // Also used by the self-ping keep-alive mechanism.
-    const httpPort = parseInt(process.env.PORT || '3000', 10);
+  constructor() {
+    // ── HTTP health server & WebSocket base ───────────────────────────────────
+    // Render and other PaaS require a single PORT for both HTTP and WebSockets.
+    const port = parseInt(process.env.PORT || '5000', 10);
     const httpServer = http.createServer((req, res) => {
       if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -43,8 +42,8 @@ class DashboardServer {
         res.end('Not found');
       }
     });
-    httpServer.listen(httpPort, () => {
-      console.log(`🌐 Health server listening on port ${httpPort}`);
+    httpServer.listen(port, () => {
+      console.log(`🌐 Server (HTTP & WS) listening on port ${port}`);
     });
 
     // ── Self-ping keep-alive ──────────────────────────────────────────────────
@@ -66,7 +65,7 @@ class DashboardServer {
     }
 
     // ── WebSocket server ──────────────────────────────────────────────────────
-    this.wss = new WebSocketServer({ port: wsPort });
+    this.wss = new WebSocketServer({ server: httpServer });
 
     this.wss.on('connection', (ws) => {
       this.clients.add(ws);
@@ -158,4 +157,4 @@ class DashboardServer {
   }
 }
 
-export const dashboard = new DashboardServer(parseInt(process.env.WS_PORT || '4000', 10));
+export const dashboard = new DashboardServer();

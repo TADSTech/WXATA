@@ -4,7 +4,7 @@
 
 ```
 Frontend (Vercel)           Backend (VPS)
-https://wxata.vercel.app ──WebSocket──► ws://YOUR_VPS_IP:4000
+https://wxata.vercel.app ──WebSocket──► ws://YOUR_VPS_IP:5000
                                         HTTP health ► :3000/health
                                         Filesystem  ► persistent ✅
 ```
@@ -80,11 +80,9 @@ pm2 status            # process list
 
 ### 9. Update the WebSocket URL in the frontend
 
-In `frontend/src/pages/Dashboard.tsx`:
-```ts
-const wsUrl = window.location.hostname === 'localhost'
-  ? 'ws://localhost:4000'
-  : 'ws://YOUR_VPS_IP:4000';   // ← put your VPS IP here
+In `frontend/.env`:
+```env
+VITE_BACKEND_URL=ws://YOUR_VPS_IP:5000
 ```
 
 Commit and push, Vercel will auto-redeploy.
@@ -143,7 +141,7 @@ Most platforms allow you to connect your GitHub repository directly. They will a
 When configuring the deployment on your PaaS provider, use the following settings:
 - **Build Command**: Not required (handled by the Dockerfile)
 - **Start Command**: Not required (handled by the Dockerfile's `CMD`)
-- **Port**: `4000` (Make sure the platform exposes this port for the WebSocket connection)
+- **Port**: `5000` (Make sure the platform exposes this port for the WebSocket connection)
 - **Environment Variables**: Add any environment variables you need (e.g., `DB_RETENTION_DAYS=3`)
 
 ### 3. Data Persistence Note
@@ -158,7 +156,7 @@ If your PaaS provider supports persistent disks (like Render's `/data` disk), th
 If you just want to run the Docker image manually on your own server without `docker-compose`:
 ```bash
 docker build -t wxata-backend .
-docker run -d -p 4000:4000 --name wxata-backend wxata-backend
+docker run -d -p 5000:5000 --name wxata-backend wxata-backend
 ```
 
 ---
@@ -169,9 +167,7 @@ Already deployed at `https://wxata.vercel.app`.
 
 To redeploy after changing the WS URL:
 ```bash
-git add frontend/src/pages/Dashboard.tsx
-git commit -m "fix: update WS URL to VPS IP"
-git push
+# Add your environment variable VITE_BACKEND_URL to your Vercel project settings
 ```
 
 Vercel picks it up automatically.
@@ -186,7 +182,7 @@ Each dev runs their own VPS instance. They do **not** share yours.
 # 1. Fork the repo on GitHub
 # 2. Get their own VPS (freevps.edu.pl or similar)
 # 3. SSH in and follow steps 2–8 above
-# 4. Update WS URL in Dashboard.tsx to their own VPS IP
+# 4. Set VITE_BACKEND_URL in your Vercel project settings to your own VPS IP
 # 5. Deploy their own frontend fork on Vercel
 ```
 
@@ -216,8 +212,8 @@ bun run all           # frontend + backend together
 ## Troubleshooting
 
 **Dashboard can't connect to backend**
-- Make sure port 4000 is open on your VPS firewall: `ufw allow 4000`
-- Check the WS URL in Dashboard.tsx matches your VPS IP
+- Make sure port 5000 is open on your VPS firewall: `ufw allow 5000`
+- Check the `VITE_BACKEND_URL` environment variable matches your VPS IP
 - Check PM2 is running: `pm2 status`
 
 **Bot disconnects / crashes**

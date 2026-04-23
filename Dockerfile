@@ -6,6 +6,8 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY backend/package.json ./backend/
 
+# Install build tools required by node-gyp for better-sqlite3
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 # Install backend dependencies
 RUN bun install
 WORKDIR /app/backend
@@ -17,7 +19,7 @@ COPY backend/ ./backend/
 COPY botinfo.example.json ./
 
 # Expose the WebSocket port for the dashboard
-EXPOSE 4000
+EXPOSE 5000
 
 # Run the backend
 WORKDIR /app/backend
