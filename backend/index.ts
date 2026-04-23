@@ -1202,6 +1202,19 @@ async function startBot() {
             dashboard.log('ERROR', 'Terminating bot system...');
             process.exit(1);
             break;
+          case 'LOGOUT':
+            dashboard.log('WARN', 'Logging out and clearing session data...');
+            if (connectionManager) {
+              await connectionManager.logout();
+            } else {
+              // Fallback if not fully initialized
+              const fs = require('fs/promises');
+              const AUTH_DIR = require('fs').existsSync('/data') ? '/data/auth_info' : path.resolve(__dirname, 'auth_info');
+              await fs.rm(AUTH_DIR, { recursive: true, force: true }).catch(() => {});
+            }
+            dashboard.log('SUCCESS', 'Session cleared. Restarting bot...');
+            setTimeout(() => process.exit(0), 1000);
+            break;
           case 'EXPORT_DATA':
             dashboard.log('INFO', 'Exporting session logs...');
             break;

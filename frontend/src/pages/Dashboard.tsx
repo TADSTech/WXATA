@@ -834,6 +834,16 @@ const Dashboard = () => {
               >
                 EXPORT DATA
               </button>
+              <button 
+                onClick={() => {
+                  if (confirm("Are you sure? This will delete the current WhatsApp session and you will need to scan a new QR code to reconnect!")) {
+                    handleQuickAction('LOGOUT');
+                  }
+                }}
+                className="border border-red-500/30 text-red-500 hover:bg-red-500/10 p-2 text-xs transition-colors col-span-2 font-bold"
+              >
+                RESET SESSION (NEW QR)
+              </button>
               <button
                 onClick={handleSignOut}
                 className="border border-red-500/50 hover:bg-red-500/20 text-red-500 p-2 text-xs transition-colors flex items-center justify-center gap-2 mt-4 w-full"

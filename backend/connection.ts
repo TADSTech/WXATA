@@ -145,11 +145,14 @@ export class WXATAConnection {
       }
     });
 
-    // Handle History Sync (to keep logs clean)
+    // Handle History Sync
     this.sock.ev.on('messaging-history.set', ({ isLatest }) => {
-      const msg = `Syncing chat history (isLatest: ${isLatest})...`;
+      const msg = `Syncing chat history (isLatest: ${isLatest}). Please wait...`;
       console.log(`📡 WXATA: ${msg}`);
-      dashboard.log('DEBUG', msg);
+      dashboard.log('INFO', msg);
+      if (isLatest) {
+        dashboard.log('SUCCESS', 'Initial history sync completed! Bot is ready to receive commands.');
+      }
     });
 
     // Atomic credential updates
@@ -178,7 +181,7 @@ export class WXATAConnection {
   /**
    * Cleanly wipe session data to prevent corruption loops
    */
-  private async clearSession() {
+  public async clearSession() {
     try {
       await fs.rm(AUTH_DIR, { recursive: true, force: true });
       logger.info('Session data wiped successfully');
@@ -189,5 +192,20 @@ export class WXATAConnection {
 
   public getSocket() {
     return this.sock;
+  }
+
+  /**
+   * Explicitly logout and clear session data
+   */
+  public async logout() {
+    try {
+      if (this.sock) {
+        await this.sock.logout();
+      }
+    } catch (err) {
+      logger.error({ err }, 'Error during socket logout');
+    } finally {
+      await this.clearSession();
+    }
   }
 }
