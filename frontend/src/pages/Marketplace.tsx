@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { Package, Download, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Package, Download, ArrowLeft, PlusCircle, ShieldAlert } from 'lucide-react';
 
 interface Extension {
   id: string;
@@ -16,6 +16,8 @@ interface Extension {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   downloads: number;
+  untrusted?: boolean;
+  disabled?: boolean;
 }
 
 export default function Marketplace() {
@@ -233,15 +235,23 @@ export default function Marketplace() {
 
                       <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                         <span>By {ext.author}</span>
-                        <span>{ext.downloads || 0} Downloads</span>
+                        <div className="flex items-center gap-2">
+                          {ext.untrusted && <span className="flex items-center gap-1 text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded font-bold"><ShieldAlert className="w-3 h-3"/> UNTRUSTED</span>}
+                          <span>{ext.downloads || 0} Downloads</span>
+                        </div>
                       </div>
                     </div>
                     <div className="mt-6 pt-4 border-t border-gray-800">
                       <button 
                         onClick={() => handleInstall(ext)}
-                        className="w-full flex items-center justify-center gap-2 bg-blue-900/30 hover:bg-blue-800/50 text-blue-400 border border-blue-500/50 py-2 rounded transition-colors text-sm font-bold"
+                        disabled={ext.disabled}
+                        className={`w-full flex items-center justify-center gap-2 py-2 rounded transition-colors text-sm font-bold ${
+                          ext.disabled 
+                            ? 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed' 
+                            : 'bg-blue-900/30 hover:bg-blue-800/50 text-blue-400 border border-blue-500/50'
+                        }`}
                       >
-                        <Download className="w-4 h-4" /> {user ? 'Install to Bot' : 'Log in to Install'}
+                        {ext.disabled ? 'Installation Disabled' : <><Download className="w-4 h-4" /> {user ? 'Install to Bot' : 'Log in to Install'}</>}
                       </button>
                     </div>
                   </div>

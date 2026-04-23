@@ -4,7 +4,7 @@ import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, Che
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { doc, getDoc, collection, getDocs, query, where, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, updateDoc, addDoc } from 'firebase/firestore';
 
 interface BotInfo {
   prefix: string;
@@ -53,8 +53,9 @@ interface MarketplaceExtension {
   trigger: string;
   response: string;
   code?: string;
-  author: string;
   downloads: number;
+  untrusted?: boolean;
+  disabled?: boolean;
 }
 
 interface MiniMarketplaceProps {
@@ -132,21 +133,24 @@ function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplace
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs font-bold text-emerald-300">{ext.name}</span>
                     <span className="text-[10px] font-mono text-slate-600">!{ext.trigger}</span>
+                    {ext.untrusted && <span className="text-[9px] text-orange-400 border border-orange-500/30 bg-orange-500/10 px-1 rounded flex items-center gap-0.5"><Shield className="w-2.5 h-2.5"/>Untrusted</span>}
                     {ext.code && <span className="text-[9px] text-purple-400 border border-purple-500/30 px-1 rounded">JS</span>}
                   </div>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{ext.description}</p>
                   <span className="text-[9px] text-slate-700">by {ext.author} · {ext.downloads || 0} installs</span>
                 </div>
                 <button
-                  onClick={() => !alreadyIn && handleInstall(ext)}
-                  disabled={alreadyIn || installing === ext.id}
+                  onClick={() => !alreadyIn && !ext.disabled && handleInstall(ext)}
+                  disabled={alreadyIn || installing === ext.id || ext.disabled}
                   className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                    alreadyIn
-                      ? 'border-emerald-500/20 text-emerald-700 cursor-default'
-                      : 'border-blue-500/40 text-blue-400 hover:bg-blue-500/10 disabled:opacity-50'
+                    ext.disabled
+                      ? 'border-red-500/20 text-red-700 bg-red-500/5 cursor-not-allowed'
+                      : alreadyIn
+                        ? 'border-emerald-500/20 text-emerald-700 cursor-default'
+                        : 'border-blue-500/40 text-blue-400 hover:bg-blue-500/10 disabled:opacity-50'
                   }`}
                 >
-                  {alreadyIn ? '✓ Added' : installing === ext.id ? '...' : <><Download className="w-2.5 h-2.5" /> Add</>}
+                  {ext.disabled ? 'Disabled' : alreadyIn ? '✓ Added' : installing === ext.id ? '...' : <><Download className="w-2.5 h-2.5" /> Add</>}
                 </button>
               </div>
             );
@@ -173,6 +177,7 @@ interface ScriptManagerProps {
   handleScriptArgumentChange: (argName: string, field: keyof BotScriptArgument, value: string) => void;
   handleDeleteScript: (key: string) => void;
   handleAddScript: () => void;
+  handlePublishScript: (key: string, script: BotScript) => void;
 }
 
 function ScriptManager({
@@ -180,7 +185,7 @@ function ScriptManager({
   addingScript, setAddingScript, newScriptKey, setNewScriptKey,
   newScriptDraft, setNewScriptDraft,
   handleScriptFieldChange, handleScriptArgumentChange,
-  handleDeleteScript, handleAddScript
+  handleDeleteScript, handleAddScript, handlePublishScript
 }: ScriptManagerProps) {
   const prefix = botInfo.prefix;
   return (
@@ -317,9 +322,14 @@ function ScriptManager({
                         </div>
                       )}
                       {!isCore && (
-                        <button onClick={() => handleDeleteScript(key)} className="flex items-center gap-1 text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-400/50 px-2 py-1 rounded text-[10px] transition-colors">
-                          <Trash2 className="w-3 h-3" /> Delete Script
-                        </button>
+                        <div className="flex gap-2">
+                          <button onClick={() => handlePublishScript(key, script)} className="flex items-center gap-1 text-blue-400 hover:text-blue-300 border border-blue-500/30 hover:border-blue-400/50 px-2 py-1 rounded text-[10px] transition-colors">
+                            <Package className="w-3 h-3" /> Publish to Marketplace
+                          </button>
+                          <button onClick={() => handleDeleteScript(key)} className="flex items-center gap-1 text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-400/50 px-2 py-1 rounded text-[10px] transition-colors">
+                            <Trash2 className="w-3 h-3" /> Delete Script
+                          </button>
+                        </div>
                       )}
                     </div>
                   </motion.div>
@@ -510,6 +520,36 @@ const Dashboard = () => {
     setBotInfo((prev) => ({ ...prev, scripts: next }));
     setExpandedScript(null);
     setConfigStatus('Unsaved changes');
+  };
+
+  const handlePublishScript = async (key: string, script: BotScript) => {
+    if (!auth.currentUser) {
+      alert("You must be logged in to publish scripts.");
+      return;
+    }
+    if (!script.name || !script.desc) {
+      alert("Please provide a Display Name and Description before publishing.");
+      return;
+    }
+    if (confirm(`Publish "${script.name}" to the Marketplace? It will undergo admin review.`)) {
+      try {
+        await addDoc(collection(db, 'extensions'), {
+          name: script.name,
+          description: script.desc,
+          trigger: script.trigger,
+          response: script.response || '',
+          code: script.code || '',
+          author: auth.currentUser.email?.split('@')[0] || 'Unknown',
+          authorUid: auth.currentUser.uid,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          downloads: 0
+        });
+        alert('Extension submitted successfully! Awaiting admin approval.');
+      } catch (err: any) {
+        alert('Error: ' + err.message);
+      }
+    }
   };
 
   const handleMarketplaceInstall = (ext: MarketplaceExtension) => {
@@ -766,6 +806,7 @@ const Dashboard = () => {
             handleScriptArgumentChange={handleScriptArgumentChange}
             handleDeleteScript={handleDeleteScript}
             handleAddScript={handleAddScript}
+            handlePublishScript={handlePublishScript}
           />
 
           {/* ── Mini Marketplace ── */}

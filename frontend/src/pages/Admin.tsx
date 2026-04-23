@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, where, deleteDoc } from 'firebase/firestore';
 
 interface UserCode {
   id: string;
@@ -23,13 +23,16 @@ interface Extension {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   downloads: number;
+  untrusted?: boolean;
+  disabled?: boolean;
 }
 
 export default function Admin() {
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [codesList, setCodesList] = useState<UserCode[]>([]);
-  const [extensionsList, setExtensionsList] = useState<Extension[]>([]);
+  const [pendingExtensions, setPendingExtensions] = useState<Extension[]>([]);
+  const [approvedExtensions, setApprovedExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
   const [extLoading, setExtLoading] = useState(true);
 
@@ -55,13 +58,17 @@ export default function Admin() {
 
   const fetchExtensions = async () => {
     try {
-      const q = query(collection(db, 'extensions'), where('status', '==', 'pending'));
+      const q = query(collection(db, 'extensions'));
       const querySnapshot = await getDocs(q);
-      const fetched: Extension[] = [];
+      const fetchedPending: Extension[] = [];
+      const fetchedApproved: Extension[] = [];
       querySnapshot.forEach((doc) => {
-        fetched.push({ id: doc.id, ...doc.data() } as Extension);
+        const data = { id: doc.id, ...doc.data() } as Extension;
+        if (data.status === 'pending') fetchedPending.push(data);
+        if (data.status === 'approved') fetchedApproved.push(data);
       });
-      setExtensionsList(fetched);
+      setPendingExtensions(fetchedPending);
+      setApprovedExtensions(fetchedApproved);
     } catch (err) {
       console.error('Failed to fetch extensions', err);
     } finally {
@@ -83,6 +90,26 @@ export default function Admin() {
      } catch(e) {
         console.error(e);
      }
+  };
+
+  const handleToggleExtField = async (id: string, field: 'untrusted' | 'disabled', currentValue: boolean | undefined) => {
+    try {
+      await updateDoc(doc(db, 'extensions', id), { [field]: !currentValue });
+      fetchExtensions();
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteExt = async (id: string) => {
+    if (confirm("Are you sure you want to permanently delete this extension from the marketplace?")) {
+      try {
+        await deleteDoc(doc(db, 'extensions', id));
+        fetchExtensions();
+      } catch(e) {
+        console.error(e);
+      }
+    }
   };
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -222,7 +249,7 @@ export default function Admin() {
           <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-gray-800 pb-2">Pending Marketplace Extensions</h2>
           {extLoading ? (
             <p className="text-gray-500">Loading extensions database...</p>
-          ) : extensionsList.length === 0 ? (
+          ) : pendingExtensions.length === 0 ? (
             <p className="text-gray-500">No pending extensions awaiting approval.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -236,7 +263,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {extensionsList.map(ext => (
+                  {pendingExtensions.map(ext => (
                     <tr key={ext.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                       <td className="py-3 px-2">
                         <div className="font-bold text-blue-400">{ext.name}</div>
@@ -255,7 +282,71 @@ export default function Admin() {
                       </td>
                       <td className="py-3 px-2 text-right space-x-2">
                          <button onClick={() => handleExtStatus(ext.id, 'approved')} className="text-xs bg-green-900/30 hover:bg-green-800/50 border border-green-500/50 text-green-400 px-3 py-1 rounded">Approve</button>
-                         <button onClick={() => handleExtStatus(ext.id, 'rejected')} className="text-xs bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-3 py-1 rounded">Reject</button>
+                         <button onClick={() => handleDeleteExt(ext.id)} className="text-xs bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-3 py-1 rounded">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Approved Marketplace Extensions */}
+        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-lg">
+          <h2 className="text-xl font-bold mb-4 text-emerald-400 border-b border-gray-800 pb-2">Active Marketplace Extensions</h2>
+          {extLoading ? (
+            <p className="text-gray-500">Loading extensions database...</p>
+          ) : approvedExtensions.length === 0 ? (
+            <p className="text-gray-500">No approved extensions exist yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-800">
+                    <th className="py-3 px-2">Extension</th>
+                    <th className="py-3 px-2">Status Tags</th>
+                    <th className="py-3 px-2 text-right">Admin Controls</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedExtensions.map(ext => (
+                    <tr key={ext.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-3 px-2">
+                        <div className="font-bold text-emerald-400">{ext.name}</div>
+                        <div className="text-gray-500 text-xs">Installs: {ext.downloads || 0}</div>
+                      </td>
+                      <td className="py-3 px-2 space-y-1">
+                        {ext.untrusted && <span className="inline-block bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded text-[10px] font-bold mr-2">⚠️ UNTRUSTED</span>}
+                        {ext.disabled ? (
+                          <span className="inline-block bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-[10px] font-bold">INSTALL DISABLED</span>
+                        ) : (
+                          <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVE</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-right">
+                        <div className="flex flex-col gap-1 items-end">
+                          <div className="space-x-1">
+                            <button 
+                              onClick={() => handleToggleExtField(ext.id, 'untrusted', ext.untrusted)} 
+                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.untrusted ? 'bg-gray-800 text-gray-400 border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
+                            >
+                              {ext.untrusted ? 'Mark Trusted' : 'Mark Untrusted'}
+                            </button>
+                            <button 
+                              onClick={() => handleToggleExtField(ext.id, 'disabled', ext.disabled)} 
+                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.disabled ? 'bg-gray-800 text-gray-400 border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
+                            >
+                              {ext.disabled ? 'Enable Install' : 'Disable Install'}
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteExt(ext.id)} 
+                              className="text-[10px] bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-2 py-1 rounded transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}
