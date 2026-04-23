@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Admin from './pages/Admin';
 import Marketplace from './pages/Marketplace';
 import './index.css';
+import { ThemeProvider } from './components/ThemeProvider';
 
 // Simple protected route helper
 function PrivateRoute({ children }: { children: React.ReactElement }) {
@@ -17,8 +18,9 @@ function PrivateRoute({ children }: { children: React.ReactElement }) {
 
 function App() {
   return (
-    <Router>
-      <Routes>
+    <ThemeProvider>
+      <Router>
+        <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -35,8 +37,9 @@ function App() {
         {/* Fallback route */}
         <Route path="/dashboard" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 

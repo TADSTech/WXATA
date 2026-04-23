@@ -824,6 +824,15 @@ function resolveScriptResponse(script: BotScript, argumentName: string | undefin
 }
 
 function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
+  sock.ev.on('messaging-history.set', async ({ messages }) => {
+    if (messages && messages.length > 0) {
+      for (const msg of messages) {
+        if (msg?.key?.id) storeMessage(msg);
+      }
+      dashboard.log('INFO', `Cached ${messages.length} historical messages for anti-delete`);
+    }
+  });
+
   sock.ev.on('messages.upsert', async (m) => {
     for (const msg of m.messages) {
       // Always cache every message for anti-delete, regardless of type

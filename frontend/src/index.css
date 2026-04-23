@@ -1,19 +1,160 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3b82f6;
-  --color-secondary: #1d4ed8;
-  --color-accent: #60a5fa;
+  --color-bg-base: var(--theme-bg-base);
+  --color-bg-panel: var(--theme-bg-panel);
+  --color-bg-panel-hover: var(--theme-bg-panel-hover);
+  --color-border-subtle: var(--theme-border-subtle);
+  --color-border-strong: var(--theme-border-strong);
+  --color-text-main: var(--theme-text-main);
+  --color-text-muted: var(--theme-text-muted);
+  --color-accent-primary: var(--theme-accent-primary);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-accent-light: var(--theme-accent-light);
+  --color-accent-subtle: var(--theme-accent-subtle);
+  
+  --color-danger-base: var(--theme-danger-base);
+  --color-danger-text: var(--theme-danger-text);
+  --color-danger-subtle: var(--theme-danger-subtle);
+  
+  --color-warning-base: var(--theme-warning-base);
+  --color-warning-text: var(--theme-warning-text);
+  --color-warning-subtle: var(--theme-warning-subtle);
+  
+  --color-success-base: var(--theme-success-base);
+  --color-success-text: var(--theme-success-text);
+  --color-success-subtle: var(--theme-success-subtle);
+  
+  --color-info-base: var(--theme-info-base);
+  --color-info-text: var(--theme-info-text);
+  --color-info-subtle: var(--theme-info-subtle);
 }
 
-:root {
-  background-color: #000;
-  color: #fff;
+:root, .theme-hacker {
+  --theme-bg-base: #050505;
+  --theme-bg-panel: #0f172a; 
+  --theme-bg-panel-hover: #1e293b; 
+  --theme-border-subtle: rgba(16, 185, 129, 0.2); 
+  --theme-border-strong: rgba(16, 185, 129, 0.5); 
+  --theme-text-main: #ffffff;
+  --theme-text-muted: #94a3b8; 
+  --theme-accent-primary: #10b981; 
+  --theme-accent-hover: #059669; 
+  --theme-accent-light: #34d399; 
+  --theme-accent-subtle: rgba(16, 185, 129, 0.1);
+  
+  --theme-danger-base: #ef4444;
+  --theme-danger-text: #f87171;
+  --theme-danger-subtle: rgba(239, 68, 68, 0.2);
+  
+  --theme-warning-base: #f59e0b;
+  --theme-warning-text: #fbbf24;
+  --theme-warning-subtle: rgba(245, 158, 11, 0.2);
+  
+  --theme-success-base: #10b981;
+  --theme-success-text: #34d399;
+  --theme-success-subtle: rgba(16, 185, 129, 0.2);
+  
+  --theme-info-base: #8b5cf6;
+  --theme-info-text: #a78bfa;
+  --theme-info-subtle: rgba(139, 92, 246, 0.2);
+}
+
+.theme-dark {
+  --theme-bg-base: #0f1115;
+  --theme-bg-panel: #181b21; 
+  --theme-bg-panel-hover: #21252d; 
+  --theme-border-subtle: rgba(59, 130, 246, 0.2); 
+  --theme-border-strong: rgba(59, 130, 246, 0.5); 
+  --theme-text-main: #f8fafc;
+  --theme-text-muted: #64748b; 
+  --theme-accent-primary: #3b82f6; 
+  --theme-accent-hover: #2563eb; 
+  --theme-accent-light: #60a5fa; 
+  --theme-accent-subtle: rgba(59, 130, 246, 0.1);
+  
+  --theme-danger-base: #ef4444;
+  --theme-danger-text: #f87171;
+  --theme-danger-subtle: rgba(239, 68, 68, 0.2);
+  
+  --theme-warning-base: #f59e0b;
+  --theme-warning-text: #fbbf24;
+  --theme-warning-subtle: rgba(245, 158, 11, 0.2);
+  
+  --theme-success-base: #10b981;
+  --theme-success-text: #34d399;
+  --theme-success-subtle: rgba(16, 185, 129, 0.2);
+  
+  --theme-info-base: #8b5cf6;
+  --theme-info-text: #a78bfa;
+  --theme-info-subtle: rgba(139, 92, 246, 0.2);
+}
+
+.theme-light {
+  --theme-bg-base: #f8fafc;
+  --theme-bg-panel: #ffffff; 
+  --theme-bg-panel-hover: #f1f5f9; 
+  --theme-border-subtle: rgba(59, 130, 246, 0.2); 
+  --theme-border-strong: rgba(59, 130, 246, 0.5); 
+  --theme-text-main: #0f172a;
+  --theme-text-muted: #64748b; 
+  --theme-accent-primary: #3b82f6; 
+  --theme-accent-hover: #2563eb; 
+  --theme-accent-light: #2563eb; 
+  --theme-accent-subtle: rgba(59, 130, 246, 0.1);
+  
+  --theme-danger-base: #ef4444;
+  --theme-danger-text: #dc2626;
+  --theme-danger-subtle: rgba(239, 68, 68, 0.1);
+  
+  --theme-warning-base: #d97706;
+  --theme-warning-text: #b45309;
+  --theme-warning-subtle: rgba(245, 158, 11, 0.1);
+  
+  --theme-success-base: #059669;
+  --theme-success-text: #047857;
+  --theme-success-subtle: rgba(16, 185, 129, 0.1);
+  
+  --theme-info-base: #7c3aed;
+  --theme-info-text: #6d28d9;
+  --theme-info-subtle: rgba(139, 92, 246, 0.1);
+}
+
+.theme-sunset {
+  --theme-bg-base: #2a0a18;
+  --theme-bg-panel: #4a152c; 
+  --theme-bg-panel-hover: #5d1a36; 
+  --theme-border-subtle: rgba(245, 158, 11, 0.2); 
+  --theme-border-strong: rgba(245, 158, 11, 0.5); 
+  --theme-text-main: #fef3c7;
+  --theme-text-muted: #fcd34d; 
+  --theme-accent-primary: #f59e0b; 
+  --theme-accent-hover: #d97706; 
+  --theme-accent-light: #fbbf24; 
+  --theme-accent-subtle: rgba(245, 158, 11, 0.1);
+  
+  --theme-danger-base: #ef4444;
+  --theme-danger-text: #f87171;
+  --theme-danger-subtle: rgba(239, 68, 68, 0.2);
+  
+  --theme-warning-base: #f59e0b;
+  --theme-warning-text: #fbbf24;
+  --theme-warning-subtle: rgba(245, 158, 11, 0.2);
+  
+  --theme-success-base: #10b981;
+  --theme-success-text: #34d399;
+  --theme-success-subtle: rgba(16, 185, 129, 0.2);
+  
+  --theme-info-base: #8b5cf6;
+  --theme-info-text: #a78bfa;
+  --theme-info-subtle: rgba(139, 92, 246, 0.2);
 }
 
 body {
   margin: 0;
-  background-color: #000;
+  background-color: var(--theme-bg-base);
+  color: var(--theme-text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -23,9 +164,9 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #1d4ed8;
+  background: var(--theme-accent-primary);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: var(--theme-accent-hover);
 }

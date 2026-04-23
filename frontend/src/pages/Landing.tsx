@@ -35,7 +35,7 @@ function Dots({ total, active }: { total: number; active: number }) {
           key={i}
           animate={{ width: i === active ? 24 : 8, opacity: i === active ? 1 : 0.3 }}
           transition={{ duration: 0.3 }}
-          className="h-2 rounded-full bg-blue-400"
+          className="h-2 rounded-full bg-accent-primary"
         />
       ))}
     </div>
@@ -50,7 +50,7 @@ function ScrollHint({ direction, onClick }: { direction: 'left' | 'right'; onCli
       initial={{ opacity: 0 }}
       animate={{ opacity: 0.5 }}
       whileHover={{ opacity: 1, scale: 1.1 }}
-      className={`fixed top-1/2 -translate-y-1/2 z-50 p-2 border border-white/10 rounded-full bg-black/40 backdrop-blur-sm text-white ${direction === 'left' ? 'left-4' : 'right-4'}`}
+      className={`fixed top-1/2 -translate-y-1/2 z-50 p-2 border border-border-subtle rounded-full bg-bg-panel/40 backdrop-blur-sm text-text-main ${direction === 'left' ? 'left-4' : 'right-4'}`}
     >
       {direction === 'left' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
     </motion.button>
@@ -64,13 +64,13 @@ function FeatureCard({ icon: Icon, title, desc, delay }: { icon: any; title: str
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
-      className="border border-blue-500/20 bg-blue-950/10 rounded-xl p-6 space-y-3 hover:border-blue-500/50 hover:bg-blue-950/20 transition-all"
+      className="border border-border-subtle bg-bg-panel/10 rounded-xl p-6 space-y-3 hover:border-border-strong hover:bg-bg-panel/20 transition-all"
     >
-      <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-        <Icon className="w-5 h-5 text-blue-400" />
+      <div className="w-10 h-10 rounded-lg bg-accent-subtle border border-border-subtle flex items-center justify-center">
+        <Icon className="w-5 h-5 text-accent-light" />
       </div>
-      <h3 className="font-bold text-white text-lg">{title}</h3>
-      <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
+      <h3 className="font-bold text-text-main text-lg">{title}</h3>
+      <p className="text-text-muted text-sm leading-relaxed">{desc}</p>
     </motion.div>
   );
 }
@@ -82,12 +82,12 @@ function CommandPill({ cmd, desc, delay }: { cmd: string; desc: string; delay: n
       initial={{ opacity: 0, x: -20 }}
       whileInView={{ opacity: 1, x: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="flex items-center gap-4 border border-green-500/15 rounded-lg p-3 bg-green-950/5 hover:bg-green-950/15 transition-colors"
+      className="flex items-center gap-4 border border-accent-subtle rounded-lg p-3 bg-accent-subtle/5 hover:bg-accent-subtle/15 transition-colors"
     >
-      <code className="text-green-400 font-mono font-bold text-sm bg-green-900/20 px-3 py-1 rounded border border-green-500/20 shrink-0">
+      <code className="text-accent-light font-mono font-bold text-sm bg-accent-subtle px-3 py-1 rounded border border-border-subtle shrink-0">
         {cmd}
       </code>
-      <span className="text-gray-400 text-sm">{desc}</span>
+      <span className="text-text-muted text-sm">{desc}</span>
     </motion.div>
   );
 }
@@ -119,9 +119,9 @@ const Landing = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black font-sans">
+    <div className="relative w-screen h-screen overflow-hidden bg-bg-base font-sans">
       {/* CRT scanline overlay */}
-      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.18)_50%),linear-gradient(90deg,rgba(255,0,0,0.04),rgba(0,255,0,0.01),rgba(0,0,255,0.04))] bg-[length:100%_2px,3px_100%] z-50" />
+      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.18)_50%),linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01),rgba(255,255,255,0.02))] bg-[length:100%_2px,3px_100%] z-50" />
 
       {/* Nav dots */}
       <Dots total={SLIDE_COUNT} active={activeSlide} />
@@ -152,7 +152,7 @@ const Landing = () => {
             transition={{ duration: 1 }}
           >
             <motion.div
-              className="inline-block text-xs font-mono text-blue-400/60 border border-blue-500/20 px-4 py-1 rounded-full mb-4"
+              className="inline-block text-xs font-mono text-accent-light/60 border border-border-subtle px-4 py-1 rounded-full mb-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
@@ -161,21 +161,21 @@ const Landing = () => {
             </motion.div>
 
             <motion.h1
-              className="text-[clamp(4rem,12vw,9rem)] font-black tracking-tighter text-white leading-none"
+              className="text-[clamp(4rem,12vw,9rem)] font-black tracking-tighter text-text-main leading-none"
               animate={{
                 textShadow: [
-                  '0 0 20px rgba(59,130,246,0.4)',
-                  '0 0 50px rgba(59,130,246,0.8)',
-                  '0 0 20px rgba(59,130,246,0.4)',
+                  '0 0 20px var(--theme-accent-subtle)',
+                  '0 0 50px var(--theme-accent-subtle)',
+                  '0 0 20px var(--theme-accent-subtle)',
                 ],
               }}
               transition={{ duration: 3, repeat: Infinity }}
             >
-              WX<span className="text-blue-400">ATA</span>
+              WX<span className="text-accent-light">ATA</span>
             </motion.h1>
 
             <motion.p
-              className="text-xl md:text-2xl font-light tracking-[0.3em] uppercase text-gray-400 max-w-xl mx-auto"
+              className="text-xl md:text-2xl font-light tracking-[0.3em] uppercase text-text-muted max-w-xl mx-auto"
               initial={{ opacity: 0, letterSpacing: '0.1em' }}
               animate={{ opacity: 1, letterSpacing: '0.3em' }}
               transition={{ duration: 1.5, delay: 0.6 }}
@@ -191,13 +191,13 @@ const Landing = () => {
             >
               <button
                 onClick={() => navigate('/login')}
-                className="px-8 py-3 border border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-black font-bold rounded transition-all tracking-widest text-sm uppercase"
+                className="px-8 py-3 border border-border-strong text-accent-light hover:bg-accent-primary hover:text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase"
               >
                 Launch
               </button>
               <button
                 onClick={() => scrollTo(1)}
-                className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
+                className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
               >
                 Explore <ChevronRight className="w-4 h-4" />
               </button>
@@ -206,7 +206,7 @@ const Landing = () => {
 
           {/* Scroll hint */}
           <motion.div
-            className="absolute bottom-12 right-12 text-gray-600 text-xs font-mono flex items-center gap-2"
+            className="absolute bottom-12 right-12 text-text-muted text-xs font-mono flex items-center gap-2"
             animate={{ x: [0, 8, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
@@ -222,9 +222,9 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="mb-10"
           >
-            <div className="text-blue-400 font-mono text-xs tracking-widest mb-2">// CAPABILITIES</div>
-            <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">Built different.</h2>
-            <p className="text-gray-400 mt-3 max-w-lg">A full-stack WhatsApp automation platform. Not a chatbot — an engine.</p>
+            <div className="text-accent-light font-mono text-xs tracking-widest mb-2">// CAPABILITIES</div>
+            <h2 className="text-4xl md:text-5xl font-black text-text-main tracking-tight">Built different.</h2>
+            <p className="text-text-muted mt-3 max-w-lg">A full-stack WhatsApp automation platform. Not a chatbot — an engine.</p>
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl">
@@ -245,9 +245,9 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="mb-10"
           >
-            <div className="text-green-400 font-mono text-xs tracking-widest mb-2">// BUILT-IN SCRIPTS</div>
-            <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">Ready out of the box.</h2>
-            <p className="text-gray-400 mt-3 max-w-lg">Every command is editable from the dashboard. Trigger words, responses, targets — all configurable.</p>
+            <div className="text-accent-primary font-mono text-xs tracking-widest mb-2">// BUILT-IN SCRIPTS</div>
+            <h2 className="text-4xl md:text-5xl font-black text-text-main tracking-tight">Ready out of the box.</h2>
+            <p className="text-text-muted mt-3 max-w-lg">Every command is editable from the dashboard. Trigger words, responses, targets — all configurable.</p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-4xl">
@@ -273,27 +273,27 @@ const Landing = () => {
               transition={{ duration: 0.6 }}
               className="mb-10"
             >
-              <div className="text-purple-400 font-mono text-xs tracking-widest mb-2">// EXTENSION MARKETPLACE</div>
-              <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">Extend anything.</h2>
-              <p className="text-gray-400 mt-3 max-w-lg">Community-built scripts. Install with one click from your dashboard. Publish your own for others to use.</p>
+              <div className="text-info-text font-mono text-xs tracking-widest mb-2">// EXTENSION MARKETPLACE</div>
+              <h2 className="text-4xl md:text-5xl font-black text-text-main tracking-tight">Extend anything.</h2>
+              <p className="text-text-muted mt-3 max-w-lg">Community-built scripts. Install with one click from your dashboard. Publish your own for others to use.</p>
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
               {[
-                { icon: MessageSquare, title: 'Chat Automations', desc: 'Auto-replies, scheduled messages, keyword triggers.', color: 'blue' },
-                { icon: Radio,         title: 'Group Tools',      desc: 'Moderation, polls, announcements, member management.', color: 'green' },
-                { icon: Tag,           title: 'Media Scripts',    desc: 'Sticker makers, image editors, file converters.', color: 'purple' },
+                { icon: MessageSquare, title: 'Chat Automations', desc: 'Auto-replies, scheduled messages, keyword triggers.', color: 'accent-primary' },
+                { icon: Radio,         title: 'Group Tools',      desc: 'Moderation, polls, announcements, member management.', color: 'accent-light' },
+                { icon: Tag,           title: 'Media Scripts',    desc: 'Sticker makers, image editors, file converters.', color: 'info-text' },
               ].map(({ icon: Icon, title, desc, color }, i) => (
                 <motion.div
                   key={title}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  className={`border border-${color}-500/20 bg-${color}-950/10 rounded-xl p-6 space-y-3`}
+                  className={`border border-border-subtle bg-bg-panel/10 rounded-xl p-6 space-y-3`}
                 >
-                  <Icon className={`w-8 h-8 text-${color}-400`} />
-                  <h3 className="font-bold text-white">{title}</h3>
-                  <p className="text-gray-400 text-sm">{desc}</p>
+                  <Icon className={`w-8 h-8 text-accent-light`} />
+                  <h3 className="font-bold text-text-main">{title}</h3>
+                  <p className="text-text-muted text-sm">{desc}</p>
                 </motion.div>
               ))}
             </div>
@@ -306,13 +306,13 @@ const Landing = () => {
             >
               <button
                 onClick={() => navigate('/extensions')}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded transition-all text-sm uppercase tracking-widest flex items-center gap-2"
+                className="px-6 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all text-sm uppercase tracking-widest flex items-center gap-2"
               >
                 <Package className="w-4 h-4" /> Browse Marketplace
               </button>
               <button
                 onClick={() => navigate('/register')}
-                className="px-6 py-3 border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 font-bold rounded transition-all text-sm uppercase tracking-widest"
+                className="px-6 py-3 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all text-sm uppercase tracking-widest"
               >
                 Publish a Script
               </button>
@@ -330,35 +330,35 @@ const Landing = () => {
             whileInView={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
           >
-            <div className="text-blue-400 font-mono text-xs tracking-widest">// GET STARTED</div>
+            <div className="text-accent-light font-mono text-xs tracking-widest">// GET STARTED</div>
 
-            <h2 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-none">
+            <h2 className="text-5xl md:text-7xl font-black text-text-main tracking-tight leading-none">
               Your bot.<br />
-              <span className="text-blue-400">Your rules.</span>
+              <span className="text-accent-light">Your rules.</span>
             </h2>
 
-            <p className="text-gray-400 text-lg max-w-md mx-auto">
+            <p className="text-text-muted text-lg max-w-md mx-auto">
               Deploy on any VPS. Connect via QR or pairing code. Configure everything from the dashboard — no code required.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => navigate('/register')}
-                className="px-10 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded transition-all text-sm uppercase tracking-widest"
+                className="px-10 py-4 bg-accent-primary hover:bg-accent-hover text-bg-base font-black rounded transition-all text-sm uppercase tracking-widest"
               >
                 Create Account
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="px-10 py-4 border border-white/20 text-white hover:bg-white/5 font-bold rounded transition-all text-sm uppercase tracking-widest"
+                className="px-10 py-4 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all text-sm uppercase tracking-widest"
               >
                 Sign In
               </button>
             </div>
 
-            <div className="pt-4 text-xs text-gray-600 font-mono space-y-1">
+            <div className="pt-4 text-xs text-text-muted font-mono space-y-1">
               <div>Built with Baileys · Powered by Bun · Open Platform</div>
-              <div className="text-gray-700">© TADS Tech</div>
+              <div className="text-text-muted opacity-30">© TADS Tech</div>
             </div>
           </motion.div>
         </section>

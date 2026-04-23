@@ -70,45 +70,45 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-800 p-8 rounded-xl w-full max-w-md">
+    <div className="min-h-screen bg-bg-base text-text-main flex items-center justify-center p-4">
+      <div className="bg-bg-base border border-border-strong p-8 rounded-xl w-full max-w-md">
         <h2 className="text-3xl font-bold text-primary mb-6 text-center">Register</h2>
         {error && <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded mb-4">{error}</div>}
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-400">Full Name</label>
+            <label className="block text-sm font-medium mb-1 text-text-muted">Full Name</label>
             <input 
               type="text" required value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-400">Username</label>
+            <label className="block text-sm font-medium mb-1 text-text-muted">Username</label>
             <input 
               type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-400">Email</label>
+            <label className="block text-sm font-medium mb-1 text-text-muted">Email</label>
             <input 
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-400">Password</label>
+            <label className="block text-sm font-medium mb-1 text-text-muted">Password</label>
             <input 
               type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-400">Registration Code</label>
+            <label className="block text-sm font-medium mb-1 text-text-muted">Registration Code</label>
             <input 
               type="text" required value={userCode} onChange={(e) => setUserCode(e.target.value)}
               placeholder="Provided by administrator"
-              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2 text-white focus:outline-none focus:border-accent"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent"
             />
           </div>
           <button disabled={loading} type="submit" className="w-full bg-primary hover:bg-primary/90 text-black font-bold py-2 px-4 rounded transition-colors disabled:opacity-50">

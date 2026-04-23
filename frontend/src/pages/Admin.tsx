@@ -36,6 +36,10 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [extLoading, setExtLoading] = useState(true);
 
+  // Edit Modal State
+  const [adminEditingExt, setAdminEditingExt] = useState<Extension | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', trigger: '', response: '', code: '' });
+
   // Simplified protection for the admin panel demonstration
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPass, setAdminPass] = useState('');
@@ -112,6 +116,35 @@ export default function Admin() {
     }
   };
 
+  const handleEditExtClick = (ext: Extension) => {
+    setAdminEditingExt(ext);
+    setEditForm({
+      name: ext.name,
+      description: ext.description,
+      trigger: ext.trigger,
+      response: ext.response || '',
+      code: ext.code || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!adminEditingExt) return;
+    try {
+      await updateDoc(doc(db, 'extensions', adminEditingExt.id), {
+        name: editForm.name,
+        description: editForm.description,
+        trigger: editForm.trigger,
+        response: editForm.response,
+        code: editForm.code
+      });
+      setAdminEditingExt(null);
+      fetchExtensions();
+    } catch(e: any) {
+      console.error(e);
+      alert('Failed to save edit: ' + e.message);
+    }
+  };
+
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminPass === 'ROOT_ACCESS') { // Standard placeholder admin pass
@@ -148,18 +181,18 @@ export default function Admin() {
 
   if (!isAdminUnlocked) {
     return (
-      <div className="min-h-screen bg-[#050505] text-blue-500 flex items-center justify-center font-mono p-4">
-        <div className="border border-blue-500/30 p-8 bg-black w-full max-w-md">
-          <h2 className="text-2xl font-bold text-center mb-6 text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">ROOT ADMIN PANEL</h2>
+      <div className="min-h-screen bg-bg-base text-accent-primary flex items-center justify-center font-mono p-4">
+        <div className="border border-border-strong p-8 bg-bg-base w-full max-w-md">
+          <h2 className="text-2xl font-bold text-center mb-6 text-accent-light drop-shadow-[0_0_10px_var(--accent-subtle)]">ROOT ADMIN PANEL</h2>
           <form onSubmit={handleAdminLogin} className="space-y-4">
             <input 
               type="password" 
               placeholder="Admin Passphrase" 
               value={adminPass}
               onChange={e => setAdminPass(e.target.value)}
-              className="w-full bg-transparent border-b border-blue-500/50 py-2 text-center text-white focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full bg-transparent border-b border-border-strong py-2 text-center text-text-main focus:outline-none focus:border-accent-light transition-colors"
             />
-            <button type="submit" className="w-full border border-blue-500/50 text-blue-400 hover:bg-blue-600 hover:text-white py-3 transition-colors">
+            <button type="submit" className="w-full border border-border-strong text-accent-light hover:bg-accent-primary hover:text-text-main py-3 transition-colors">
               AUTHENTICATE
             </button>
           </form>
@@ -169,37 +202,37 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8 font-mono">
+    <div className="min-h-screen bg-bg-base text-text-main p-8 font-mono">
       <div className="max-w-5xl mx-auto space-y-8">
-        <h1 className="text-3xl font-bold text-blue-400 border-b border-blue-500/20 pb-4">WXATA Registration Manager</h1>
+        <h1 className="text-3xl font-bold text-accent-light border-b border-border-subtle pb-4">WXATA Registration Manager</h1>
         
         {/* Code Generator Card */}
-        <div className="bg-gray-900/50 border border-blue-500/30 p-6 rounded-lg flex flex-col md:flex-row gap-6 shadow-[0_0_15px_rgba(59,130,246,0.05)]">
+        <div className="bg-bg-panel border border-border-strong p-6 rounded-lg flex flex-col md:flex-row gap-6 shadow-[0_0_15px_rgba(59,130,246,0.05)]">
           <div className="flex-1">
             <h2 className="text-xl font-bold mb-2 text-indigo-400">Generate Access Code</h2>
-            <p className="text-gray-400 text-sm mb-4">Create a unique token to allow a new user to securely register on the platform.</p>
+            <p className="text-text-muted text-sm mb-4">Create a unique token to allow a new user to securely register on the platform.</p>
             <div className="flex items-center gap-4 mb-4">
               <input 
                 type="text" 
                 readOnly 
                 value={code} 
                 placeholder="Click generate ->"
-                className="flex-1 bg-black border border-gray-700 focus:border-blue-500 text-blue-400 px-4 py-3 rounded outline-none"
+                className="flex-1 bg-bg-base border border-border-subtle focus:border-border-strong text-accent-light px-4 py-3 rounded outline-none"
               />
-              <button onClick={generateRandomCode} className="bg-blue-900/30 hover:bg-blue-800/50 text-blue-400 px-6 py-3 rounded border border-blue-500/50 transition-colors">
+              <button onClick={generateRandomCode} className="bg-accent-subtle hover:bg-accent-subtle text-accent-light px-6 py-3 rounded border border-border-strong transition-colors">
                 Generate
               </button>
             </div>
             <button 
               onClick={saveCode}
               disabled={!code}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-accent-primary hover:bg-accent-hover text-text-main font-bold py-3 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Push to Database
             </button>
             
             {message && (
-              <div className={`mt-4 p-3 rounded text-sm ${message.startsWith('Error') ? 'bg-red-900/50 text-red-200 border border-red-500' : 'bg-blue-900/30 text-blue-300 border border-blue-500/50'}`}>
+              <div className={`mt-4 p-3 rounded text-sm ${message.startsWith('Error') ? 'bg-red-900/50 text-red-200 border border-red-500' : 'bg-accent-subtle text-accent-light border border-border-strong'}`}>
                 {message}
               </div>
             )}
@@ -207,17 +240,17 @@ export default function Admin() {
         </div>
 
         {/* Existing Codes List */}
-        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-lg">
-          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-gray-800 pb-2">Issued Codes Register</h2>
+        <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
+          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-border-strong pb-2">Issued Codes Register</h2>
           {loading ? (
-            <p className="text-gray-500">Loading token database...</p>
+            <p className="text-text-muted">Loading token database...</p>
           ) : codesList.length === 0 ? (
-            <p className="text-gray-500">No codes issued yet.</p>
+            <p className="text-text-muted">No codes issued yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-gray-400 border-b border-gray-800">
+                  <tr className="text-text-muted border-b border-border-strong">
                     <th className="py-3 px-2">Access Token</th>
                     <th className="py-3 px-2">Status</th>
                     <th className="py-3 px-2">Claimed By (UID)</th>
@@ -226,16 +259,16 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {codesList.map(c => (
-                    <tr key={c.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-3 px-2 font-bold text-blue-400">{c.code}</td>
+                    <tr key={c.id} className="border-b border-border-strong/50 hover:bg-bg-panel-hover/30">
+                      <td className="py-3 px-2 font-bold text-accent-light">{c.code}</td>
                       <td className="py-3 px-2">
                         {c.used 
                           ? <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded text-xs">USED</span> 
                           : <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded text-xs">AVAILABLE</span>
                         }
                       </td>
-                      <td className="py-3 px-2 text-gray-400 font-mono text-xs">{c.usedBy || '-'}</td>
-                      <td className="py-3 px-2 text-gray-500">{new Date(c.createdAt).toLocaleString()}</td>
+                      <td className="py-3 px-2 text-text-muted font-mono text-xs">{c.usedBy || '-'}</td>
+                      <td className="py-3 px-2 text-text-muted">{new Date(c.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -245,17 +278,17 @@ export default function Admin() {
         </div>
 
         {/* Pending Extensions List */}
-        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-lg">
-          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-gray-800 pb-2">Pending Marketplace Extensions</h2>
+        <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
+          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-border-strong pb-2">Pending Marketplace Extensions</h2>
           {extLoading ? (
-            <p className="text-gray-500">Loading extensions database...</p>
+            <p className="text-text-muted">Loading extensions database...</p>
           ) : pendingExtensions.length === 0 ? (
-            <p className="text-gray-500">No pending extensions awaiting approval.</p>
+            <p className="text-text-muted">No pending extensions awaiting approval.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-gray-400 border-b border-gray-800">
+                  <tr className="text-text-muted border-b border-border-strong">
                     <th className="py-3 px-2">Name / Desc</th>
                     <th className="py-3 px-2">Trigger & Response</th>
                     <th className="py-3 px-2">Author (UID)</th>
@@ -264,23 +297,24 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {pendingExtensions.map(ext => (
-                    <tr key={ext.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <tr key={ext.id} className="border-b border-border-strong/50 hover:bg-bg-panel-hover/30">
                       <td className="py-3 px-2">
-                        <div className="font-bold text-blue-400">{ext.name}</div>
-                        <div className="text-gray-500 text-xs truncate max-w-xs">{ext.description}</div>
+                        <div className="font-bold text-accent-light">{ext.name}</div>
+                        <div className="text-text-muted text-xs truncate max-w-xs">{ext.description}</div>
                       </td>
                       <td className="py-3 px-2">
                          <div className="text-xs">
-                           <span className="text-gray-500">Trigger:</span> <span className="font-mono text-blue-300 px-1">!{ext.trigger}</span><br/>
-                           <span className="text-gray-500">Resp:</span> <span className="font-mono text-gray-300">{ext.response || '<script>'}</span>
+                           <span className="text-text-muted">Trigger:</span> <span className="font-mono text-accent-light px-1">!{ext.trigger}</span><br/>
+                           <span className="text-text-muted">Resp:</span> <span className="font-mono text-text-muted">{ext.response || '<script>'}</span>
                          </div>
                          {ext.code && <div className="text-green-500 text-[10px] mt-1">Contains JS Code</div>}
                       </td>
-                      <td className="py-3 px-2 text-gray-400">
+                      <td className="py-3 px-2 text-text-muted">
                         {ext.author}<br/>
                         <span className="font-mono text-[10px] opacity-50">{ext.authorUid}</span>
                       </td>
                       <td className="py-3 px-2 text-right space-x-2">
+                         <button onClick={() => handleEditExtClick(ext)} className="text-xs bg-accent-subtle hover:bg-accent-subtle border border-border-strong text-accent-light px-3 py-1 rounded">Edit</button>
                          <button onClick={() => handleExtStatus(ext.id, 'approved')} className="text-xs bg-green-900/30 hover:bg-green-800/50 border border-green-500/50 text-green-400 px-3 py-1 rounded">Approve</button>
                          <button onClick={() => handleDeleteExt(ext.id)} className="text-xs bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-3 py-1 rounded">Delete</button>
                       </td>
@@ -293,17 +327,17 @@ export default function Admin() {
         </div>
 
         {/* Approved Marketplace Extensions */}
-        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-lg">
-          <h2 className="text-xl font-bold mb-4 text-emerald-400 border-b border-gray-800 pb-2">Active Marketplace Extensions</h2>
+        <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
+          <h2 className="text-xl font-bold mb-4 text-accent-light border-b border-border-strong pb-2">Active Marketplace Extensions</h2>
           {extLoading ? (
-            <p className="text-gray-500">Loading extensions database...</p>
+            <p className="text-text-muted">Loading extensions database...</p>
           ) : approvedExtensions.length === 0 ? (
-            <p className="text-gray-500">No approved extensions exist yet.</p>
+            <p className="text-text-muted">No approved extensions exist yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-gray-400 border-b border-gray-800">
+                  <tr className="text-text-muted border-b border-border-strong">
                     <th className="py-3 px-2">Extension</th>
                     <th className="py-3 px-2">Status Tags</th>
                     <th className="py-3 px-2 text-right">Admin Controls</th>
@@ -311,17 +345,17 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {approvedExtensions.map(ext => (
-                    <tr key={ext.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <tr key={ext.id} className="border-b border-border-strong/50 hover:bg-bg-panel-hover/30">
                       <td className="py-3 px-2">
-                        <div className="font-bold text-emerald-400">{ext.name}</div>
-                        <div className="text-gray-500 text-xs">Installs: {ext.downloads || 0}</div>
+                        <div className="font-bold text-accent-light">{ext.name}</div>
+                        <div className="text-text-muted text-xs">Installs: {ext.downloads || 0}</div>
                       </td>
                       <td className="py-3 px-2 space-y-1">
                         {ext.untrusted && <span className="inline-block bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded text-[10px] font-bold mr-2">⚠️ UNTRUSTED</span>}
                         {ext.disabled ? (
                           <span className="inline-block bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded text-[10px] font-bold">INSTALL DISABLED</span>
                         ) : (
-                          <span className="inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">ACTIVE</span>
+                          <span className="inline-block bg-accent-subtle text-accent-light border border-border-strong px-2 py-0.5 rounded text-[10px] font-bold">ACTIVE</span>
                         )}
                       </td>
                       <td className="py-3 px-2 text-right">
@@ -329,15 +363,21 @@ export default function Admin() {
                           <div className="space-x-1">
                             <button 
                               onClick={() => handleToggleExtField(ext.id, 'untrusted', ext.untrusted)} 
-                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.untrusted ? 'bg-gray-800 text-gray-400 border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
+                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.untrusted ? 'bg-bg-panel-hover text-text-muted border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
                             >
                               {ext.untrusted ? 'Mark Trusted' : 'Mark Untrusted'}
                             </button>
                             <button 
                               onClick={() => handleToggleExtField(ext.id, 'disabled', ext.disabled)} 
-                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.disabled ? 'bg-gray-800 text-gray-400 border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
+                              className={`text-[10px] px-2 py-1 rounded border transition-colors ${ext.disabled ? 'bg-bg-panel-hover text-text-muted border-gray-600' : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'}`}
                             >
                               {ext.disabled ? 'Enable Install' : 'Disable Install'}
+                            </button>
+                            <button 
+                              onClick={() => handleEditExtClick(ext)} 
+                              className="text-[10px] bg-accent-subtle hover:bg-accent-subtle border border-border-strong text-accent-light px-2 py-1 rounded transition-colors"
+                            >
+                              Edit
                             </button>
                             <button 
                               onClick={() => handleDeleteExt(ext.id)} 
@@ -356,6 +396,82 @@ export default function Admin() {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {adminEditingExt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
+          <div className="bg-bg-panel border border-border-strong p-6 rounded-lg w-full max-w-2xl shadow-[0_0_20px_var(--accent-subtle)] max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-6 text-accent-light border-b border-border-subtle pb-4">Edit Extension: {adminEditingExt.name}</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Extension Name</label>
+                <input 
+                  type="text" 
+                  value={editForm.name}
+                  onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-bg-base border border-border-subtle focus:border-border-strong text-text-main p-3 rounded outline-none" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Description</label>
+                <textarea 
+                  value={editForm.description}
+                  onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full bg-bg-base border border-border-subtle focus:border-border-strong text-text-main p-3 rounded outline-none h-20" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">Trigger Command</label>
+                  <input 
+                    type="text" 
+                    value={editForm.trigger}
+                    onChange={e => setEditForm(prev => ({ ...prev, trigger: e.target.value }))}
+                    className="w-full bg-bg-base border border-border-subtle focus:border-border-strong text-text-main p-3 rounded outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-text-muted mb-1">Bot Response</label>
+                  <input
+                    type="text"
+                    value={editForm.response}
+                    onChange={e => setEditForm(prev => ({ ...prev, response: e.target.value }))}
+                    className="w-full bg-bg-base border border-border-subtle focus:border-border-strong text-text-main p-3 rounded outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-text-muted mb-1">Custom JS / TypeScript Execution (Advanced)</label>
+                <textarea
+                  rows={6}
+                  value={editForm.code}
+                  onChange={e => setEditForm(prev => ({ ...prev, code: e.target.value }))}
+                  className="w-full bg-bg-base font-mono text-sm border border-border-subtle focus:border-border-strong text-green-400 p-3 rounded outline-none"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4 border-t border-border-strong">
+                <button 
+                  onClick={handleSaveEdit}
+                  className="flex-1 bg-accent-primary hover:bg-accent-hover text-text-main font-bold py-3 px-4 rounded transition-colors"
+                >
+                  Save Changes
+                </button>
+                <button 
+                  onClick={() => setAdminEditingExt(null)}
+                  className="flex-1 bg-bg-panel-hover hover:bg-gray-700 text-text-muted font-bold py-3 px-4 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
