@@ -1141,7 +1141,7 @@ async function startBot() {
   } catch { /* vars.json missing or empty — use default */ }
 
   let connectionManager: WXATAConnection | null = null;
-  let activeSocket: Awaited<ReturnType<WXATAConnection['createConnection']>> | null = null;
+  let hasSentWelcome = false;
 
   dashboard.onCommand(async (payload) => {
     try {
@@ -1160,22 +1160,29 @@ async function startBot() {
           onPairingCode: (code) => {
             dashboard.sendPairingCode(code);
           },
+          onSocketCreated: (sock) => {
+            attachMessageHandler(sock);
+          },
           onOpen: () => {
             dashboard.log('SUCCESS', 'Bot is now fully operational');
-            setTimeout(() => {
-              const socketForWelcome = connectionManager?.getSocket();        
-              if (socketForWelcome) {
-                sendWelcomeMessage(socketForWelcome).catch((err) => {
-                  console.error('Failed to send welcome message', err);       
-                  dashboard.log('ERROR', 'Failed to send welcome message');   
-                });
-              }
-            }, 15000); // Increased timeout to ensure session keys fully propagate to WhatsApp servers before sending
+            
+            if (!hasSentWelcome) {
+              setTimeout(() => {
+                const socketForWelcome = connectionManager?.getSocket();        
+                if (socketForWelcome) {
+                  sendWelcomeMessage(socketForWelcome).then(() => {
+                    hasSentWelcome = true;
+                  }).catch((err) => {
+                    console.error('Failed to send welcome message', err);       
+                    dashboard.log('ERROR', 'Failed to send welcome message');   
+                  });
+                }
+              }, 15000); // Increased timeout to ensure session keys fully propagate to WhatsApp servers before sending
+            }
           }
         });
 
-        activeSocket = await connectionManager.createConnection();
-        attachMessageHandler(activeSocket);
+        await connectionManager.createConnection();
       }
 
       if (payload.command === 'GET_BOT_INFO') {

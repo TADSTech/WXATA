@@ -35,6 +35,7 @@ interface ConnectionOptions {
   onPairingCode?: (code: string) => void;
   onOpen?: () => void;
   onLogout?: () => void;
+  onSocketCreated?: (sock: WASocket) => void;
 }
 
 export class WXATAConnection {
@@ -79,6 +80,10 @@ export class WXATAConnection {
         return { conversation: '' };
       },
     });
+
+    if (this.options.onSocketCreated) {
+      this.options.onSocketCreated(this.sock);
+    }
 
     // Handle Pairing Code
     if (this.options.usePairingCode && !this.sock.authState.creds.registered && this.options.phoneNumber) {
