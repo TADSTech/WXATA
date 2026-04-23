@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, where, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
 
 interface UserCode {
   id: string;

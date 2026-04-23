@@ -527,7 +527,7 @@ const Dashboard = () => {
     setConfigStatus('Unsaved changes');
   };
 
-  const handlePublishScript = async (key: string, script: BotScript) => {
+  const handlePublishScript = async (_key: string, script: BotScript) => {
     if (!auth.currentUser) {
       alert("You must be logged in to publish scripts.");
       return;

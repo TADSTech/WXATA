@@ -283,7 +283,7 @@ const Landing = () => {
                 { icon: MessageSquare, title: 'Chat Automations', desc: 'Auto-replies, scheduled messages, keyword triggers.', color: 'accent-primary' },
                 { icon: Radio,         title: 'Group Tools',      desc: 'Moderation, polls, announcements, member management.', color: 'accent-light' },
                 { icon: Tag,           title: 'Media Scripts',    desc: 'Sticker makers, image editors, file converters.', color: 'info-text' },
-              ].map(({ icon: Icon, title, desc, color }, i) => (
+              ].map(({ icon: Icon, title, desc }, i) => (
                 <motion.div
                   key={title}
                   initial={{ opacity: 0, y: 20 }}
