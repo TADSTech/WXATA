@@ -74,6 +74,10 @@ export class WXATAConnection {
       patchMessageBeforeSending: (message) => {
         return message;
       },
+      // Fix for "Waiting for message" sync issues: allows Baileys to request a key retry
+      getMessage: async (key) => {
+        return { conversation: '' };
+      },
     });
 
     // Handle Pairing Code

@@ -1170,7 +1170,7 @@ async function startBot() {
                   dashboard.log('ERROR', 'Failed to send welcome message');   
                 });
               }
-            }, 5000); // Increased timeout to ensure socket is fully stabilized before querying URLs/messages
+            }, 15000); // Increased timeout to ensure session keys fully propagate to WhatsApp servers before sending
           }
         });
 
