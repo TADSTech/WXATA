@@ -117,7 +117,16 @@ export class WXATAConnection {
           this.reconnectAttempts = 0; // Reset backoff
           if (this.options.onLogout) this.options.onLogout();
           setTimeout(() => this.createConnection(), 2000);
+        } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+          logger.error('Connection replaced by another session. Stopping reconnects to prevent conflict loops.');
+          dashboard.log('ERROR', 'Session taken over by another instance. Please restart the container if this is unexpected.');
+          // Do not automatically reconnect on 440. This allows PaaS rolling-deployments to cleanly transition
+          // by letting the old container die instead of fighting the new container for the session.
         } else {
+          // Make sure to clean up the old socket before reconnecting to prevent memory leaks and zombie listeners
+          try { this.sock?.ws?.close(); } catch {}
+          this.sock?.ev.removeAllListeners('connection.update');
+          this.sock?.ev.removeAllListeners('creds.update');
           this.handleReconnect();
         }
       } else if (connection === 'open') {

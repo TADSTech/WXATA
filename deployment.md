@@ -142,7 +142,9 @@ When configuring the deployment on your PaaS provider, use the following setting
 - **Build Command**: Not required (handled by the Dockerfile)
 - **Start Command**: Not required (handled by the Dockerfile's `CMD`)
 - **Port**: `5000` (Make sure the platform exposes this port for the WebSocket connection)
-- **Environment Variables**: Add any environment variables you need (e.g., `DB_RETENTION_DAYS=3`)
+- **Environment Variables**: Add any environment variables you need:
+  - `PORT=5000` (Optional: specify the port the backend should bind to internally)
+  - `DB_RETENTION_DAYS=3`
 
 ### 3. Data Persistence Note
 Since this deployment method relies on the container's ephemeral filesystem (without mounted volumes), **any data stored locally inside the container will be lost if the container spins down, restarts, or redeploys.**
@@ -155,7 +157,10 @@ If your PaaS provider supports persistent disks (like Render's `/data` disk), th
 ### 4. Deploying Manually (Local/VPS)
 If you just want to run the Docker image manually on your own server without `docker-compose`:
 ```bash
-docker build -t wxata-backend .
+# Build with a custom port if desired (default is 5000)
+docker build --build-arg PORT=5000 -t wxata-backend .
+
+# Run the container, binding your server's port to the container's port
 docker run -d -p 5000:5000 --name wxata-backend wxata-backend
 ```
 
@@ -202,6 +207,12 @@ What's shared vs per-instance:
 
 ## Local Development
 
+You can configure the backend port locally by creating a `backend/.env` file:
+```bash
+echo "PORT=5000" > backend/.env
+```
+
+To run both frontend and backend locally:
 ```bash
 bun run install:all   # install all deps
 bun run all           # frontend + backend together

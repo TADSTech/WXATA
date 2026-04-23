@@ -18,8 +18,12 @@ WORKDIR /app
 COPY backend/ ./backend/
 COPY botinfo.example.json ./
 
-# Expose the WebSocket port for the dashboard
-EXPOSE 5000
+# Set default port
+ARG PORT=5000
+ENV PORT=${PORT}
+
+# Expose the configured port for the dashboard
+EXPOSE ${PORT}
 
 # Run the backend
 WORKDIR /app/backend
