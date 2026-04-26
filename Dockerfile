@@ -14,11 +14,11 @@ WORKDIR /app
 
 # ── Install dependencies ──────────────────────────────────────────────────────
 COPY package.json bun.lock ./
-COPY backend/package.json ./backend/
+COPY backend/package.json backend/bun.lock ./backend/
 
-RUN bun install
+RUN bun install --frozen-lockfile
 WORKDIR /app/backend
-RUN bun install
+RUN bun install --frozen-lockfile
 WORKDIR /app
 
 # ── Copy source ───────────────────────────────────────────────────────────────

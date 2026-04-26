@@ -1,10 +1,7 @@
-# Dependencies — reinstalled inside the image
+# Dependencies — reinstalled inside the image (node_modules excluded, lockfiles INCLUDED for reproducible install)
 node_modules
 backend/node_modules
 frontend/node_modules
-bun.lock
-backend/bun.lock
-frontend/bun.lock
 
 # Git
 .git
