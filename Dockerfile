@@ -1,10 +1,10 @@
 FROM oven/bun:latest
 
 # ── System deps ───────────────────────────────────────────────────────────────
-# python3/make/g++ are required by node-gyp (better-sqlite3)
-# Node.js + npm are required to install PM2 globally
+# Node.js + npm are required to install PM2 globally.
+# python3/make/g++ are only needed if any native addon uses node-gyp.
+# The backend uses bun:sqlite (built-in), so no native build tools are needed.
 RUN apt-get update && \
-    apt-get install -y python3 make g++ curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g pm2 && \

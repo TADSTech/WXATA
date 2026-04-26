@@ -26,9 +26,5 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^9.1.2"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.9.0",
-    "node-cache": "^5.1.2"
   }
 }
