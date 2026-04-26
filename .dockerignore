@@ -1,15 +1,41 @@
+# Dependencies — reinstalled inside the image
 node_modules
 backend/node_modules
 frontend/node_modules
-bun.lockb
+bun.lock
+backend/bun.lock
+frontend/bun.lock
+
+# Git
 .git
 .gitignore
 .vscode
-backend/auth_info
-backend/db
+
+# Frontend — not needed in the backend image
+frontend/
+
+# Per-instance runtime data — provided via Docker volumes at runtime
+backend/auth_info/
+backend/db/
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 botinfo.json
 warns.json
 vars.json
 backend/antidel.json
 backend/antibc.json
+
+# Secrets
+.env
+backend/.env
+root.env
+
+# Logs
+logs/
+*.log
+
+# Scratch / dev
+scratch/
+refactor_v2.js
+frontend/refactor_themes.js

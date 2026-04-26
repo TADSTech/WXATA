@@ -3,6 +3,7 @@ import { WXATAConnection } from './connection';
 import * as qrcode from 'qrcode-terminal';
 import { dashboard } from './DashboardServer';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { storeMessage, getMessage, pruneOldMessages, getRetentionDays, setRetentionDays, getMessageCount } from './db';
 
@@ -10,6 +11,8 @@ interface BotScript {
   name: string;
   desc: string;
   trigger: string;
+  aliases?: string[];
+  type?: string;
   response: string;
   target: string;
   code?: string;
@@ -53,83 +56,176 @@ const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
   scripts: {
     menu: {
-      name: 'menu',
-      desc: 'List all core scripts and their usage',
-      trigger: 'menu',
-      response: 'Available scripts listed below.',
-      target: 'chat'
+      name: 'System Menu',
+      desc: 'Show professional system menu with stats',
+      trigger: 'mn',
+      aliases: ['menu', 'm'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `const os = require('os');
+const uptime = Math.floor(process.uptime());
+const h = Math.floor(uptime / 3600);
+const m = Math.floor((uptime % 3600) / 60);
+const s = Math.floor(uptime % 60);
+const uptimeStr = \`\${h}h \${m}m \${s}s\`;
+const ram = (os.totalmem() - os.freemem()) / 1024 / 1024 / 1024;
+const totalRam = os.totalmem() / 1024 / 1024 / 1024;
+
+const isDetailed = argumentName === 'detailed' || argumentName === 'd';
+const date = new Date();
+const time = date.toLocaleTimeString();
+
+let menuText = \`╭━─━─━─≪✠≫─━─━─━╮
+     *WXATA SYSTEM v1.0*
+╰━─━─━─≪✠≫─━─━─━╯
+╭━─━─━─≪✠≫─━─━─━╮
+│ 📅 *Date:* \${date.toLocaleDateString()}
+│ ⏰ *Time:* \${time}
+│ ❄️ *Day:* \${date.toLocaleString('en', { weekday: 'long' })}
+│ 🚀 *Version:* 1.2.0
+│ 🪻 *RAM:* \${ram.toFixed(2)}GB / \${totalRam.toFixed(0)}GB
+│ ⏳ *Uptime:* \${uptimeStr}
+╰━─━─━─≪✠≫─━─━─━╯\\n\\n\`;
+
+const categories = {};
+Object.entries(botInfo.scripts).forEach(([key, script]) => {
+    const type = script.type || 'misc';
+    if (!categories[type]) categories[type] = [];
+    categories[type].push(script);
+});
+
+for (const [cat, cmds] of Object.entries(categories)) {
+    menuText += \`╭━─━─━─≪❥≫\\n│ *\${cat.toUpperCase()} ❞*\\n╰━─━─━─≪❥≫\\n\`;
+    cmds.forEach(cmd => {
+        if (isDetailed) {
+            menuText += \`│ ✗ \${botInfo.prefix}\${cmd.trigger} (\${cmd.name})\\n│    \${cmd.desc}\\n\`;
+        } else {
+            menuText += \`│ ✗ \${botInfo.prefix}\${cmd.trigger}\\n\`;
+        }
+    });
+    menuText += '\\n';
+}
+
+if (!isDetailed) menuText += \`_Tip: Use \${botInfo.prefix}mn detailed for descriptions._\`;
+
+await sock.sendMessage(remoteJid, { 
+    text: menuText,
+    contextInfo: {
+        externalAdReply: {
+            title: 'WXATA • PREMIUM ENGINE',
+            body: isDetailed ? 'Detailed Command Overview' : 'Advanced WhatsApp Automation',
+            mediaType: 1,
+            thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',
+            sourceUrl: 'https://wxata.tadstech.dev'
+        }
+    }
+});`
+    },
+    help: {
+      name: 'Help System',
+      desc: 'Describe a specific command and its usage',
+      trigger: 'hp',
+      aliases: ['help', 'h'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `if (!argumentName) return sendTrackedMessage(sock, remoteJid, \`📖 *WXATA HELP*\\n\\nUsage: \${botInfo.prefix}hp <command>\\nExample: \${botInfo.prefix}hp st\\n\\nType \${botInfo.prefix}mn to see all aliases.\`);
+
+const cmdKey = argumentName.toLowerCase().trim();
+const script = Object.values(botInfo.scripts).find(s => s.trigger === cmdKey || s.name?.toLowerCase() === cmdKey || (s.aliases && s.aliases.includes(cmdKey)));
+
+if (!script) return sendTrackedMessage(sock, remoteJid, \`❌ Command "\${cmdKey}" not found.\`);
+
+let helpText = \`*───『 HELP: \${script.name?.toUpperCase() || cmdKey.toUpperCase()} 』───*\\n\\n\`;
+helpText += \`🔹 *Alias:* \${botInfo.prefix}\${script.trigger}\\n\`;
+helpText += \`🔹 *Full Name:* \${script.name}\\n\`;
+helpText += \`🔹 *Description:* \${script.desc || 'No description available.'}\\n\`;
+if (script.aliases && script.aliases.length > 0) helpText += \`🔹 *Other Aliases:* \${script.aliases.join(', ')}\\n\`;
+helpText += \`🔹 *Target:* \${script.target || 'chat'}\\n\`;
+
+await sock.sendMessage(remoteJid, { 
+  text: helpText,
+  contextInfo: {
+    externalAdReply: {
+      title: \`HELP: \${script.name}\`,
+      body: 'WXATA Documentation System',
+      mediaType: 1,
+      thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',
+      sourceUrl: 'https://wxata.tadstech.dev/docs'
+    }
+  }
+});`
     },
     perm: {
-      name: 'perm',
+      name: 'Permission Manager',
       desc: 'Grant bot permissions: chat | all | +number',
-      trigger: 'perm',
+      trigger: 'pm',
+      aliases: ['perm', 'pms'],
+      type: 'admin',
       response: 'Permission updated.',
       target: 'chat'
     },
     summoner: {
-      name: 'summoner',
-      desc: 'Send summon response to root or current chat',
-      trigger: 'summon',
-      response: 'WXATA summoned successfully.',
-      target: 'self',
-      defaultArgument: 'self',
-      arguments: {
-        here: {
-          target: 'chat'
-        },
-        self: {
-          target: 'self'
-        }
-      }
+      name: 'System Ping',
+      desc: 'Check bot network speed and status',
+      trigger: 'pg',
+      aliases: ['ping', 'p'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `const start = Date.now();
+await sendTrackedMessage(sock, remoteJid, "Pong! 🟢 Calculating speed...");
+const end = Date.now();
+await sendTrackedMessage(sock, remoteJid, \`🚀 Speed: \${end - start}ms\\n🤖 WXATA is ONLINE\`);`
     },
     extractor: {
-      name: 'extractor',
-      desc: 'Extract view once message and send to self, here, or number',
-      trigger: 'extract',
+      name: 'Media Extractor',
+      desc: 'Extract view once media',
+      trigger: 'ex',
+      aliases: ['extract', 'e'],
+      type: 'tools',
       response: '',
       target: 'chat',
       code: `const bail = require('@whiskeysockets/baileys');
 const extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to a View Once message.");
 
-let viewOnce = extractFrom.viewOnceMessage?.message || extractFrom.viewOnceMessageV2?.message || extractFrom.viewOnceMessageV2Extension?.message;
-if (!viewOnce) return sendTrackedMessage(sock, remoteJid, "The replied message is not a View Once message.");
-
+let viewOnce = extractFrom.viewOnceMessage?.message || extractFrom.viewOnceMessageV2?.message || extractFrom.viewOnceMessageV2Extension?.message || extractFrom;
 const mediaMsg = viewOnce.imageMessage || viewOnce.videoMessage || viewOnce.audioMessage;
 const mediaType = viewOnce.imageMessage ? 'image' : (viewOnce.videoMessage ? 'video' : 'audio');
 
 if (mediaMsg) {
   const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
   let buffer = Buffer.from([]);
-  for await(const chunk of stream) {
-      buffer = Buffer.concat([buffer, chunk]);
-  }
+  for await(const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }
   
-  let target = remoteJid; // 'here' default
-  if (argumentName === 'self' || argumentName === 'me') {
-     target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-  } else if (argumentName && argumentName.match(/^\\d+$/)) {
-     target = argumentName + '@s.whatsapp.net';
-  }
+  let target = remoteJid;
+  if (argumentName === 'self' || argumentName === 'me') target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  else if (argumentName && argumentName.match(/^\\d+$/)) target = argumentName + '@s.whatsapp.net';
   
   const payload = {};
   payload[mediaType] = buffer;
   if (mediaMsg.caption) payload.caption = mediaMsg.caption;
 
   await sock.sendMessage(target, payload);
-  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, \`Extracted and sent successfully.\`);
+  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, "Extracted and sent successfully.");
+} else {
+  return sendTrackedMessage(sock, remoteJid, "Could not find valid media in the quoted message.");
 }`
     },
     saver: {
-      name: 'saver',
-      desc: 'Save any status media to your own chat',
-      trigger: 'save',
+      name: 'Status Saver',
+      desc: 'Save status media to your chat',
+      trigger: 'sv',
+      aliases: ['save', 's'],
+      type: 'tools',
       response: '',
       target: 'chat',
       code: `const bail = require('@whiskeysockets/baileys');
 const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
 const extractFrom = contextInfo?.quotedMessage;
-if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to a message.");
+if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to a message to save it to your chat.");
 
 const mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;
 const mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');
@@ -137,11 +233,9 @@ const mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage
 if (mediaMsg) {
   const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
   let buffer = Buffer.from([]);
-  for await(const chunk of stream) {
-      buffer = Buffer.concat([buffer, chunk]);
-  }
+  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }
   
-  let target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+  const target = sock.user.id.split(':')[0] + '@s.whatsapp.net';
   const payload = {};
   payload[mediaType] = buffer;
   if (mediaMsg.caption) payload.caption = mediaMsg.caption;
@@ -153,17 +247,17 @@ if (mediaMsg) {
 }`
     },
     tagall: {
-      name: 'tagall',
-      desc: 'Tag all members in a group',
-      trigger: 'tagall',
+      name: 'Tag All Members',
+      desc: 'Tag everyone in the group',
+      trigger: 'ta',
+      aliases: ['tagall', 'tag'],
+      type: 'group',
       response: '',
       target: 'chat',
-      code: `if (!remoteJid.endsWith('@g.us')) {
-  return sendTrackedMessage(sock, remoteJid, "This command can only be used in groups.");
-}
+      code: `if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "This command can only be used in groups.");
 const groupMetadata = await sock.groupMetadata(remoteJid);
 const participants = groupMetadata.participants;
-let text = "✨ Calling all members ✨\\n\\n";
+let text = "✨ *ATTENTION EVERYONE* ✨\\n\\n";
 const mentions = [];
 for (let mem of participants) {
   text += \`@\${mem.id.split('@')[0]} \`;
@@ -171,23 +265,254 @@ for (let mem of participants) {
 }
 await sock.sendMessage(remoteJid, { text, mentions });`
     },
-    joke: {
-      name: 'joke',
-      desc: 'Tells a programming joke',
-      trigger: 'joke',
+    sticker: {
+      name: 'Sticker Maker',
+      desc: 'Convert image/video to sticker',
+      trigger: 'st',
+      aliases: ['sticker', 'stick'],
+      type: 'tools',
       response: '',
       target: 'chat',
-      code: `const jokes = [
-  "There are 10 types of people in the world: those who understand binary, and those who don't.",
-  "Why do programmers prefer dark mode? Because light attracts bugs.",
-  "How many programmers does it take to change a light bulb? None. It's a hardware problem.",
-  "A SQL query goes into a bar, walks up to two tables and asks... 'Can I join you?'",
-  "To understand what recursion is, you must first understand recursion.",
-  "If at first you don't succeed; call it version 1.0",
-  "I would love to change the world, but they won't give me the source code."
-];
-const joke = jokes[Math.floor(Math.random() * jokes.length)];
-await sendTrackedMessage(sock, remoteJid, joke);`
+      code: `const bail = require('@whiskeysockets/baileys');
+const { Sticker, StickerTypes } = require('wa-sticker-formatter');
+const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+const extractFrom = contextInfo?.quotedMessage || msg.message;
+if (!extractFrom) return sendTrackedMessage(sock, remoteJid, "Please reply to an image/video or send one with the command.");
+
+const mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage;
+const mediaType = extractFrom.imageMessage ? 'image' : 'video';
+
+if (mediaMsg) {
+  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
+  let buffer = Buffer.from([]);
+  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }
+  
+  const sticker = new Sticker(buffer, {
+    pack: 'WXATA Pack',
+    author: 'WXATA Bot',
+    type: StickerTypes.FULL,
+    quality: 100
+  });
+  await sock.sendMessage(remoteJid, await sticker.toMessage());
+} else {
+  return sendTrackedMessage(sock, remoteJid, "No image or video found.");
+}`
+    },
+    qc: {
+      name: 'Quote Sticker Maker',
+      desc: 'Generate quote sticker from text',
+      trigger: 'qc',
+      aliases: ['quote', 'q'],
+      type: 'tools',
+      response: '',
+      target: 'chat',
+      code: `const axios = require('axios');
+const { Sticker, StickerTypes } = require('wa-sticker-formatter');
+
+if (!argumentName) return sendTrackedMessage(sock, remoteJid, "Usage: !qc <text> [; <name>]");
+const [text, name] = argumentName.split(';');
+
+let pp = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
+try {
+    const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+    const target = contextInfo?.participant || msg.key.participant || remoteJid;
+    pp = await sock.profilePictureUrl(target, 'image');
+} catch (e) {}
+
+const obj = {
+    type: 'quote',
+    format: 'png',
+    backgroundColor: '#FFFFFF',
+    width: 512,
+    height: 512,
+    scale: 2,
+    messages: [{
+        avatar: true,
+        from: {
+            name: name?.trim() || msg.pushName || "User",
+            photo: { url: pp },
+        },
+        text: text.trim(),
+        replyMessage: {},
+    }],
+};
+
+try {
+    const response = await axios.post('https://bot.lyo.su/quote/generate', obj);
+    const imgBuffer = Buffer.from(response.data.result.image, 'base64');
+    const sticker = new Sticker(imgBuffer, {
+        pack: 'WXATA Pack',
+        author: 'WXATA Bot',
+        type: StickerTypes.FULL,
+        quality: 100
+    });
+    await sock.sendMessage(remoteJid, await sticker.toMessage());
+} catch (e) {
+    await sendTrackedMessage(sock, remoteJid, "❌ Failed to generate quote sticker.");
+}`
+    },
+    delete: {
+      name: 'Message Deleter',
+      desc: 'Delete a message',
+      trigger: 'dl',
+      aliases: ['delete', 'del'],
+      type: 'tools',
+      response: '',
+      target: 'chat',
+      code: `const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+if (!contextInfo?.quotedMessage) return sendTrackedMessage(sock, remoteJid, "Please reply to the message you want to delete.");
+
+await sock.sendMessage(remoteJid, { 
+  delete: { 
+    remoteJid, 
+    fromMe: contextInfo.participant === sock.user.id.split(':')[0] + '@s.whatsapp.net', 
+    id: contextInfo.stanzaId, 
+    participant: contextInfo.participant 
+  } 
+});`
+    },
+    tkick: {
+      name: 'Time Kick',
+      desc: 'Kick user and re-add in 5m',
+      trigger: 'tk',
+      aliases: ['tkick'],
+      type: 'admin',
+      response: '',
+      target: 'chat',
+      code: `const bail = require('@whiskeysockets/baileys');
+if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "❌ This command is for groups only.");
+
+const groupMetadata = await sock.groupMetadata(remoteJid);
+const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+const botIsAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
+if (!botIsAdmin) return sendTrackedMessage(sock, remoteJid, "❌ Permission Denied: I must be a Group Admin.");
+
+const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);
+if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user or tag them to T-Kick.");
+
+const targetIsAdmin = groupMetadata.participants.find(p => p.id === targetUser)?.admin;
+if (targetIsAdmin) return sendTrackedMessage(sock, remoteJid, "❌ I cannot kick a Group Admin.");
+
+await sock.sendMessage(remoteJid, { 
+    text: \`⏳ @\${targetUser.split('@')[0]} will be kicked and re-added in 5 minutes.\`, 
+    mentions: [targetUser] 
+});
+
+try {
+    await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');
+    setTimeout(async () => {
+        try {
+            await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
+            await sock.sendMessage(remoteJid, { 
+                text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`, 
+                mentions: [targetUser] 
+            });
+        } catch (e) {
+            await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]}. They might have privacy settings blocking invites.\` });
+        }
+    }, 5 * 60 * 1000);
+} catch (e) {
+    await sendTrackedMessage(sock, remoteJid, "❌ Failed to execute T-Kick. Ensure I have proper permissions.");
+}`
+    },
+    ss: {
+      name: 'Web Screenshot',
+      desc: 'Take web page screenshot',
+      trigger: 'ss',
+      aliases: ['screenshot', 'snap'],
+      type: 'tools',
+      response: '',
+      target: 'chat',
+      code: `if (!argumentName) return sendTrackedMessage(sock, remoteJid, "Please provide a URL (e.g. !ss google.com)");
+let url = argumentName;
+if (!url.startsWith('http')) url = 'https://' + url;
+await sendTrackedMessage(sock, remoteJid, '📸 Taking screenshot...');
+try {
+  const ssUrl = \`https://image.thum.io/get/width/1280/crop/900/\${encodeURIComponent(url)}\`;
+  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: \`📸 \${url}\` });
+} catch(e) {
+  await sendTrackedMessage(sock, remoteJid, '❌ Failed to take screenshot.');
+}`
+    },
+    warn: {
+      name: 'User Warner',
+      desc: 'Warn 3x then kick',
+      trigger: 'wn',
+      aliases: ['warn', 'w'],
+      type: 'admin',
+      response: '',
+      target: 'chat',
+      code: `if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "This command can only be used in groups.");
+const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);
+if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user's message or tag them to warn.");
+
+const fs = require('fs');
+const path = require('path');
+const warnsFile = path.resolve(__rootdir, 'warns.json');
+let warns = {};
+if (fs.existsSync(warnsFile)) { warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8')); }
+if (!warns[remoteJid]) warns[remoteJid] = {};
+
+warns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;
+fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
+
+const warnCount = warns[remoteJid][targetUser];
+if (warnCount >= 3) {
+    await sock.sendMessage(remoteJid, { text: \`🚨 @\${targetUser.split('@')[0]} has reached 3 warnings and is being removed!\`, mentions: [targetUser] });
+    try { await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove'); } catch (e) {
+        await sock.sendMessage(remoteJid, { text: "❌ I don't have Admin permissions to remove them!" });
+    }
+    warns[remoteJid][targetUser] = 0;
+    fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
+} else {
+    await sock.sendMessage(remoteJid, { text: \`⚠️ @\${targetUser.split('@')[0]} you have been warned! (\${warnCount}/3)\`, mentions: [targetUser] });
+}`
+    },
+    antidel: {
+      name: 'Anti-Delete System',
+      desc: 'Forward deleted msgs',
+      trigger: 'ad',
+      aliases: ['antidel', 'anti'],
+      type: 'tools',
+      response: '',
+      target: 'chat',
+      code: `const arg = argumentName ? argumentName.toLowerCase() : '';
+const fs = require('fs');
+const rPath = require('path');
+const cfgPath = rPath.resolve(__rootdir, 'antidel.json');
+const selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';
+const defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;\n\nlet cfg = { enabled: true, target: defaultTarget };\ntry {\n  if (fs.existsSync(cfgPath)) {\n    const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));\n    cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;\n    if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;\n  }\n} catch(e) {}\n\nif (arg === 'on') {\n  cfg.enabled = true;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, \`✅ Anti-Delete *ON* — forwarding to \${cfg.target}\`);\n} else if (arg === 'off') {\n  cfg.enabled = false;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, '❌ Anti-Delete *OFF*');\n}\nawait sendTrackedMessage(sock, remoteJid, \`*Anti-Delete Status*\\nEnabled: \${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\\nTarget: \${cfg.target}\\n\\nUsage: !ad on | off\`);`
+    },
+    vars: {
+      name: 'System Variables',
+      desc: 'View/set bot config vars',
+      trigger: 'vs',
+      aliases: ['vars', 'v'],
+      type: 'admin',
+      response: '',
+      target: 'chat',
+      code: `const fs = require('fs');
+const path = require('path');
+const warnsFile = path.resolve(__rootdir, 'warns.json');
+const biPath = path.resolve(__rootdir, 'botinfo.json');
+
+const isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;
+if (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied. Sudo only.');
+
+let configVars = {};
+if (fs.existsSync(varsFile)) {\n  try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {}\n}
+
+const args = argumentName ? [argumentName] : []; // simplified for now
+if (args.length === 0) {
+  let text = '⚙️ *WXATA System Vars*\\n\\n';
+  text += \`🔹 *PREFIX*: \${botInfo.prefix}\\n\`;
+  text += \`🔹 *ALLOW_ALL*: \${botInfo.permissions.allowAll}\\n\`;
+  text += \`🔹 *DB_RETENTION_DAYS*: \${configVars.DB_RETENTION_DAYS || 3}\\n\`;
+  return sendTrackedMessage(sock, remoteJid, text);
+}
+return sendTrackedMessage(sock, remoteJid, "Use the Dashboard to edit complex vars.");`
     }
   },
   root: {
@@ -195,7 +520,7 @@ await sendTrackedMessage(sock, remoteJid, joke);`
   },
   welcome: {
     enabled: true,
-    text: '╔════════════════════════════╗\n║   WELCOME TO WXATA         ║\n║   SYSTEM ONLINE            ║\n╚════════════════════════════╝'
+    text: "*───『 WXATA • PREMIUM 』───*\\n\\nHello! Thank you for connecting with the WXATA engine.\\nThe system is currently *ONLINE* and ready to assist.\\n\\n🚀 *Get Started:*\\nType *{prefix}{menu}* to view the professional command console.\\n\\n🔗 *Resources:*\\n• Website: https://wxata.tadstech.dev\\n• Docs: https://wxata.tadstech.dev/docs\\n• X: @tads_tech\\n• Telegram: https://t.me/+dR5zABepmkNhYjQ0\\n\\n_Powered by TADSTech_"
   },
   permissions: {
     allowAll: false,
@@ -374,8 +699,9 @@ function buildMenuResponse(botInfo: BotInfo): string {
     const baseCommand = `${botInfo.prefix}${script.trigger}`;
     const argumentNames = Object.keys(script.arguments ?? {});
     const argsSuffix = argumentNames.length ? ` [${argumentNames.join(' | ')}]` : '';
+    const aliasesSuffix = script.aliases?.length ? ` (aliases: ${script.aliases.join(', ')})` : '';
     const defaultArgSuffix = script.defaultArgument ? ` (default: ${script.defaultArgument})` : '';
-    lines.push(`> ${script.name || key}`);
+    lines.push(`> ${script.name || key}${aliasesSuffix}`);
     lines.push(`  command : ${baseCommand}${argsSuffix}${defaultArgSuffix}`);
     lines.push(`  desc    : ${script.desc}`);
     if (key === 'perm') {
@@ -566,12 +892,18 @@ function extractSenderNumber(msg: { key?: { participant?: string | null; remoteJ
   return senderJid.split('@')[0]?.replace(/\D/g, '') || null;
 }
 
-function isCommandPermitted(botInfo: BotInfo, msg: { key?: { remoteJid?: string | null; participant?: string | null } }): boolean {
+function isCommandPermitted(botInfo: BotInfo, msg: { key?: { remoteJid?: string | null; participant?: string | null; fromMe?: boolean | null } }, sock?: any): boolean {
   if (botInfo.permissions.allowAll) {
     return true;
   }
 
   const remoteJid = msg.key?.remoteJid ?? undefined;
+
+  // Linked Device handling: if it's from us, check if the sender LID matches our LID
+  if (msg.key?.fromMe && sock?.user?.lid && remoteJid === sock.user.lid) {
+    return true;
+  }
+
   const chatId = normalizePermissionChatId(remoteJid);
   const senderNumber = extractSenderNumber(msg);
 
@@ -724,23 +1056,13 @@ function senderMatchesRoot(
   const normalizedRootTarget = rootTarget.trim().toLowerCase();
   const isSelfRoot = ['self', 'root', 'me', 'myself'].includes(normalizedRootTarget);
 
-  // fromMe=true always means it's us — trust it when root is self
-  if (isSelfRoot && msg.key?.fromMe) {
-    return true;
-  }
-
-  // Also treat any fromMe message as root when root.target resolves to our own JID
+  // fromMe=true always means it's us. 
+  // On linked devices, remoteJid may be our @lid.
   if (msg.key?.fromMe) {
-    const selfJid = resolveSelfJid(sock);
-    if (!selfJid) {
-      // Can't resolve self yet — treat fromMe as root to avoid blocking commands on startup
-      return true;
-    }
-    const rootJid = resolveTargetJid(sock, rootTarget);
-    if (!rootJid) return true; // Same: can't resolve, don't block
-    const selfNum = selfJid.split('@')[0]?.replace(/\D/g, '');
-    const rootNum = rootJid.split('@')[0]?.replace(/\D/g, '');
-    if (selfNum && rootNum && selfNum === rootNum) return true;
+    if (isSelfRoot) return true;
+    
+    // Check if our own LID matches the sender if we're not using 'self'
+    if (sock.user?.lid && msg.key.remoteJid === sock.user.lid) return true;
   }
 
   // participant can be empty string — use || not ??
@@ -862,7 +1184,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       const isBotEcho = msg.key?.fromMe && wasRecentlySentByBot(remoteJid ?? undefined, text ?? undefined);
       const botInfo = await readBotInfo();
       const isRootSender = senderMatchesRoot(sock, msg, botInfo.root.target);
-      const isCommandPermittedByList = isCommandPermitted(botInfo, msg);
+      const isCommandPermittedByList = isCommandPermitted(botInfo, msg, sock);
       const hasPermission = isRootSender || isCommandPermittedByList;
 
       if (text && text.startsWith(botInfo.prefix)) {
@@ -912,15 +1234,27 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
 
         for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
           const prefixPattern = escapeRegex(botInfo.prefix.trim());
-          const triggerPattern = escapeRegex(script.trigger.trim());
           
-          // Simplified regex: match prefix+trigger, then capture the first word as argumentName, 
-          // allow any trailing content without requiring exact word matches.
-          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?.*$`, 'i');
-          const triggerMatch = normalizedText.match(triggerRegex);
+          // Generate list of all possible triggers (main trigger + aliases)
+          const allTriggers = [script.trigger, ...(script.aliases || [])];
+          let triggerMatch = null;
+          let argumentName: string | undefined = undefined;
+          let matchedTrigger = '';
+
+          for (const trig of allTriggers) {
+            const triggerPattern = escapeRegex(trig.trim());
+            const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?.*$`, 'i');
+            const m = normalizedText.match(triggerRegex);
+            if (m) {
+              triggerMatch = m;
+              argumentName = m[1];
+              matchedTrigger = triggerPattern;
+              break;
+            }
+          }
 
           if (triggerMatch) {
-            const argumentName = triggerMatch[1];
+            dashboard.log('DEBUG', `Match found: script="${scriptName}" trigger="${matchedTrigger}" args="${argumentName || 'none'}"`);
 
             if (!hasPermission) {
               dashboard.log('WARN', `Blocked unpermitted command "${scriptName}" from ${remoteJid}`);
@@ -934,7 +1268,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
                 break;
               }
 
-              const permArgRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?(?:\\s+(\\S+))?$`, 'i');
+              const permArgRegex = new RegExp(`^${prefixPattern}\\s*${matchedTrigger}(?:\\s+(\\S+))?(?:\\s+(\\S+))?$`, 'i');
               const permArgMatch = normalizedText.match(permArgRegex);
               const primaryArg = permArgMatch?.[1];
               const secondaryArg = permArgMatch?.[2];
@@ -993,8 +1327,9 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
             } else {
               dashboard.log('ERROR', `${scriptName} triggered but target could not be resolved`);
             }
-            break;
+            if (triggerMatch) break;
           }
+          if (triggerMatch) break;
         }
       }
 
@@ -1103,6 +1438,7 @@ async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection['crea
 
   // Interpolate variables in welcome message
   const interpolatedText = botInfo.welcome.text
+    .replace(/\\n/g, '\n')
     .replace(/{prefix}/g, botInfo.prefix)
     .replace(/{bot}/g, botInfo.scripts.summoner?.trigger || 'bot')
     .replace(/{menu}/g, botInfo.scripts.menu?.trigger || 'menu');
@@ -1170,13 +1506,19 @@ async function startBot() {
 
   let connectionManager: WXATAConnection | null = null;
   let hasSentWelcome = false;
+  let lastConnectionParams: { method: string, phoneNumber?: string } | null = null;
 
   dashboard.onCommand(async (payload) => {
     try {
       if (payload.command === 'START_CONNECTION') {
         const { method, phoneNumber } = payload.data;
+        lastConnectionParams = { method, phoneNumber };
 
         dashboard.log('INFO', `Starting connection via ${method}...`);
+
+        if (connectionManager) {
+          await connectionManager.destroy();
+        }
 
         connectionManager = new WXATAConnection({
           phoneNumber,
@@ -1230,25 +1572,42 @@ async function startBot() {
 
         switch (action) {
           case 'RESTART_BOT':
-            dashboard.log('INFO', 'Restarting bot system...');
-            process.exit(0);
+            dashboard.log('INFO', 'Restarting bot process via PM2...');
+            if (connectionManager) {
+              await connectionManager.destroy();
+              connectionManager = null;
+            }
+            dashboard.setConnectionStatus('DISCONNECTED');
+            dashboard.log('SUCCESS', 'Graceful shutdown complete. PM2 will restart the process.');
+            // Exit code 0 → PM2 treats this as a normal exit and restarts automatically.
+            // If PM2 is not in use the process simply stops (no infinite loop).
+            setTimeout(() => process.exit(0), 500);
             break;
           case 'TERMINATE':
-            dashboard.log('ERROR', 'Terminating bot system...');
-            process.exit(1);
+            dashboard.log('WARN', 'Terminating bot process. PM2 will NOT restart (stop_exit_codes: [2]).');
+            if (connectionManager) {
+              await connectionManager.destroy();
+              connectionManager = null;
+            }
+            dashboard.setConnectionStatus('DISCONNECTED');
+            // Exit code 2 → listed in PM2 stop_exit_codes, so PM2 stops without restarting.
+            // Without PM2 this also cleanly exits the process.
+            setTimeout(() => process.exit(2), 500);
             break;
           case 'LOGOUT':
             dashboard.log('WARN', 'Logging out and clearing session data...');
             if (connectionManager) {
               await connectionManager.logout();
+              await connectionManager.destroy();
+              connectionManager = null;
             } else {
               // Fallback if not fully initialized
               const fs = require('fs/promises');
-              const AUTH_DIR = require('fs').existsSync('/data') ? '/data/auth_info' : path.resolve(__dirname, 'auth_info');
+              const AUTH_DIR = fsSync.existsSync('/data') ? '/data/auth_info' : path.resolve(__dirname, 'auth_info');
               await fs.rm(AUTH_DIR, { recursive: true, force: true }).catch(() => {});
             }
-            dashboard.log('SUCCESS', 'Session cleared. Restarting bot...');
-            setTimeout(() => process.exit(0), 1000);
+            dashboard.setConnectionStatus('DISCONNECTED');
+            dashboard.log('SUCCESS', 'Session cleared. System ready for new pairing.');
             break;
           case 'EXPORT_DATA':
             dashboard.log('INFO', 'Exporting session logs...');

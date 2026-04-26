@@ -50,6 +50,7 @@ function ScrollHint({ direction, onClick }: { direction: 'left' | 'right'; onCli
       initial={{ opacity: 0 }}
       animate={{ opacity: 0.5 }}
       whileHover={{ opacity: 1, scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
       className={`fixed top-1/2 -translate-y-1/2 z-50 p-2 border border-border-subtle rounded-full bg-bg-panel/40 backdrop-blur-sm text-text-main ${direction === 'left' ? 'left-4' : 'right-4'}`}
     >
       {direction === 'left' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
@@ -121,7 +122,39 @@ const Landing = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-bg-base font-sans">
       {/* CRT scanline overlay */}
-      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.18)_50%),linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01),rgba(255,255,255,0.02))] bg-[length:100%_2px,3px_100%] z-50" />
+      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.18)_50%),linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01),rgba(255,255,255,0.02))] bg-[length:100%_2px,3px_100%] z-[60]" />
+
+      {/* Sticky Navbar */}
+      <nav className="fixed top-0 left-0 w-full z-50 px-8 py-6 flex justify-between items-center backdrop-blur-md bg-bg-base/20 border-b border-border-subtle/50">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => scrollTo(0)}>
+          <div className="w-8 h-8 bg-accent-primary rounded flex items-center justify-center font-black text-bg-base">W</div>
+          <span className="font-black text-xl tracking-tighter text-text-main">WX<span className="text-accent-primary">ATA</span></span>
+        </div>
+        
+        <div className="flex items-center gap-6">
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/docs')} 
+            className="text-sm font-bold text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest hidden md:block"
+          >
+            Documentation
+          </motion.button>
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/login')} 
+            className="text-sm font-bold text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest"
+          >
+            Sign In
+          </motion.button>
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/register')} 
+            className="px-5 py-2 bg-accent-primary hover:bg-accent-hover text-bg-base text-xs font-black rounded transition-all uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+          >
+            Get Started
+          </motion.button>
+        </div>
+      </nav>
 
       {/* Nav dots */}
       <Dots total={SLIDE_COUNT} active={activeSlide} />
@@ -190,18 +223,20 @@ const Landing = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1 }}
             >
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => navigate('/login')}
-                className="px-8 py-3 border border-border-strong text-accent-light hover:bg-accent-primary hover:text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase"
+                className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase shadow-[0_0_20px_rgba(139,92,246,0.4)]"
               >
-                Launch
-              </button>
-              <button
+                Launch App
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => scrollTo(1)}
-                className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
+                className="px-8 py-3 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
               >
-                Explore <ChevronRight className="w-4 h-4" />
-              </button>
+                Features <ChevronRight className="w-4 h-4" />
+              </motion.button>
             </motion.div>
           </motion.div>
 
@@ -343,18 +378,20 @@ const Landing = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => navigate('/register')}
                 className="px-10 py-4 bg-accent-primary hover:bg-accent-hover text-bg-base font-black rounded transition-all text-sm uppercase tracking-widest"
               >
                 Create Account
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => navigate('/login')}
                 className="px-10 py-4 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all text-sm uppercase tracking-widest"
               >
                 Sign In
-              </button>
+              </motion.button>
             </div>
 
             <div className="pt-4 text-xs text-text-muted font-mono space-y-1">

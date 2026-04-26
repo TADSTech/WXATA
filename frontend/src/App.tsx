@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Admin from './pages/Admin';
 import Marketplace from './pages/Marketplace';
+import Docs from './pages/Docs';
 import './index.css';
 import { ThemeProvider } from './components/ThemeProvider';
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/extensions" element={<Marketplace />} />
+        <Route path="/docs" element={<Docs />} />
 
         {/* Dynamic user dashboard */}
         <Route path="/dashboard/:username" element={

@@ -1,0 +1,1 @@
+ ssh -i $env:USERPROFILE\.ssh\ssh-key-2026-04-26.key ubuntu@129.151.247.139

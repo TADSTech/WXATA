@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X, Package, Download, ExternalLink, Palette } from 'lucide-react';
+import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X, Package, Download, ExternalLink, Palette, BookOpen } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
@@ -19,6 +19,8 @@ interface BotScript {
   name?: string;
   desc?: string;
   trigger: string;
+  aliases?: string[];
+  type?: string;
   response: string;
   target: string;
   code?: string;
@@ -205,15 +207,31 @@ function ScriptManager({
         {addingScript && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="border border-border-strong rounded p-3 space-y-2 text-xs bg-bg-panel">
-              <div className="text-accent-light font-bold uppercase tracking-wider text-[10px] mb-1">New Script</div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block space-y-1">
-                  <span className="text-text-muted">Script Key</span>
-                  <input value={newScriptKey} onChange={e => setNewScriptKey(e.target.value)} placeholder="e.g. weather" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong" />
+                  <span className="text-text-muted">Display Name</span>
+                  <input value={newScriptDraft.name} onChange={e => setNewScriptDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Get Weather" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong" />
                 </label>
                 <label className="block space-y-1">
                   <span className="text-text-muted">Trigger</span>
-                  <input value={newScriptDraft.trigger} onChange={e => setNewScriptDraft(d => ({ ...d, trigger: e.target.value }))} placeholder="e.g. weather" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong" />
+                  <input value={newScriptDraft.trigger} onChange={e => setNewScriptDraft(d => ({ ...d, trigger: e.target.value }))} placeholder="e.g. wt" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block space-y-1">
+                  <span className="text-text-muted">Aliases (comma separated)</span>
+                  <input value={newScriptDraft.aliases?.join(', ')} onChange={e => setNewScriptDraft(d => ({ ...d, aliases: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="weather, temp" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-text-muted">Type</span>
+                  <select value={newScriptDraft.type || 'misc'} onChange={e => setNewScriptDraft(d => ({ ...d, type: e.target.value }))} className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong">
+                    <option value="core">core</option>
+                    <option value="tools">tools</option>
+                    <option value="admin">admin</option>
+                    <option value="group">group</option>
+                    <option value="fun">fun</option>
+                    <option value="misc">misc</option>
+                  </select>
                 </label>
               </div>
               <label className="block space-y-1">
@@ -253,17 +271,22 @@ function ScriptManager({
       {/* Script list */}
       <div className="space-y-1">
         {Object.entries(botInfo.scripts).map(([key, script]) => {
-          const isCore = ['menu', 'perm'].includes(key);
           const isExpanded = expandedScript === key;
+          const isCore = script.type === 'core';
           return (
             <div key={key} className="border border-border-strong/15 rounded overflow-hidden">
               <button onClick={() => setExpandedScript(isExpanded ? null : key)} className="w-full flex items-center justify-between p-2.5 hover:bg-accent-subtle transition-colors text-left">
                 <div className="flex items-center gap-2 min-w-0">
                   <Edit3 className="w-3 h-3 text-accent-primary shrink-0" />
                   <span className="text-accent-light font-bold text-xs capitalize truncate">{script.name || key}</span>
-                  <span className="text-text-muted text-[10px] font-mono shrink-0">{prefix}{script.trigger}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-text-muted text-[10px] font-mono">{prefix}{script.trigger}</span>
+                    {script.aliases && script.aliases.length > 0 && (
+                      <span className="text-[9px] text-text-muted/50 font-mono">({script.aliases.join(', ')})</span>
+                    )}
+                  </div>
                   {script.code && <span className="text-[9px] text-info-text border border-info-subtle px-1 rounded shrink-0">JS</span>}
-                  {isCore && <span className="text-[9px] text-warning-text border border-warning-subtle px-1 rounded shrink-0">core</span>}
+                  {script.type && <span className="text-[9px] text-warning-text border border-warning-subtle px-1 rounded shrink-0">{script.type}</span>}
                 </div>
                 {isExpanded ? <ChevronUp className="w-3 h-3 text-text-muted shrink-0" /> : <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />}
               </button>
@@ -274,12 +297,34 @@ function ScriptManager({
                     <div className="p-3 border-t border-border-strong/10 space-y-2 text-xs bg-bg-panel-hover">
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block space-y-1">
-                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Display Name</span>
+                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Full Name</span>
                           <input value={script.name || key} onChange={e => handleScriptFieldChange(key, 'name', e.target.value)} className="w-full bg-bg-panel border border-border-subtle p-1.5 text-accent-light outline-none focus:border-border-strong" />
                         </label>
                         <label className="block space-y-1">
-                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Trigger</span>
+                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Trigger (Alias)</span>
                           <input value={script.trigger} onChange={e => handleScriptFieldChange(key, 'trigger', e.target.value)} className="w-full bg-bg-panel border border-border-subtle p-1.5 text-accent-light outline-none focus:border-border-strong" />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block space-y-1">
+                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Aliases (comma separated)</span>
+                          <input 
+                            value={script.aliases?.join(', ') || ''} 
+                            onChange={e => handleScriptFieldChange(key, 'aliases' as any, e.target.value)} 
+                            className="w-full bg-bg-panel border border-border-subtle p-1.5 text-accent-light outline-none focus:border-border-strong" 
+                            placeholder="e.g. menu, m"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-text-muted uppercase tracking-wider text-[10px]">Type</span>
+                          <select value={script.type || 'misc'} onChange={e => handleScriptFieldChange(key, 'type', e.target.value)} className="w-full bg-bg-panel border border-border-subtle p-1.5 text-accent-light outline-none focus:border-border-strong">
+                            <option value="core">core</option>
+                            <option value="tools">tools</option>
+                            <option value="admin">admin</option>
+                            <option value="group">group</option>
+                            <option value="fun">fun</option>
+                            <option value="misc">misc</option>
+                          </select>
                         </label>
                       </div>
                       <label className="block space-y-1">
@@ -394,7 +439,7 @@ const Dashboard = () => {
   const [addingScript, setAddingScript] = useState(false);
   const [newScriptKey, setNewScriptKey] = useState('');
   const [newScriptDraft, setNewScriptDraft] = useState<BotScript>({
-    name: '', desc: '', trigger: '', response: '', target: 'chat', code: '', defaultArgument: ''
+    name: '', desc: '', trigger: '', aliases: [], type: 'misc', response: '', target: 'chat', code: '', defaultArgument: ''
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -508,12 +553,17 @@ const Dashboard = () => {
   };
 
   // Generic: update any field on any script by key
-  const handleScriptFieldChange = (scriptKey: string, field: keyof BotScript, value: string) => {
+  const handleScriptFieldChange = (scriptKey: string, field: keyof BotScript, value: any) => {
+    let finalValue = value;
+    if (field === 'aliases' && typeof value === 'string') {
+      finalValue = value.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    
     setBotInfo((prev) => ({
       ...prev,
       scripts: {
         ...prev.scripts,
-        [scriptKey]: { ...prev.scripts[scriptKey]!, [field]: value }
+        [scriptKey]: { ...prev.scripts[scriptKey]!, [field]: finalValue }
       }
     }));
     setConfigStatus('Unsaved changes');
@@ -585,7 +635,7 @@ const Dashboard = () => {
       scripts: { ...prev.scripts, [key]: { ...newScriptDraft, name: newScriptDraft.name || key } }
     }));
     setNewScriptKey('');
-    setNewScriptDraft({ name: '', desc: '', trigger: '', response: '', target: 'chat', code: '', defaultArgument: '' });
+    setNewScriptDraft({ name: '', desc: '', trigger: '', aliases: [], type: 'misc', response: '', target: 'chat', code: '', defaultArgument: '' });
     setAddingScript(false);
     setExpandedScript(key);
     setConfigStatus('Unsaved changes');
@@ -673,6 +723,12 @@ const Dashboard = () => {
           {userData && <span className="ml-4 text-sm text-text-muted">Welcome, {userData.name || userData.username}</span>}
         </div>
         <div className="flex items-center gap-6 text-sm">
+          <button 
+            onClick={() => navigate('/docs')}
+            className="flex items-center gap-2 text-text-muted hover:text-accent-light transition-colors uppercase text-xs tracking-widest border border-border-strong px-2 py-1 rounded"
+          >
+            <BookOpen className="w-3 h-3" /> Docs
+          </button>
           <div className="relative">
             <button 
               onClick={() => setShowThemeMenu(!showThemeMenu)}

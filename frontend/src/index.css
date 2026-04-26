@@ -342,6 +342,14 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+button {
+  @apply transition-all hover:scale-[1.02] active:scale-[0.98] active:brightness-90;
+}
+
+input, textarea, select {
+  @apply transition-all focus:ring-1 focus:ring-accent-primary/30;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
   height: 5px;

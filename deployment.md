@@ -3,100 +3,194 @@
 ## Architecture
 
 ```
-Frontend (Vercel)           Backend (VPS)
-https://wxata.vercel.app ──WebSocket──► ws://YOUR_VPS_IP:5000
-                                        HTTP health ► :3000/health
-                                        Filesystem  ► persistent ✅
+Frontend (Vercel)                  Backend (Oracle Cloud VPS)
+https://wxata.vercel.app  ──WSS──► wss://YOUR_ORACLE_IP:5000
+                           ──HTTP─► http://YOUR_ORACLE_IP:5000/health
+                                    Persistent volumes ✅  PM2 managed ✅
 ```
 
 ---
 
-## Backend — VPS Setup (freevps.edu.pl or any Linux VPS)
+## Oracle Cloud Free Tier — Full Setup
 
-### 1. SSH into your VPS
+Oracle's Always Free tier gives you a real Ubuntu VM (up to 4 OCPU / 24 GB RAM on Ampere A1).
+Everything below runs on the free tier.
+
+---
+
+### 1. Create the VM
+
+1. Log in → **Compute → Instances → Create Instance**
+2. **Image**: Ubuntu 22.04 (Canonical)
+3. **Shape**: `VM.Standard.A1.Flex` — set **1 OCPU / 6 GB RAM** (free)
+4. **Networking**: keep the default VCN, make sure **Assign a public IPv4** is checked
+5. **SSH keys**: upload your public key (or download the generated one)
+6. Click **Create** — note the **Public IP** once it's running
+
+---
+
+### 2. Open firewall ports
+
+Oracle has two layers of firewall. You need to open port **5000** in both.
+
+#### A — Oracle Security List (cloud console)
+
+1. Go to **Networking → Virtual Cloud Networks → your VCN → Security Lists → Default**
+2. **Add Ingress Rule**:
+   - Source CIDR: `0.0.0.0/0`
+   - IP Protocol: TCP
+   - Destination Port: `5000`
+3. Save
+
+#### B — OS firewall (iptables / ufw inside the VM)
 
 ```bash
-ssh root@YOUR_VPS_IP
+# Oracle Ubuntu images use iptables by default, not ufw
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 5000 -j ACCEPT
+sudo netfilter-persistent save
 ```
 
-### 2. Install Bun
-
+If you prefer ufw:
 ```bash
-curl -fsSL https://bun.sh/install | bash
-source ~/.bashrc   # or restart the shell
-bun --version      # confirm it works
+sudo ufw allow 5000/tcp
+sudo ufw reload
 ```
 
-### 3. Install Git
+---
+
+### 3. SSH into the VM
 
 ```bash
-apt update && apt install -y git
+ssh -i ~/.ssh/your_key ubuntu@YOUR_ORACLE_IP
 ```
 
-### 4. Clone your repo
+---
+
+### 4. Install Docker & Docker Compose
 
 ```bash
-cd /root
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com | sudo bash
+
+# Add your user to the docker group (no sudo needed after re-login)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Install Docker Compose plugin
+sudo apt install -y docker-compose-plugin
+
+# Verify
+docker --version
+docker compose version
+```
+
+---
+
+### 5. Clone the repo
+
+```bash
+cd ~
 git clone https://github.com/TADSTech/WXATA.git wxata
 cd wxata
 ```
 
-### 5. Seed your config
+---
+
+### 6. Configure environment
 
 ```bash
-cp botinfo.example.json botinfo.json
-# Edit if needed — prefix, welcome message, etc.
-nano botinfo.json
+# Create the backend .env from the example
+cp backend/.env.example backend/.env
+
+# Edit if you want a different port (default 5000 is fine)
+nano backend/.env
 ```
 
-### 6. Install backend dependencies
-
-```bash
-cd backend
-bun install
-cd ..
-```
-
-### 7. Run the bot with PM2 (keeps it alive after SSH disconnect)
-
-```bash
-# Install PM2
-bun add -g pm2
-
-# Start the bot
-pm2 start backend/index.ts --name wxata --interpreter bun
-
-# Save so it restarts on VPS reboot
-pm2 save
-pm2 startup   # run the command it outputs
-```
-
-### 8. Check it's running
-
-```bash
-pm2 logs wxata        # live logs
-pm2 status            # process list
-```
-
-### 9. Update the WebSocket URL in the frontend
-
-In `frontend/.env`:
-```env
-VITE_BACKEND_URL=ws://YOUR_VPS_IP:5000
-```
-
-Commit and push, Vercel will auto-redeploy.
+The only required variable is `PORT=5000`. Everything else has safe defaults.
 
 ---
 
-## Useful PM2 Commands
+### 7. Build and start with Docker Compose
 
 ```bash
-pm2 restart wxata     # restart bot
-pm2 stop wxata        # stop bot
-pm2 logs wxata        # tail logs
-pm2 logs wxata --lines 100   # last 100 lines
-pm2 monit             # live CPU/memory dashboard
+# Build the image and start in the background
+docker compose up -d --build
+
+# Watch logs
+docker compose logs -f wxata
+```
+
+The container starts PM2 in no-daemon mode (`pm2-runtime`).
+PM2 manages the Bun process inside the container.
+
+---
+
+### 8. Verify it's running
+
+```bash
+# Container status
+docker compose ps
+
+# Health check
+curl http://localhost:5000/health
+
+# PM2 info
+curl http://localhost:5000/pm2
+
+# Live PM2 logs from inside the container
+docker compose exec wxata pm2 logs wxata
+```
+
+---
+
+### 9. Connect the frontend
+
+In your Vercel project settings, add the environment variable:
+
+```
+VITE_BACKEND_URL=ws://YOUR_ORACLE_IP:5000
+```
+
+Then trigger a redeploy on Vercel. The dashboard will connect to your Oracle backend.
+
+> **TLS note**: If you want `wss://` (secure WebSocket), put Nginx or Caddy in front
+> of port 5000 with a Let's Encrypt cert. See the optional section below.
+
+---
+
+## How Dashboard Actions Work with PM2
+
+| Dashboard Button | What happens in code | Exit code | PM2 behaviour |
+|---|---|---|---|
+| **Restart** | Destroys WA connection, `process.exit(0)` | `0` | PM2 restarts the process automatically |
+| **Terminate** | Destroys WA connection, `process.exit(2)` | `2` | PM2 stops — does **not** restart (`stop_exit_codes: [2]`) |
+| **Logout** | Clears session files, then same as Restart | `0` | PM2 restarts; bot will show QR/pairing on next connect |
+
+---
+
+## Useful Commands
+
+### Docker Compose
+
+```bash
+docker compose up -d          # start (detached)
+docker compose down           # stop and remove containers
+docker compose restart wxata  # restart container
+docker compose logs -f wxata  # tail logs
+docker compose pull           # pull latest image (after git pull + rebuild)
+docker compose up -d --build  # rebuild and restart
+```
+
+### PM2 (inside the container)
+
+```bash
+docker compose exec wxata pm2 status
+docker compose exec wxata pm2 logs wxata
+docker compose exec wxata pm2 logs wxata --lines 100
+docker compose exec wxata pm2 monit
 ```
 
 ---
@@ -104,137 +198,114 @@ pm2 monit             # live CPU/memory dashboard
 ## Updating the Bot
 
 ```bash
-cd /root/wxata
+cd ~/wxata
 git pull
-cd backend && bun install   # only if package.json changed
-pm2 restart wxata
+docker compose up -d --build   # rebuilds image with new code, restarts container
 ```
+
+Your data (WhatsApp session, SQLite DB, botinfo.json) lives in Docker named volumes
+and is **not affected** by rebuilds.
 
 ---
 
-## File Locations on VPS
+## Persistent Data — What's Stored Where
 
-```
-/root/wxata/
-├── botinfo.json          ← your bot config (persistent ✅)
-├── warns.json            ← auto-created on first run
-├── vars.json             ← auto-created on first run
-└── backend/
-    ├── auth_info/        ← WhatsApp session (persistent ✅)
-    ├── antidel.json      ← auto-created on first run
-    ├── antibc.json       ← auto-created on first run
-    └── db/               ← SQLite database (persistent ✅)
-```
-
-Everything persists on a real VPS — no disk wipes, no sleep.
-
----
-
-## Backend — Docker PaaS Deployment (Alternative)
-
-If you prefer to deploy the backend to a Platform as a Service (PaaS) like Render, Railway, or Fly.io, you can use the provided `Dockerfile`. Most PaaS providers support deploying directly from a `Dockerfile` without needing `docker-compose`.
-
-### 1. Connecting your Repo
-Most platforms allow you to connect your GitHub repository directly. They will automatically detect the `Dockerfile` in the root of the repository and build the image.
-
-### 2. Configuration Settings
-When configuring the deployment on your PaaS provider, use the following settings:
-- **Build Command**: Not required (handled by the Dockerfile)
-- **Start Command**: Not required (handled by the Dockerfile's `CMD`)
-- **Port**: `5000` (Make sure the platform exposes this port for the WebSocket connection)
-- **Environment Variables**: Add any environment variables you need:
-  - `PORT=5000` (Optional: specify the port the backend should bind to internally)
-  - `DB_RETENTION_DAYS=3`
-
-### 3. Data Persistence Note
-Since this deployment method relies on the container's ephemeral filesystem (without mounted volumes), **any data stored locally inside the container will be lost if the container spins down, restarts, or redeploys.**
-- **Plugins**: Your marketplace plugins are safely stored in Firestore and will not be affected.
-- **WhatsApp Session (`auth_info`)**: If the container restarts, you will need to re-scan the QR code to re-authenticate the bot.
-- **SQLite DB**: The local SQLite database containing chat history for commands will be wiped on restart.
-
-If your PaaS provider supports persistent disks (like Render's `/data` disk), the application is already configured to prioritize it automatically to prevent data loss.
-
-### 4. Deploying Manually (Local/VPS)
-If you just want to run the Docker image manually on your own server without `docker-compose`:
-```bash
-# Build with a custom port if desired (default is 5000)
-docker build --build-arg PORT=5000 -t wxata-backend .
-
-# Run the container, binding your server's port to the container's port
-docker run -d -p 5000:5000 --name wxata-backend wxata-backend
-```
-
----
-
-## Frontend — Vercel (already live)
-
-Already deployed at `https://wxata.vercel.app`.
-
-To redeploy after changing the WS URL:
-```bash
-# Add your environment variable VITE_BACKEND_URL to your Vercel project settings
-```
-
-Vercel picks it up automatically.
-
----
-
-## For Other Developers (Self-Hosting)
-
-Each dev runs their own VPS instance. They do **not** share yours.
-
-```bash
-# 1. Fork the repo on GitHub
-# 2. Get their own VPS (freevps.edu.pl or similar)
-# 3. SSH in and follow steps 2–8 above
-# 4. Set VITE_BACKEND_URL in your Vercel project settings to your own VPS IP
-# 5. Deploy their own frontend fork on Vercel
-```
-
-What's shared vs per-instance:
-
-| Resource | Shared | Per-instance |
+| Data | Docker Volume | Host path (inside VM) |
 |---|---|---|
-| Frontend (Vercel) | ✅ Can share | Each can deploy their own |
-| Firebase Auth/Firestore | ✅ Shared | — |
-| Extension Marketplace | ✅ Shared | — |
-| VPS / Backend process | ❌ | ✅ Each needs their own |
-| WhatsApp session | ❌ | ✅ |
-| `botinfo.json` | ❌ | ✅ |
-| SQLite DB | ❌ | ✅ |
+| WhatsApp session | `wxata_auth` → `/data/auth_info` | managed by Docker |
+| SQLite database | `wxata_db` → `/data/db` | managed by Docker |
+| botinfo / warns / vars | `wxata_data` → `/data` | managed by Docker |
+| PM2 logs | `wxata_logs` → `/app/logs` | managed by Docker |
+
+To back up your session:
+```bash
+docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
+  tar czf /backup/auth_backup.tar.gz /data
+```
+
+To restore:
+```bash
+docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
+  tar xzf /backup/auth_backup.tar.gz -C /
+```
 
 ---
 
-## Local Development
+## Optional: HTTPS / WSS with Caddy (recommended)
 
-You can configure the backend port locally by creating a `backend/.env` file:
+Caddy auto-provisions a Let's Encrypt cert. You need a domain pointing to your Oracle IP.
+
 ```bash
-echo "PORT=5000" > backend/.env
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install caddy
 ```
 
-To run both frontend and backend locally:
+`/etc/caddy/Caddyfile`:
+```
+your.domain.com {
+    reverse_proxy localhost:5000
+}
+```
+
 ```bash
-bun run install:all   # install all deps
-bun run all           # frontend + backend together
+sudo systemctl reload caddy
+```
+
+Then set in Vercel:
+```
+VITE_BACKEND_URL=wss://your.domain.com
+```
+
+---
+
+## Bare VPS (without Docker)
+
+If you prefer to run directly on the VM without Docker:
+
+```bash
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc
+
+# Install Node + PM2
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt install -y nodejs
+sudo npm install -g pm2
+
+# Install deps
+cd ~/wxata
+bun install
+cd backend && bun install && cd ..
+
+# Start
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup   # run the command it prints
 ```
 
 ---
 
 ## Troubleshooting
 
-**Dashboard can't connect to backend**
-- Make sure port 5000 is open on your VPS firewall: `ufw allow 5000`
-- Check the `VITE_BACKEND_URL` environment variable matches your VPS IP
-- Check PM2 is running: `pm2 status`
+**Dashboard can't connect**
+- Check port 5000 is open: `curl http://YOUR_ORACLE_IP:5000/health` from your local machine
+- Oracle Security List AND iptables both need the port open (see step 2)
+- Check container is running: `docker compose ps`
 
-**Bot disconnects / crashes**
-- Check logs: `pm2 logs wxata`
-- PM2 auto-restarts on crash — check restart count in `pm2 status`
+**Bot crashes on startup**
+- Check logs: `docker compose logs wxata`
+- Usually a missing `botinfo.json` — the app creates it automatically from defaults on first run
 
-**QR code needed after VPS reboot**
-- Session is in `backend/auth_info/` — it persists across reboots on a real VPS
-- Only need to re-scan if you manually deleted auth_info or the VPS was wiped
+**QR code needed after restart**
+- Session is in the `wxata_auth` Docker volume — it persists across restarts and rebuilds
+- Only need to re-scan if you ran **Logout** from the dashboard or manually deleted the volume
 
-**Commands not working**
-- Check `botinfo.json` exists: `cat /root/wxata/botinfo.json`
-- Check permissions in botinfo.json — run `+perm grant all` from your number
+**PM2 not restarting after dashboard Restart**
+- Confirm you're running via `docker compose` (uses `pm2-runtime`)
+- Check: `curl http://localhost:5000/pm2` — `managed: true` means PM2 is active
+
+**Container keeps restarting**
+- `docker compose logs wxata` — look for the error
+- If it's a port conflict: `sudo lsof -i :5000`

@@ -16,7 +16,11 @@ export interface SystemStatus {
   connection: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING';
   uptime: string;
   memory: string;
+  pm2: boolean;
 }
+
+// Detect whether we are running under PM2
+const IS_PM2 = !!(process.env.PM2_HOME || process.env.pm_id !== undefined || process.env.PM2_USAGE);
 
 class DashboardServer {
   private wss: WebSocketServer | null = null;
@@ -25,30 +29,47 @@ class DashboardServer {
   private currentConnection: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' = 'DISCONNECTED';
 
   constructor() {
-    // ── HTTP health server & WebSocket base ───────────────────────────────────
-    // Render and other PaaS require a single PORT for both HTTP and WebSockets.
     const port = parseInt(process.env.PORT || '5000', 10);
+
+    // ── HTTP server ───────────────────────────────────────────────────────────
     const httpServer = http.createServer((req, res) => {
+      // Health check — used by Docker healthcheck and Oracle load balancer
       if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'ok',
           connection: this.currentConnection,
           uptime: this.getUptime(),
-          memory: this.getMemoryUsage()
+          memory: this.getMemoryUsage(),
+          pm2: IS_PM2,
         }));
-      } else {
-        res.writeHead(404);
-        res.end('Not found');
+        return;
       }
-    });
-    httpServer.listen(port, () => {
-      console.log(`🌐 Server (HTTP & WS) listening on port ${port}`);
+
+      // PM2 status endpoint — queried by the dashboard to show process manager info
+      if (req.url === '/pm2') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          managed: IS_PM2,
+          pid: process.pid,
+          uptime: this.getUptime(),
+          restartBehaviour: {
+            restart: 'exit(0) → PM2 restarts automatically',
+            terminate: 'exit(2) → PM2 stops, no restart',
+          },
+        }));
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('Not found');
     });
 
-    // ── Self-ping keep-alive ──────────────────────────────────────────────────
-    // Only needed on platforms that sleep (Render free tier).
-    // On a real VPS with PM2, this is not needed.
+    httpServer.listen(port, () => {
+      console.log(`🌐 Server (HTTP & WS) listening on port ${port}${IS_PM2 ? ' [PM2 managed]' : ''}`);
+    });
+
+    // ── Self-ping keep-alive (Render free tier only) ──────────────────────────
     const selfUrl = process.env.RENDER_EXTERNAL_URL
       ? `${process.env.RENDER_EXTERNAL_URL}/health`
       : null;
@@ -68,8 +89,15 @@ class DashboardServer {
     this.wss = new WebSocketServer({ server: httpServer });
 
     this.wss.on('connection', (ws) => {
+      // Mark alive for heartbeat tracking
+      (ws as any).isAlive = true;
+
       this.clients.add(ws);
       console.log('🖥️  Dashboard: Frontend client connected');
+
+      ws.on('pong', () => {
+        (ws as any).isAlive = true;
+      });
 
       ws.on('message', (message) => {
         try {
@@ -85,9 +113,32 @@ class DashboardServer {
         console.log('🖥️  Dashboard: Frontend client disconnected');
       });
 
+      ws.on('error', (err) => {
+        logger.warn({ err }, 'WebSocket client error');
+        this.clients.delete(ws);
+      });
+
+      // Send current state immediately on connect
       this.sendStatus();
     });
 
+    // ── Heartbeat — detect and clean up dead connections ─────────────────────
+    // Without this, stale connections accumulate and the dashboard appears
+    // connected even after a network drop.
+    setInterval(() => {
+      this.clients.forEach((ws) => {
+        if ((ws as any).isAlive === false) {
+          logger.warn('Terminating stale WebSocket connection');
+          this.clients.delete(ws);
+          ws.terminate();
+          return;
+        }
+        (ws as any).isAlive = false;
+        ws.ping();
+      });
+    }, 30_000);
+
+    // Status broadcast every 5 s
     setInterval(() => this.sendStatus(), 5000);
   }
 
@@ -97,7 +148,7 @@ class DashboardServer {
     this.onCommandCallback = callback;
   }
 
-  private handleCommand(payload: any) {
+  public handleCommand(payload: any) {
     if (this.onCommandCallback) {
       this.onCommandCallback(payload);
     }
@@ -138,7 +189,8 @@ class DashboardServer {
     const status: SystemStatus = {
       connection: this.currentConnection,
       uptime: this.getUptime(),
-      memory: this.getMemoryUsage()
+      memory: this.getMemoryUsage(),
+      pm2: IS_PM2,
     };
     this.broadcast({ event: 'status', data: status });
   }
@@ -153,7 +205,7 @@ class DashboardServer {
 
   private getMemoryUsage(): string {
     const used = process.memoryUsage().heapUsed / 1024 / 1024;
-    return `${Math.round(used)}MB / 512MB`;
+    return `${Math.round(used)}MB`;
   }
 }
 

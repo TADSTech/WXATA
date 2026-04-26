@@ -8,7 +8,13 @@
     "backend": "cd backend && bun run index.ts",
     "backend:pair": "cd backend && bun run index.ts",
     "all": "concurrently \"bun run frontend\" \"bun run backend\"",
-    "install:all": "bun install && cd frontend && bun install && cd ../backend && bun install"
+    "install:all": "bun install && cd frontend && bun install && cd ../backend && bun install",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop wxata",
+    "pm2:restart": "pm2 restart wxata",
+    "pm2:logs": "pm2 logs wxata",
+    "pm2:status": "pm2 status",
+    "pm2:delete": "pm2 delete wxata"
   },
   "keywords": [
     "whatsapp",

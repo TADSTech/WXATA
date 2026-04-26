@@ -42,6 +42,7 @@ export class WXATAConnection {
   private sock: WASocket | null = null;
   private reconnectAttempts = 0;
   private isConnected = false;
+  private isShuttingDown = false;
 
   constructor(private options: ConnectionOptions) {}
 
@@ -136,7 +137,9 @@ export class WXATAConnection {
           try { this.sock?.ws?.close(); } catch {}
           this.sock?.ev.removeAllListeners('connection.update');
           this.sock?.ev.removeAllListeners('creds.update');
-          this.handleReconnect();
+          if (!this.isShuttingDown) {
+            this.handleReconnect();
+          }
         }
       } else if (connection === 'open') {
         this.isConnected = true;
@@ -211,6 +214,23 @@ export class WXATAConnection {
       logger.error({ err }, 'Error during socket logout');
     } finally {
       await this.clearSession();
+    }
+  }
+
+  /**
+   * Completely shut down the connection and prevent reconnects
+   */
+  public async destroy() {
+    this.isShuttingDown = true;
+    try {
+      if (this.sock) {
+        this.sock.ev.removeAllListeners('connection.update');
+        this.sock.ev.removeAllListeners('creds.update');
+        this.sock.ev.removeAllListeners('messaging-history.set');
+        this.sock.ws.close();
+      }
+    } catch (err) {
+      logger.error({ err }, 'Error during socket destruction');
     }
   }
 }

@@ -72,35 +72,35 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-bg-base text-text-main flex items-center justify-center p-4">
       <div className="bg-bg-base border border-border-strong p-8 rounded-xl w-full max-w-md">
-        <h2 className="text-3xl font-bold text-primary mb-6 text-center">Register</h2>
+        <h2 className="text-3xl font-bold text-accent-primary mb-6 text-center">Register</h2>
         {error && <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded mb-4">{error}</div>}
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Full Name</label>
             <input 
               type="text" required value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Username</label>
             <input 
               type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Email</label>
             <input 
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Password</label>
             <input 
               type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-primary"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
@@ -108,15 +108,15 @@ export default function Register() {
             <input 
               type="text" required value={userCode} onChange={(e) => setUserCode(e.target.value)}
               placeholder="Provided by administrator"
-              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent"
+              className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
-          <button disabled={loading} type="submit" className="w-full bg-primary hover:bg-primary/90 text-black font-bold py-2 px-4 rounded transition-colors disabled:opacity-50">
+          <button disabled={loading} type="submit" className="w-full bg-accent-primary hover:bg-accent-hover text-bg-base font-bold py-2 px-4 rounded transition-colors disabled:opacity-50">
             {loading ? 'Creating Account...' : 'Register'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
-          Already have an account? <Link to="/login" className="text-primary hover:underline">Log in</Link>
+        <p className="mt-4 text-center text-sm text-text-muted">
+          Already have an account? <Link to="/login" className="text-accent-primary hover:underline">Log in</Link>
         </p>
       </div>
     </div>
