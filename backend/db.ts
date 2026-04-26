@@ -36,7 +36,7 @@ db.run(`
 `);
 db.run(`CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp)`);
 
-export function storeMessage(msg: any) {
+export function storeMessage(msg: any, explicitTimestamp?: number) {
   if (!msg?.key?.id) return;
   const isViewOnce = msg.message?.viewOnceMessage || msg.message?.viewOnceMessageV2 || msg.message?.viewOnceMessageV2Extension ? 1 : 0;
 
@@ -51,7 +51,7 @@ export function storeMessage(msg: any) {
       msg.key.remoteJid,
       msg.key.participant || msg.key.remoteJid,
       msg.key.fromMe ? 1 : 0,
-      Date.now(),
+      explicitTimestamp || Date.now(),
       JSON.stringify(msg),
       isViewOnce
     );

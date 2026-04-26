@@ -826,10 +826,23 @@ function resolveScriptResponse(script: BotScript, argumentName: string | undefin
 function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
   sock.ev.on('messaging-history.set', async ({ messages }) => {
     if (messages && messages.length > 0) {
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - (24 * 60 * 60); // 24 hours in seconds
+      let count = 0;
+      
       for (const msg of messages) {
-        if (msg?.key?.id) storeMessage(msg);
+        // Extract timestamp, handling both number and Long types
+        const ts = msg.messageTimestamp 
+          ? (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : (msg.messageTimestamp as any).low)
+          : 0;
+
+        if (msg?.key?.id && ts >= cutoff) {
+          // Convert seconds to ms for db storage
+          storeMessage(msg, ts * 1000);
+          count++;
+        }
       }
-      dashboard.log('INFO', `Cached ${messages.length} historical messages for anti-delete`);
+      dashboard.log('INFO', `Cached ${count} historical messages from last 24h (skipped ${messages.length - count} older messages)`);
     }
   });
 
@@ -849,7 +862,12 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       const isBotEcho = msg.key?.fromMe && wasRecentlySentByBot(remoteJid ?? undefined, text ?? undefined);
       const botInfo = await readBotInfo();
       const isRootSender = senderMatchesRoot(sock, msg, botInfo.root.target);
-      const hasPermission = isRootSender || isCommandPermitted(botInfo, msg);
+      const isCommandPermittedByList = isCommandPermitted(botInfo, msg);
+      const hasPermission = isRootSender || isCommandPermittedByList;
+
+      if (text && text.startsWith(botInfo.prefix)) {
+        dashboard.log('DEBUG', `COMMAND_CHECK text="${text.trim()}" isRoot=${isRootSender} isPermitted=${isCommandPermittedByList} fromMe=${msg.key?.fromMe}`);
+      }
 
       const participant = msg.key?.participant ?? '-';
       const textPreview = (text ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -895,9 +913,10 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
           const prefixPattern = escapeRegex(botInfo.prefix.trim());
           const triggerPattern = escapeRegex(script.trigger.trim());
-          // Match prefix+trigger followed by optional arguments (any trailing content)
-          // Only capture the first word argument for simple scripts; perm uses its own regex
-          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?(?:\\s+\\S+)*$`, 'i');
+          
+          // Simplified regex: match prefix+trigger, then capture the first word as argumentName, 
+          // allow any trailing content without requiring exact word matches.
+          const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?.*$`, 'i');
           const triggerMatch = normalizedText.match(triggerRegex);
 
           if (triggerMatch) {

@@ -7,7 +7,7 @@ export const Mist = () => {
       {[...Array(5)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute bg-gray-500/10 blur-[100px] rounded-full"
+          className="absolute bg-accent-primary/5 blur-[120px] rounded-full"
           initial={{ 
             width: Math.random() * 400 + 200, 
             height: Math.random() * 400 + 200,
@@ -47,7 +47,7 @@ export const Chain = ({ delay = 0, x = "10%" }: { delay?: number, x?: string }) 
       }}
     >
       {[...Array(20)].map((_, i) => (
-        <Link2 key={i} className="text-green-500 w-8 h-8 rotate-90" />
+        <Link2 key={i} className="text-accent-primary w-8 h-8 rotate-90" />
       ))}
     </motion.div>
   );

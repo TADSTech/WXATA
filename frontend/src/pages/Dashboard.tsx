@@ -638,10 +638,26 @@ const Dashboard = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-bg-base flex items-center justify-center font-mono">
-        <div className="flex flex-col items-center gap-4">
-          <Activity className="text-accent-light w-8 h-8 animate-pulse" />
-          <h2 className="text-accent-light text-lg tracking-widest">AUTHENTICATING...</h2>
+      <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center font-mono relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--theme-accent-subtle)_0%,transparent_70%)] opacity-50" />
+        <div className="z-10 flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 blur-xl bg-accent-primary opacity-20 animate-pulse" />
+            <Activity className="text-accent-primary w-12 h-12 relative animate-spin-slow" />
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h2 className="text-accent-light text-xl font-black tracking-[0.4em] uppercase">SYSTEM_AUTH</h2>
+            <div className="flex gap-1">
+              {[0, 1, 2].map(i => (
+                <motion.div
+                  key={i}
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                  className="w-1.5 h-1.5 rounded-full bg-accent-primary"
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -666,19 +682,36 @@ const Dashboard = () => {
               <span className="uppercase text-xs hidden sm:inline">{theme}</span>
             </button>
             {showThemeMenu && (
-              <div className="absolute right-0 top-full mt-2 flex flex-col bg-bg-panel border border-border-strong rounded shadow-lg overflow-hidden z-50 min-w-[120px]">
-                {(['hacker', 'dark', 'light', 'sunset'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      setTheme(t);
-                      setShowThemeMenu(false);
-                    }}
-                    className={`px-4 py-2 text-left text-xs uppercase hover:bg-accent-subtle transition-colors ${theme === t ? 'text-accent-primary font-bold bg-accent-subtle/50' : 'text-text-muted'}`}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="absolute right-0 top-full mt-4 bg-bg-panel border border-border-strong rounded-xl shadow-2xl overflow-hidden z-50 min-w-[280px] p-4 backdrop-blur-md bg-opacity-90">
+                <div className="text-[10px] uppercase tracking-widest text-text-muted mb-3 border-b border-border-subtle pb-2">Select Visual Identity</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: 'midnight', name: 'Midnight', color: '#8b5cf6' },
+                    { id: 'nord', name: 'Nord', color: '#88c0d0' },
+                    { id: 'cyberpunk', name: 'Cyberpunk', color: '#ff00ff' },
+                    { id: 'rose', name: 'Rose Pine', color: '#ebbcba' },
+                    { id: 'ocean', name: 'Oceanic', color: '#0ea5e9' },
+                    { id: 'forest', name: 'Deep Forest', color: '#10b981' },
+                    { id: 'minimal', name: 'Minimal', color: '#000000' },
+                    { id: 'sepia', name: 'Vintage', color: '#7c2d12' },
+                    { id: 'hacker', name: 'Hacker', color: '#00ff41' },
+                    { id: 'sunset', name: 'Sunset', color: '#f59e0b' }
+                  ] as const).map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setTheme(t.id);
+                        setShowThemeMenu(false);
+                      }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group ${theme === t.id ? 'bg-accent-subtle ring-1 ring-accent-primary' : 'hover:bg-bg-panel-hover'}`}
+                    >
+                      <div className="w-4 h-4 rounded-full border border-border-strong shrink-0" style={{ backgroundColor: t.color }} />
+                      <div className="flex flex-col">
+                        <span className={`text-[11px] font-bold uppercase tracking-tight ${theme === t.id ? 'text-accent-light' : 'text-text-main'}`}>{t.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

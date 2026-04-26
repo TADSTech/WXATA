@@ -161,17 +161,18 @@ const Landing = () => {
             </motion.div>
 
             <motion.h1
-              className="text-[clamp(4rem,12vw,9rem)] font-black tracking-tighter text-text-main leading-none"
+              className="text-[clamp(4rem,12vw,9rem)] font-black tracking-tighter text-text-main leading-none drop-shadow-[0_0_30px_var(--theme-accent-subtle)]"
               animate={{
                 textShadow: [
                   '0 0 20px var(--theme-accent-subtle)',
-                  '0 0 50px var(--theme-accent-subtle)',
+                  '0 0 60px var(--theme-accent-subtle)',
                   '0 0 20px var(--theme-accent-subtle)',
                 ],
+                scale: [1, 1.02, 1]
               }}
-              transition={{ duration: 3, repeat: Infinity }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             >
-              WX<span className="text-accent-light">ATA</span>
+              WX<span className="text-accent-primary">ATA</span>
             </motion.h1>
 
             <motion.p

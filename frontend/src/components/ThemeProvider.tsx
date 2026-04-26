@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'hacker' | 'dark' | 'light' | 'sunset';
+type Theme = 'midnight' | 'nord' | 'cyberpunk' | 'rose' | 'ocean' | 'forest' | 'minimal' | 'sepia' | 'hacker' | 'sunset';
 
 interface ThemeContextType {
   theme: Theme;
@@ -8,24 +8,24 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'hacker',
+  theme: 'midnight',
   setTheme: () => {}
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem('wxata-theme') as Theme) || 'hacker';
+    return (localStorage.getItem('wxata-theme') as Theme) || 'midnight';
   });
 
   useEffect(() => {
     localStorage.setItem('wxata-theme', theme);
-    // Also keep body class for any external styles, but the wrapper div is primary
-    document.body.className = `theme-${theme}`;
+    // Apply theme to html element for global CSS variable overrides
+    document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>
-      <div className={`theme-${theme} min-h-screen bg-bg-base transition-colors duration-300`}>
+      <div className="min-h-screen bg-bg-base transition-colors duration-300">
         {children}
       </div>
     </ThemeContext.Provider>
