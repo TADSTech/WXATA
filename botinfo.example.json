@@ -2,110 +2,163 @@
   "prefix": "!",
   "scripts": {
     "menu": {
-      "name": "menu",
-      "desc": "List all core scripts and their usage",
-      "trigger": "menu",
-      "response": "Available scripts listed below.",
+      "name": "System Menu",
+      "desc": "Show professional system menu with stats",
+      "trigger": "mn",
+      "aliases": ["menu", "m"],
+      "type": "core",
+      "response": "",
       "target": "chat",
-      "defaultArgument": "self"
+      "code": "const os = require('os');\nconst uptime = Math.floor(process.uptime());\nconst h = Math.floor(uptime / 3600);\nconst m = Math.floor((uptime % 3600) / 60);\nconst s = Math.floor(uptime % 60);\nconst uptimeStr = `${h}h ${m}m ${s}s`;\nconst ram = (os.totalmem() - os.freemem()) / 1024 / 1024 / 1024;\nconst totalRam = os.totalmem() / 1024 / 1024 / 1024;\n\nconst isDetailed = argumentName === 'detailed' || argumentName === 'd';\nconst date = new Date();\nconst time = date.toLocaleTimeString();\n\nlet menuText = `╭━─━─━─≪✠≫─━─━─━╮\n     *WXATA SYSTEM v1.0*\n╰━─━─━─≪✠≫─━─━─━╯\n╭━─━─━─≪✠≫─━─━─━╮\n│ 📅 *Date:* ${date.toLocaleDateString()}\n│ ⏰ *Time:* ${time}\n│ ❄️ *Day:* ${date.toLocaleString('en', { weekday: 'long' })}\n│ 🚀 *Version:* 1.2.0\n│ 🪻 *RAM:* ${ram.toFixed(2)}GB / ${totalRam.toFixed(0)}GB\n│ ⏳ *Uptime:* ${uptimeStr}\n╰━─━─━─≪✠≫─━─━─━╯\n\n`;\n\nconst categories = {};\nObject.entries(botInfo.scripts).forEach(([key, script]) => {\n    const type = script.type || 'misc';\n    if (!categories[type]) categories[type] = [];\n    categories[type].push(script);\n});\n\nconst order = ['core', 'tools', 'admin', 'group', 'fun', 'misc'];\nconst sortedCats = Object.keys(categories).sort((a, b) => {\n    const ia = order.indexOf(a); const ib = order.indexOf(b);\n    if (ia === -1) return 1; if (ib === -1) return -1;\n    return ia - ib;\n});\n\nfor (const cat of sortedCats) {\n    const cmds = categories[cat];\n    menuText += `╭━─━─━─≪❥≫\n│ *${cat.toUpperCase()} ❞*\n╰━─━─━─≪❥≫\n`;\n    cmds.forEach(cmd => {\n        const ali = cmd.aliases && cmd.aliases.length > 0 ? ` (${cmd.aliases.join(', ')})` : '';\n        if (isDetailed) {\n            menuText += `│ ✗ ${botInfo.prefix}${cmd.trigger}${ali}\n│    ${cmd.name}: ${cmd.desc}\n`;\n        } else {\n            menuText += `│ ✗ ${botInfo.prefix}${cmd.trigger}${ali}\n`;\n        }\n    });\n    menuText += '\\n';\n}\n\nif (!isDetailed) menuText += `_Tip: Use ${botInfo.prefix}mn detailed for descriptions._`;\n\nawait sock.sendMessage(remoteJid, { \n    text: menuText,\n    contextInfo: {\n        externalAdReply: {\n            title: 'WXATA • PREMIUM ENGINE',\n            body: isDetailed ? 'Detailed Command Overview' : 'Advanced WhatsApp Automation',\n            mediaType: 1,\n            thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',\n            sourceUrl: 'https://wxata.tadstech.dev'\n        }\n    }\n});"
+    },
+    "help": {
+      "name": "Help System",
+      "desc": "Describe a specific command and its usage",
+      "trigger": "hp",
+      "aliases": ["help", "h"],
+      "type": "core",
+      "response": "",
+      "target": "chat",
+      "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, `📖 *WXATA HELP*\n\nUsage: ${botInfo.prefix}hp <command>\nExample: ${botInfo.prefix}hp st\n\nType ${botInfo.prefix}mn to see all aliases.`);\n\nconst cmdKey = argumentName.toLowerCase().trim();\nconst script = Object.values(botInfo.scripts).find(s => s.trigger === cmdKey || s.name?.toLowerCase() === cmdKey || (s.aliases && s.aliases.includes(cmdKey)));\n\nif (!script) return sendTrackedMessage(sock, remoteJid, `❌ Command \"${cmdKey}\" not found.`);\n\nlet helpText = `*───『 HELP: ${script.name?.toUpperCase() || cmdKey.toUpperCase()} 』───*\n\n`;\nhelpText += `🔹 *Primary:* ${botInfo.prefix}${script.trigger}\n`;\nif (script.aliases?.length) helpText += `🔹 *Aliases:* ${script.aliases.join(', ')}\n`;\nhelpText += `🔹 *Type:* ${script.type || 'misc'}\n`;\nhelpText += `🔹 *Target:* ${script.target || 'chat'}\n`;\nhelpText += `🔹 *Details:* ${script.desc || 'No description available.'}\n\n`;\nhelpText += `💡 *Usage Example:*\n${botInfo.prefix}${script.trigger} ${script.defaultArgument || ''}\n\n_Visit wxata.tadstech.dev/docs for full guides_`;\n\nawait sock.sendMessage(remoteJid, { \n  text: helpText,\n  contextInfo: {\n    externalAdReply: {\n      title: `HELP: ${script.name}`,\n      body: 'WXATA Documentation System',\n      mediaType: 1,\n      thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg'\n    }\n  }\n});"
+    },
+    "docs": {
+      "name": "Documentation",
+      "desc": "Show link to official documentation",
+      "trigger": "dc",
+      "aliases": ["docs", "doc"],
+      "type": "core",
+      "response": "",
+      "target": "chat",
+      "code": "const helpText = `📚 *WXATA DOCUMENTATION*\n\nYou can find the full system documentation and guides here:\n\n🔗 *URL:* https://wxata.tadstech.dev/docs\n\n_Learn how to build scripts, manage permissions, and optimize your engine._`;\n\nawait sock.sendMessage(remoteJid, { \n  text: helpText,\n  contextInfo: {\n    externalAdReply: {\n      title: 'WXATA DOCUMENTATION',\n      body: 'Official Guides & Documentation',\n      mediaType: 1,\n      thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',\n      sourceUrl: 'https://wxata.tadstech.dev/docs'\n    }\n  }\n});"
     },
     "perm": {
-      "name": "perm",
+      "name": "Permission Manager",
       "desc": "Grant bot permissions: chat | all | +number",
-      "trigger": "perm",
+      "trigger": "pm",
+      "aliases": ["perm", "pms"],
+      "type": "admin",
       "response": "Permission updated.",
-      "target": "chat",
-      "defaultArgument": "self"
+      "target": "chat"
     },
     "summoner": {
-      "name": "ping",
+      "name": "System Ping",
       "desc": "Check bot network speed and status",
-      "trigger": "ping",
+      "trigger": "pg",
+      "aliases": ["ping", "p"],
+      "type": "core",
       "response": "",
       "target": "chat",
-      "code": "const start = Date.now();\nawait sendTrackedMessage(sock, remoteJid, \"Pong! 🟢 Calculating speed...\");\nconst end = Date.now();\nawait sendTrackedMessage(sock, remoteJid, `🚀 Speed: ${end - start}ms\n🤖 WXATA is ONLINE`);",
-      "defaultArgument": "self"
+      "code": "const start = Date.now();\nawait sendTrackedMessage(sock, remoteJid, \"Pong! 🟢 Calculating speed...\");\nconst end = Date.now();\nawait sendTrackedMessage(sock, remoteJid, `🚀 Speed: ${end - start}ms\n🤖 WXATA is ONLINE`);"
     },
     "extractor": {
-      "name": "extractor",
-      "desc": "Extract view once message and send to self, here, or number",
-      "trigger": "extract",
+      "name": "Media Extractor",
+      "desc": "Extract view once media",
+      "trigger": "ex",
+      "aliases": ["extract", "e"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "const bail = require('@whiskeysockets/baileys');\nconst extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a View Once message.\");\n\nlet viewOnce = extractFrom.viewOnceMessage?.message || extractFrom.viewOnceMessageV2?.message || extractFrom.viewOnceMessageV2Extension?.message || extractFrom;\nconst mediaMsg = viewOnce.imageMessage || viewOnce.videoMessage || viewOnce.audioMessage;\nconst mediaType = viewOnce.imageMessage ? 'image' : (viewOnce.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  let target = remoteJid;\n  if (argumentName === 'self' || argumentName === 'me') target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  else if (argumentName && argumentName.match(/^\\d+$/)) target = argumentName + '@s.whatsapp.net';\n  \n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, \"Extracted and sent successfully.\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"Could not find valid media in the quoted message.\");\n}",
-      "defaultArgument": "self"
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst extractFrom = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a View Once message.\");\n\nlet viewOnce = extractFrom.viewOnceMessage?.message || extractFrom.viewOnceMessageV2?.message || extractFrom.viewOnceMessageV2Extension?.message || extractFrom;\nconst mediaMsg = viewOnce.imageMessage || viewOnce.videoMessage || viewOnce.audioMessage;\nconst mediaType = viewOnce.imageMessage ? 'image' : (viewOnce.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await(const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  let target = remoteJid;\n  if (argumentName === 'self' || argumentName === 'me') target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  else if (argumentName && argumentName.match(/^\\d+$/)) target = argumentName + '@s.whatsapp.net';\n  \n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  if (target !== remoteJid) await sendTrackedMessage(sock, remoteJid, \"Extracted and sent successfully.\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"Could not find valid media in the quoted message.\");\n}"
     },
     "saver": {
-      "name": "saver",
-      "desc": "Save any status media to your own chat",
-      "trigger": "save",
+      "name": "Status Saver",
+      "desc": "Save status media to your chat",
+      "trigger": "sv",
+      "aliases": ["save", "s"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a message to save it to your chat.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  const target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  await sendTrackedMessage(sock, remoteJid, \"Media saved to your own chat successfully!\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No media found in the quoted message.\");\n}",
-      "defaultArgument": "self"
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to a message to save it to your chat.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage || extractFrom.audioMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : (extractFrom.videoMessage ? 'video' : 'audio');\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  const target = sock.user.id.split(':')[0] + '@s.whatsapp.net';\n  const payload = {};\n  payload[mediaType] = buffer;\n  if (mediaMsg.caption) payload.caption = mediaMsg.caption;\n\n  await sock.sendMessage(target, payload);\n  await sendTrackedMessage(sock, remoteJid, \"Media saved to your own chat successfully!\");\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No media found in the quoted message.\");\n}"
     },
     "tagall": {
-      "name": "tagall",
-      "desc": "Tag all members in a group",
-      "trigger": "tagall",
+      "name": "Tag All Members",
+      "desc": "Tag everyone in the group",
+      "trigger": "ta",
+      "aliases": ["tagall", "tag"],
+      "type": "group",
       "response": "",
       "target": "chat",
-      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst participants = groupMetadata.participants;\nlet text = \"✨ *ATTENTION EVERYONE* ✨\\n\\n\";\nconst mentions = [];\nfor (let mem of participants) {\n  text += `@${mem.id.split('@')[0]} `;\n  mentions.push(mem.id);\n}\nawait sock.sendMessage(remoteJid, { text, mentions });",
-      "defaultArgument": "self"
+      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst participants = groupMetadata.participants;\nlet text = \"✨ *ATTENTION EVERYONE* ✨\n\n\";\nconst mentions = [];\nfor (let mem of participants) {\n  text += `@${mem.id.split('@')[0]} `;\n  mentions.push(mem.id);\n}\nawait sock.sendMessage(remoteJid, { text, mentions });"
     },
     "sticker": {
-      "name": "sticker",
-      "desc": "Convert image or video to sticker",
-      "trigger": "sticker",
+      "name": "Sticker Maker",
+      "desc": "Convert image/video to sticker",
+      "trigger": "st",
+      "aliases": ["sticker", "stick"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "const bail = require('@whiskeysockets/baileys');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage || msg.message;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to an image/video or send one with the command.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : 'video';\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  await sock.sendMessage(remoteJid, { \n    sticker: buffer,\n    mimetype: 'image/webp' \n  });\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No image or video found.\");\n}",
-      "defaultArgument": "self"
+      "code": "const bail = require('@whiskeysockets/baileys');\nconst { Sticker, StickerTypes } = require('wa-sticker-formatter');\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst extractFrom = contextInfo?.quotedMessage || msg.message;\nif (!extractFrom) return sendTrackedMessage(sock, remoteJid, \"Please reply to an image/video or send one with the command.\");\n\nconst mediaMsg = extractFrom.imageMessage || extractFrom.videoMessage;\nconst mediaType = extractFrom.imageMessage ? 'image' : 'video';\n\nif (mediaMsg) {\n  const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);\n  let buffer = Buffer.from([]);\n  for await (const chunk of stream) { buffer = Buffer.concat([buffer, chunk]); }\n  \n  const sticker = new Sticker(buffer, {\n    pack: 'WXATA Pack',\n    author: 'WXATA Bot',\n    type: StickerTypes.FULL,\n    quality: 100\n  });\n  await sock.sendMessage(remoteJid, await sticker.toMessage());\n} else {\n  return sendTrackedMessage(sock, remoteJid, \"No image or video found.\");\n}"
+    },
+    "qc": {
+      "name": "Quote Sticker Maker",
+      "desc": "Generate quote sticker from text",
+      "trigger": "qc",
+      "aliases": ["quote", "q"],
+      "type": "tools",
+      "response": "",
+      "target": "chat",
+      "code": "const axios = require('axios');\nconst { Sticker, StickerTypes } = require('wa-sticker-formatter');\n\nif (!argumentName) return sendTrackedMessage(sock, remoteJid, \"Usage: !qc <text> [; <name>]\");\nconst [text, name] = argumentName.split(';');\n\nlet pp = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';\ntry {\n    const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\n    const target = contextInfo?.participant || msg.key.participant || remoteJid;\n    pp = await sock.profilePictureUrl(target, 'image');\n} catch (e) {}\n\nconst obj = {\n    type: 'quote',\n    format: 'png',\n    backgroundColor: '#FFFFFF',\n    width: 512,\n    height: 512,\n    scale: 2,\n    messages: [{\n        avatar: true,\n        from: {\n            name: name?.trim() || msg.pushName || \"User\",\n            photo: { url: pp },\n        },\n        text: text.trim(),\n        replyMessage: {},\n    }],\n};\n\ntry {\n    const response = await axios.post('https://bot.lyo.su/quote/generate', obj);\n    const imgBuffer = Buffer.from(response.data.result.image, 'base64');\n    const sticker = new Sticker(imgBuffer, {\n        pack: 'WXATA Pack',\n        author: 'WXATA Bot',\n        type: StickerTypes.FULL,\n        quality: 100\n    });\n    await sock.sendMessage(remoteJid, await sticker.toMessage());\n} catch (e) {\n    await sendTrackedMessage(sock, remoteJid, \"❌ Failed to generate quote sticker.\");\n}"
     },
     "delete": {
-      "name": "delete",
-      "desc": "Delete a message the bot sent or you sent (sudo only)",
-      "trigger": "delete",
+      "name": "Message Deleter",
+      "desc": "Delete a message",
+      "trigger": "dl",
+      "aliases": ["delete", "del"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nif (!contextInfo?.quotedMessage) return sendTrackedMessage(sock, remoteJid, \"Please reply to the message you want to delete.\");\n\nawait sock.sendMessage(remoteJid, { \n  delete: { \n    remoteJid, \n    fromMe: contextInfo.participant === sock.user.id.split(':')[0] + '@s.whatsapp.net', \n    id: contextInfo.stanzaId, \n    participant: contextInfo.participant \n  } \n});",
-      "defaultArgument": "self"
+      "code": "const contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nif (!contextInfo?.quotedMessage) return sendTrackedMessage(sock, remoteJid, \"Please reply to the message you want to delete.\");\n\nawait sock.sendMessage(remoteJid, { \n  delete: { \n    remoteJid, \n    fromMe: contextInfo.participant === sock.user.id.split(':')[0] + '@s.whatsapp.net', \n    id: contextInfo.stanzaId, \n    participant: contextInfo.participant \n  } \n});"
+    },
+    "tkick": {
+      "name": "Time Kick",
+      "desc": "Kick user and re-add in 5m",
+      "trigger": "tk",
+      "aliases": ["tkick"],
+      "type": "admin",
+      "response": "",
+      "target": "chat",
+      "code": "const bail = require('@whiskeysockets/baileys');\nif (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"❌ This command is for groups only.\");\n\nconst groupMetadata = await sock.groupMetadata(remoteJid);\nconst botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';\nconst botIsAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;\nif (!botIsAdmin) return sendTrackedMessage(sock, remoteJid, \"❌ Permission Denied: I must be a Group Admin.\");\n\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\nif (!targetUser) return sendTrackedMessage(sock, remoteJid, \"⚠️ Please reply to a user or tag them to T-Kick.\");\n\nconst targetIsAdmin = groupMetadata.participants.find(p => p.id === targetUser)?.admin;\nif (targetIsAdmin) return sendTrackedMessage(sock, remoteJid, \"❌ I cannot kick a Group Admin.\");\n\nawait sock.sendMessage(remoteJid, { \n    text: `⏳ @${targetUser.split('@')[0]} will be kicked and re-added in 5 minutes.`, \n    mentions: [targetUser] \n});\n\ntry {\n    await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');\n    setTimeout(async () => {\n        try {\n            await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');\n            await sock.sendMessage(remoteJid, { \n                text: `✅ @${targetUser.split('@')[0]} has been re-added automatically.`, \n                mentions: [targetUser] \n            });\n        } catch (e) {\n            await sock.sendMessage(remoteJid, { text: `❌ Failed to re-add @${targetUser.split('@')[0]}. They might have privacy settings blocking invites.` });\n        }\n    }, 5 * 60 * 1000);\n} catch (e) {\n    await sendTrackedMessage(sock, remoteJid, \"❌ Failed to execute T-Kick. Ensure I have proper permissions.\");\n}"
     },
     "ss": {
-      "name": "ss",
+      "name": "Web Screenshot",
       "desc": "Take web page screenshot",
       "trigger": "ss",
+      "aliases": ["screenshot", "snap"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, \"Please provide a URL (e.g. !ss google.com)\");\nlet url = argumentName;\nif (!url.startsWith('http')) url = 'https://' + url;\nawait sendTrackedMessage(sock, remoteJid, '📸 Taking screenshot...');\ntry {\n  const ssUrl = `https://image.thum.io/get/width/1280/crop/900/${encodeURIComponent(url)}`;\n  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: `📸 ${url}` });\n} catch(e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Failed to take screenshot.');\n}",
-      "defaultArgument": "self"
+      "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, \"Please provide a URL (e.g. !ss google.com)\");\nlet url = argumentName.trim();\nif (!url.startsWith('http')) url = 'https://' + url;\nawait sendTrackedMessage(sock, remoteJid, '📸 *Capturing page...*');\ntry {\n  const ssUrl = `https://image.thum.io/get/width/1280/crop/900/noanimate/refresh/${encodeURIComponent(url)}`;\n  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: `📸 *Screenshot:* ${url}` });\n} catch(e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ *Failed:* Could not capture screenshot. Check the URL.');\n}"
     },
     "warn": {
-      "name": "warn",
-      "desc": "Warns a user 3 times then kicks them (Group Admin only)",
-      "trigger": "warn",
+      "name": "User Warner",
+      "desc": "Warn 3x then kick",
+      "trigger": "wn",
+      "aliases": ["warn", "w"],
+      "type": "admin",
       "response": "",
       "target": "chat",
-      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\nif (!targetUser) return sendTrackedMessage(sock, remoteJid, \"⚠️ Please reply to a user's message or tag them to warn.\");\n\nconst fs = require('fs');\nconst path = require('path');\nconst warnsFile = path.resolve(__rootdir, 'warns.json');\nlet warns = {};\nif (fs.existsSync(warnsFile)) { warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8')); }\nif (!warns[remoteJid]) warns[remoteJid] = {};\n\nwarns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;\nfs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n\nconst warnCount = warns[remoteJid][targetUser];\nif (warnCount >= 3) {\n    await sock.sendMessage(remoteJid, { text: `🚨 @${targetUser.split('@')[0]} has reached 3 warnings and is being removed!`, mentions: [targetUser] });\n    try { await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove'); } catch (e) {\n        await sock.sendMessage(remoteJid, { text: \"❌ I don't have Admin permissions to remove them!\" });\n    }\n    warns[remoteJid][targetUser] = 0;\n    fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n} else {\n    await sock.sendMessage(remoteJid, { text: `⚠️ @${targetUser.split('@')[0]} you have been warned! (${warnCount}/3)`, mentions: [targetUser] });\n}",
-      "defaultArgument": "self"
+      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, \"This command can only be used in groups.\");\nconst contextInfo = msg.message?.extendedTextMessage?.contextInfo;\nconst targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);\nif (!targetUser) return sendTrackedMessage(sock, remoteJid, \"⚠️ Please reply to a user's message or tag them to warn.\");\n\nconst fs = require('fs');\nconst path = require('path');\nconst warnsFile = path.resolve(__rootdir, 'warns.json');\nlet warns = {};\nif (fs.existsSync(warnsFile)) { warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8')); }\nif (!warns[remoteJid]) warns[remoteJid] = {};\n\nwarns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;\nfs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n\nconst warnCount = warns[remoteJid][targetUser];\nif (warnCount >= 3) {\n    await sock.sendMessage(remoteJid, { text: `🚨 @${targetUser.split('@')[0]} has reached 3 warnings and is being removed!`, mentions: [targetUser] });\n    try { await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove'); } catch (e) {\n        await sock.sendMessage(remoteJid, { text: \"❌ I don't have Admin permissions to remove them!\" });\n    }\n    warns[remoteJid][targetUser] = 0;\n    fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));\n} else {\n    await sock.sendMessage(remoteJid, { text: `⚠️ @${targetUser.split('@')[0]} you have been warned! (${warnCount}/3)`, mentions: [targetUser] });\n}"
     },
     "antidel": {
-      "name": "antidelete",
-      "desc": "Auto-forwards deleted messages to root number",
-      "trigger": "antidel",
+      "name": "Anti-Delete System",
+      "desc": "Forward deleted msgs",
+      "trigger": "ad",
+      "aliases": ["antidel", "anti"],
+      "type": "tools",
       "response": "",
       "target": "chat",
-      "code": "const arg = argumentName ? argumentName.toLowerCase() : '';\nconst fs = require('fs');\nconst rPath = require('path');\nconst cfgPath = rPath.resolve(__rootdir, 'antidel.json');\nconst selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';\nconst defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;\n\nlet cfg = { enabled: true, target: defaultTarget };\ntry {\n  if (fs.existsSync(cfgPath)) {\n    const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));\n    cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;\n    if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;\n  }\n} catch(e) {}\n\nif (arg === 'on') {\n  cfg.enabled = true;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, `✅ Anti-Delete *ON* — forwarding to ${cfg.target}`);\n} else if (arg === 'off') {\n  cfg.enabled = false;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, '❌ Anti-Delete *OFF*');\n}\nawait sendTrackedMessage(sock, remoteJid, `*Anti-Delete Status*\\nEnabled: ${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\\nTarget: ${cfg.target}\\n\\nUsage: !antidel on | off`);",
-      "defaultArgument": "self"
+      "code": "const arg = argumentName ? argumentName.toLowerCase() : '';\nconst fs = require('fs');\nconst rPath = require('path');\nconst cfgPath = rPath.resolve(__rootdir, 'antidel.json');\nconst selfJid = sock.user?.id.split(':')[0] + '@s.whatsapp.net';\nconst defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numbers[0] + '@s.whatsapp.net' : null) || selfJid;\n\nlet cfg = { enabled: true, target: defaultTarget };\ntry {\n  if (fs.existsSync(cfgPath)) {\n    const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));\n    cfg.enabled = typeof parsed.enabled === 'boolean' ? parsed.enabled : cfg.enabled;\n    if (typeof parsed.target === 'string' && parsed.target.includes('@')) cfg.target = parsed.target;\n  }\n} catch(e) {}\n\nif (arg === 'on') {\n  cfg.enabled = true;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, `✅ Anti-Delete *ON* — forwarding to ${cfg.target}`);\n} else if (arg === 'off') {\n  cfg.enabled = false;\n  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));\n  return sendTrackedMessage(sock, remoteJid, '❌ Anti-Delete *OFF*');\n}\nawait sendTrackedMessage(sock, remoteJid, `*Anti-Delete Status*\nEnabled: ${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\nTarget: ${cfg.target}\n\nUsage: !ad on | off`);"
     },
     "vars": {
-      "name": "vars",
-      "desc": "View/set bot config vars (sudo only)",
-      "trigger": "vars",
+      "name": "System Variables",
+      "desc": "View/set bot config vars",
+      "trigger": "vs",
+      "aliases": ["vars", "v"],
+      "type": "admin",
       "response": "",
       "target": "chat",
-      "code": "const fs = require('fs');\nconst path = require('path');\nconst varsFile = path.resolve(__rootdir, 'vars.json');\nconst biPath = path.resolve(__rootdir, 'botinfo.json');\n\nconst isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;\nif (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied. Sudo only.');\n\nlet configVars = {};\nif (fs.existsSync(varsFile)) {\n  try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {}\n}\n\nconst args = argumentName ? [argumentName] : []; // simplified for now\nif (args.length === 0) {\n  let text = '⚙️ *WXATA System Vars*\\n\\n';\n  text += `🔹 *PREFIX*: ${botInfo.prefix}\\n`;\n  text += `🔹 *ALLOW_ALL*: ${botInfo.permissions.allowAll}\\n`;\n  text += `🔹 *DB_RETENTION_DAYS*: ${configVars.DB_RETENTION_DAYS || 3}\\n`;\n  return sendTrackedMessage(sock, remoteJid, text);\n}\nreturn sendTrackedMessage(sock, remoteJid, \"Use the Dashboard to edit complex vars.\");",
-      "defaultArgument": "self"
+      "code": "const fs = require('fs');\nconst path = require('path');\nconst os = require('os');\nconst varsFile = path.resolve(__rootdir, 'vars.json');\n\nconst isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;\nif (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied. Sudo only.');\n\nlet configVars = {};\nif (fs.existsSync(varsFile)) {\n  try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {}\n}\n\nlet text = '⚙️ *WXATA SYSTEM VARS*\n\n';\ntext += `🔹 *Prefix:* ${botInfo.prefix}\n`;\ntext += `🔹 *Allow All:* ${botInfo.permissions.allowAll}\n`;\ntext += `🔹 *OS:* ${os.platform()} (${os.release()})\n`;\ntext += `🔹 *Node:* ${process.version}\n`;\ntext += `🔹 *Arch:* ${os.arch()}\n`;\ntext += `🔹 *RAM:* ${((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024).toFixed(2)}GB / ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(0)}GB\n`;\n\nreturn sendTrackedMessage(sock, remoteJid, text);"
     }
   },
   "root": {
@@ -113,7 +166,7 @@
   },
   "welcome": {
     "enabled": true,
-    "text": "╔════════════════════════════╗\\n║   ✨ WXATA SYSTEM ONLINE ✨   ║\\n╚════════════════════════════╝\\n\\nWelcome to the next generation of WhatsApp automation.\\n\\n🚀 *Bot Ready*\\n🔹 Prefix: {prefix}\\n🔹 Menu  : {prefix}{menu}\\n\\n_Type {prefix}{menu} to see available commands._"
+    "text": "*───『 WXATA • PREMIUM 』───*\n\nHello! Thank you for connecting with the WXATA engine.\nThe system is currently *ONLINE* and ready to assist.\n\n> *Get Started:*\n> Type *{prefix}{menu}* to view the professional command console.\n\n🔗 *Resources:*\n- *Website:* https://wxata.tadstech.dev\n- *Documentation:* https://wxata.tadstech.dev/docs\n- *X (Twitter):* @tads_tech\n- *Telegram:* https://t.me/+dR5zABepmkNhYjQ0\n\n_Powered by TADSTech_"
   },
   "permissions": {
     "allowAll": false,
