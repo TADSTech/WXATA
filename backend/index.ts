@@ -266,9 +266,15 @@ const pool = tagAdminsOnly
 
 if (pool.length === 0) return sendTrackedMessage(sock, remoteJid, "No admins found in this group.");
 
+const fs = require('fs');
+const path = require('path');
+const varsFile = path.resolve(__rootdir, 'vars.json');
+let configVars = {};
+if (fs.existsSync(varsFile)) { try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {} }
+
 const header = tagAdminsOnly
-  ? \`👑 *ATTENTION ADMINS* 👑\\n\\n\`
-  : (argumentName ? \`📢 *\${argumentName.trim()}*\\n\\n\` : \`✨ *ATTENTION EVERYONE* ✨\\n\\n\`);
+  ? \`\${configVars.TAGADMINS_MESSAGE || '👑 *ATTENTION ADMINS* 👑'}\\n\\n\`
+  : (argumentName ? \`📢 *\${argumentName.trim()}*\\n\\n\` : \`\${configVars.TAGALL_MESSAGE || '✨ *ATTENTION EVERYONE* ✨'}\\n\\n\`);
 
 let text = header;
 const mentions = [];
@@ -386,66 +392,69 @@ await sock.sendMessage(remoteJid, {
     },
     tkick: {
       name: 'Time Kick',
-      desc: 'Kick user and re-add in 5m',
+      desc: 'Kick user and re-add in 5m. Reply to or mention the target.',
       trigger: 'tk',
       aliases: ['tkick'],
       type: 'admin',
       response: '',
       target: 'chat',
-      code: `const bail = require('@whiskeysockets/baileys');
-if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "❌ This command is for groups only.");
+      code: `if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "❌ This command is for groups only.");
 
 const groupMetadata = await sock.groupMetadata(remoteJid);
-const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-const botIsAdmin = groupMetadata.participants.find(p => p.id === botNumber)?.admin;
-if (!botIsAdmin) return sendTrackedMessage(sock, remoteJid, "❌ Permission Denied: I must be a Group Admin.");
+
+// Match bot by number — sock.user.id may be a @lid on linked devices
+const botRawNumber = sock.user.id.split(':')[0].split('@')[0];
+const botParticipant = groupMetadata.participants.find(p =>
+  p.id.split('@')[0] === botRawNumber || p.id.split(':')[0] === botRawNumber
+);
+if (!botParticipant?.admin) return sendTrackedMessage(sock, remoteJid, "❌ Permission Denied: I must be a Group Admin.");
 
 const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
 const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);
-if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user or tag them to T-Kick.");
+if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user's message or tag them to T-Kick.");
 
 const targetIsAdmin = groupMetadata.participants.find(p => p.id === targetUser)?.admin;
 if (targetIsAdmin) return sendTrackedMessage(sock, remoteJid, "❌ I cannot kick a Group Admin.");
 
-await sock.sendMessage(remoteJid, { 
-    text: \`⏳ @\${targetUser.split('@')[0]} will be kicked and re-added in 5 minutes.\`, 
-    mentions: [targetUser] 
+await sock.sendMessage(remoteJid, {
+  text: \`⏳ @\${targetUser.split('@')[0]} will be kicked and re-added in 5 minutes.\`,
+  mentions: [targetUser]
 });
 
 try {
-    await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');
-    setTimeout(async () => {
-        try {
-            await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
-            await sock.sendMessage(remoteJid, { 
-                text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`, 
-                mentions: [targetUser] 
-            });
-        } catch (e) {
-            await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]}. They might have privacy settings blocking invites.\` });
-        }
-    }, 5 * 60 * 1000);
+  await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');
+  setTimeout(async () => {
+    try {
+      await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
+      await sock.sendMessage(remoteJid, {
+        text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`,
+        mentions: [targetUser]
+      });
+    } catch (e) {
+      await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]}. They may have privacy settings blocking invites.\` });
+    }
+  }, 5 * 60 * 1000);
 } catch (e) {
-    await sendTrackedMessage(sock, remoteJid, "❌ Failed to execute T-Kick. Ensure I have proper permissions.");
+  await sendTrackedMessage(sock, remoteJid, "❌ Failed to execute T-Kick. Ensure I have proper permissions.");
 }`
     },
     ss: {
       name: 'Web Screenshot',
-      desc: 'Take web page screenshot',
+      desc: 'Take web page screenshot. Usage: !ss <url>',
       trigger: 'ss',
       aliases: ['screenshot', 'snap'],
       type: 'tools',
       response: '',
       target: 'chat',
       code: `if (!argumentName) return sendTrackedMessage(sock, remoteJid, "Please provide a URL (e.g. !ss google.com)");
-let url = argumentName;
+let url = argumentName.trim();
 if (!url.startsWith('http')) url = 'https://' + url;
-await sendTrackedMessage(sock, remoteJid, '📸 Taking screenshot...');
+await sendTrackedMessage(sock, remoteJid, '📸 *Capturing screenshot...*');
 try {
-  const ssUrl = \`https://image.thum.io/get/width/1280/crop/900/\${encodeURIComponent(url)}\`;
-  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: \`📸 \${url}\` });
+  const ssUrl = \`https://api.screenshotone.com/take?url=\${encodeURIComponent(url)}&viewport_width=1280&viewport_height=900&format=jpg&image_quality=80\`;
+  await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: \`📸 *\${url}*\` });
 } catch(e) {
-  await sendTrackedMessage(sock, remoteJid, '❌ Failed to take screenshot.');
+  await sendTrackedMessage(sock, remoteJid, '❌ Failed to capture screenshot. Check the URL and try again.');
 }`
     },
     warn: {
@@ -464,6 +473,7 @@ if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply
 const fs = require('fs');
 const path = require('path');
 const warnsFile = path.resolve(__rootdir, 'warns.json');
+const varsFile = path.resolve(__rootdir, 'vars.json');
 let warns = {};
 if (fs.existsSync(warnsFile)) { warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8')); }
 if (!warns[remoteJid]) warns[remoteJid] = {};
@@ -471,16 +481,21 @@ if (!warns[remoteJid]) warns[remoteJid] = {};
 warns[remoteJid][targetUser] = (warns[remoteJid][targetUser] || 0) + 1;
 fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
 
+let configVars = {};
+if (fs.existsSync(varsFile)) { try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {} }
+const warnTemplate = configVars.WARN_MESSAGE || '⚠️ You have been warned! ({count}/3)';
+
 const warnCount = warns[remoteJid][targetUser];
 if (warnCount >= 3) {
-    await sock.sendMessage(remoteJid, { text: \`🚨 @\${targetUser.split('@')[0]} has reached 3 warnings and is being removed!\`, mentions: [targetUser] });
-    try { await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove'); } catch (e) {
-        await sock.sendMessage(remoteJid, { text: "❌ I don't have Admin permissions to remove them!" });
-    }
-    warns[remoteJid][targetUser] = 0;
-    fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
+  await sock.sendMessage(remoteJid, { text: \`🚨 @\${targetUser.split('@')[0]} has reached 3 warnings and is being removed!\`, mentions: [targetUser] });
+  try { await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove'); } catch (e) {
+    await sock.sendMessage(remoteJid, { text: "❌ I don't have Admin permissions to remove them!" });
+  }
+  warns[remoteJid][targetUser] = 0;
+  fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
 } else {
-    await sock.sendMessage(remoteJid, { text: \`⚠️ @\${targetUser.split('@')[0]} you have been warned! (\${warnCount}/3)\`, mentions: [targetUser] });
+  const warnMsg = warnTemplate.replace('{count}', warnCount).replace('{max}', '3').replace('{user}', \`@\${targetUser.split('@')[0]}\`);
+  await sock.sendMessage(remoteJid, { text: \`@\${targetUser.split('@')[0]} \${warnMsg}\`, mentions: [targetUser] });
 }`
     },
     antidel: {
@@ -500,7 +515,7 @@ const defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numb
     },
     vars: {
       name: 'System Variables',
-      desc: 'View/set bot config vars',
+      desc: 'View/set bot config vars. Usage: !vs | !vs set <key> <value> | !vs reset <key>',
       trigger: 'vs',
       aliases: ['vars', 'v'],
       type: 'admin',
@@ -508,24 +523,59 @@ const defaultTarget = (botInfo.permissions.numbers[0] ? botInfo.permissions.numb
       target: 'chat',
       code: `const fs = require('fs');
 const path = require('path');
-const warnsFile = path.resolve(__rootdir, 'warns.json');
-const biPath = path.resolve(__rootdir, 'botinfo.json');
+const os = require('os');
+const varsFile = path.resolve(__rootdir, 'vars.json');
 
 const isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;
 if (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied. Sudo only.');
 
-let configVars = {};
-if (fs.existsSync(varsFile)) {\n  try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {}\n}
-
-const args = argumentName ? [argumentName] : []; // simplified for now
-if (args.length === 0) {
-  let text = '⚙️ *WXATA System Vars*\\n\\n';
-  text += \`🔹 *PREFIX*: \${botInfo.prefix}\\n\`;
-  text += \`🔹 *ALLOW_ALL*: \${botInfo.permissions.allowAll}\\n\`;
-  text += \`🔹 *DB_RETENTION_DAYS*: \${configVars.DB_RETENTION_DAYS || 3}\\n\`;
-  return sendTrackedMessage(sock, remoteJid, text);
+// Load current vars
+let configVars = {
+  WARN_MESSAGE: '⚠️ You have been warned! ({count}/3)',
+  TAGALL_MESSAGE: '✨ *ATTENTION EVERYONE* ✨',
+  TAGADMINS_MESSAGE: '👑 *ATTENTION ADMINS* 👑',
+  WELCOME_ENABLED: 'true',
+  DB_RETENTION_DAYS: '3',
+};
+if (fs.existsSync(varsFile)) {
+  try { Object.assign(configVars, JSON.parse(fs.readFileSync(varsFile, 'utf8'))); } catch(e) {}
 }
-return sendTrackedMessage(sock, remoteJid, "Use the Dashboard to edit complex vars.");`
+
+const arg = argumentName ? argumentName.trim() : '';
+
+// !vs set KEY value
+if (arg.toLowerCase().startsWith('set ')) {
+  const parts = arg.slice(4).trim().split(' ');
+  const key = parts[0].toUpperCase();
+  const value = parts.slice(1).join(' ');
+  if (!key || !value) return sendTrackedMessage(sock, remoteJid, '❌ Usage: !vs set <KEY> <value>');
+  configVars[key] = value;
+  fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
+  return sendTrackedMessage(sock, remoteJid, \`✅ *\${key}* set to: \${value}\`);
+}
+
+// !vs reset KEY
+if (arg.toLowerCase().startsWith('reset ')) {
+  const key = arg.slice(6).trim().toUpperCase();
+  delete configVars[key];
+  fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
+  return sendTrackedMessage(sock, remoteJid, \`🔄 *\${key}* reset to default.\`);
+}
+
+// Show all vars
+const uptime = Math.floor(process.uptime());
+const h = Math.floor(uptime / 3600), m = Math.floor((uptime % 3600) / 60), s = uptime % 60;
+let text = '⚙️ *WXATA SYSTEM VARS*\\n\\n';
+text += \`🔹 *PREFIX:* \${botInfo.prefix}\\n\`;
+text += \`🔹 *ALLOW_ALL:* \${botInfo.permissions.allowAll}\\n\`;
+text += \`🔹 *UPTIME:* \${h}h \${m}m \${s}s\\n\`;
+text += \`🔹 *RAM:* \${((os.totalmem()-os.freemem())/1024/1024/1024).toFixed(2)}GB / \${(os.totalmem()/1024/1024/1024).toFixed(0)}GB\\n\\n\`;
+text += '*Configurable Vars:*\\n';
+for (const [k, v] of Object.entries(configVars)) {
+  text += \`🔸 *\${k}:* \${v}\\n\`;
+}
+text += '\\n_Usage: !vs set WARN\\_MESSAGE new text_';
+return sendTrackedMessage(sock, remoteJid, text);`
     }
   },
   root: {
