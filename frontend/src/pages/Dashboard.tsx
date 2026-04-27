@@ -466,7 +466,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const wsUrl = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' ? 'ws://localhost:5000' : 'wss://wxata.onrender.com');
+      // Auto-upgrade to wss:// when the page is served over HTTPS.
+      // VITE_BACKEND_URL should be set in Vercel env vars (e.g. wss://wxata.tadstech.dev/ws).
+      // Fallback: same host as the page, port 5000, correct protocol.
+      const envUrl = import.meta.env.VITE_BACKEND_URL as string | undefined;
+      const wsUrl = envUrl
+        ? envUrl
+        : window.location.hostname === 'localhost'
+          ? 'ws://localhost:5000'
+          : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:5000`;
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 

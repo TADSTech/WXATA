@@ -1,0 +1,12 @@
+# Caddy reverse proxy — terminates TLS and forwards to the WXATA backend.
+# Replace YOUR_DOMAIN with your actual domain (e.g. wxata.tadstech.dev).
+# Caddy auto-provisions a Let's Encrypt cert — no manual cert setup needed.
+#
+# Usage:
+#   sudo caddy run --config /root/WXATA/Caddyfile
+# Or as a systemd service (see deployment.md).
+
+YOUR_DOMAIN {
+    # Forward all traffic (HTTP + WebSocket upgrades) to the backend
+    reverse_proxy localhost:5000
+}

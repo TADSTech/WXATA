@@ -146,18 +146,90 @@ docker compose exec wxata pm2 logs wxata
 
 ---
 
-### 9. Connect the frontend
+### 9. Set up TLS with Caddy (required for wss://)
 
-In your Vercel project settings, add the environment variable:
+Your frontend is on HTTPS (`wxata.tadstech.dev`). Browsers **block** plain `ws://` connections from HTTPS pages (Mixed Content policy). You need `wss://` — Caddy handles this automatically with a free Let's Encrypt cert.
 
+#### A — Point a (sub)domain at your Oracle IP
+
+In your DNS provider, add an **A record**:
 ```
-VITE_BACKEND_URL=ws://YOUR_ORACLE_IP:5000
+wxata-api.tadstech.dev  →  129.151.247.139
+```
+Or reuse the same domain with a path — whatever you prefer. Wait for DNS to propagate (~1–5 min with low TTL).
+
+#### B — Open port 80 and 443 in Oracle Security List + iptables
+
+Port 80 is needed for the ACME HTTP challenge (cert issuance). Port 443 is the TLS endpoint.
+
+In Oracle Console → Security List → Add Ingress Rules:
+- TCP port `80`  (source `0.0.0.0/0`)
+- TCP port `443` (source `0.0.0.0/0`)
+
+In the VM:
+```bash
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT 7 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+sudo netfilter-persistent save
 ```
 
-Then trigger a redeploy on Vercel. The dashboard will connect to your Oracle backend.
+#### C — Install Caddy
 
-> **TLS note**: If you want `wss://` (secure WebSocket), put Nginx or Caddy in front
-> of port 5000 with a Let's Encrypt cert. See the optional section below.
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
+```
+
+#### D — Configure Caddy
+
+Edit the Caddyfile (one is included in the repo):
+```bash
+sudo nano /etc/caddy/Caddyfile
+```
+
+Replace the entire contents with:
+```
+wxata-api.tadstech.dev {
+    reverse_proxy localhost:5000
+}
+```
+
+Then reload:
+```bash
+sudo systemctl reload caddy
+sudo systemctl status caddy   # confirm it's running
+```
+
+Caddy will automatically obtain and renew the TLS cert.
+
+#### E — Update Vercel environment variable
+
+In your Vercel project settings, change:
+```
+VITE_BACKEND_URL=wss://wxata-api.tadstech.dev
+```
+
+Trigger a redeploy. The dashboard will now connect over `wss://` and the Mixed Content error is gone.
+
+---
+
+### 10. Verify everything
+
+```bash
+# Backend running?
+docker compose ps
+curl http://localhost:5000/health
+
+# TLS working?
+curl https://wxata-api.tadstech.dev/health
+
+# WebSocket reachable?
+# Open browser devtools on wxata.tadstech.dev/dashboard — no Mixed Content errors
+```
 
 ---
 
@@ -227,35 +299,6 @@ To restore:
 ```bash
 docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
   tar xzf /backup/auth_backup.tar.gz -C /
-```
-
----
-
-## Optional: HTTPS / WSS with Caddy (recommended)
-
-Caddy auto-provisions a Let's Encrypt cert. You need a domain pointing to your Oracle IP.
-
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-`/etc/caddy/Caddyfile`:
-```
-your.domain.com {
-    reverse_proxy localhost:5000
-}
-```
-
-```bash
-sudo systemctl reload caddy
-```
-
-Then set in Vercel:
-```
-VITE_BACKEND_URL=wss://your.domain.com
 ```
 
 ---
