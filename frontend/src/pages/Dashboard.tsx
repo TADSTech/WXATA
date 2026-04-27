@@ -174,8 +174,6 @@ interface ScriptManagerProps {
   setExpandedScript: (k: string | null) => void;
   addingScript: boolean;
   setAddingScript: (v: boolean) => void;
-  newScriptKey: string;
-  setNewScriptKey: (v: string) => void;
   newScriptDraft: BotScript;
   setNewScriptDraft: (fn: (d: BotScript) => BotScript) => void;
   handleScriptFieldChange: (key: string, field: keyof BotScript, value: string) => void;
@@ -187,7 +185,7 @@ interface ScriptManagerProps {
 
 function ScriptManager({
   botInfo, expandedScript, setExpandedScript,
-  addingScript, setAddingScript, newScriptKey, setNewScriptKey,
+  addingScript, setAddingScript,
   newScriptDraft, setNewScriptDraft,
   handleScriptFieldChange, handleScriptArgumentChange,
   handleDeleteScript, handleAddScript, handlePublishScript
@@ -256,7 +254,7 @@ function ScriptManager({
                 <textarea rows={3} value={newScriptDraft.code} onChange={e => setNewScriptDraft(d => ({ ...d, code: e.target.value }))} placeholder="await sendTrackedMessage(sock, remoteJid, 'Hello!');" className="w-full bg-bg-panel border border-border-strong p-1.5 text-accent-light outline-none focus:border-border-strong font-mono text-[11px]" />
               </label>
               <div className="flex gap-2 pt-1">
-                <button onClick={handleAddScript} disabled={!newScriptKey.trim() || !newScriptDraft.trigger.trim()} className="flex items-center gap-1 bg-accent-primary hover:bg-accent-hover disabled:opacity-40 text-bg-base px-3 py-1.5 rounded font-bold text-xs">
+                <button onClick={handleAddScript} disabled={!newScriptDraft.trigger.trim()} className="flex items-center gap-1 bg-accent-primary hover:bg-accent-hover disabled:opacity-40 text-bg-base px-3 py-1.5 rounded font-bold text-xs">
                   <Save className="w-3 h-3" /> Add
                 </button>
                 <button onClick={() => setAddingScript(false)} className="flex items-center gap-1 border border-border-strong hover:border-border-subtle text-text-muted px-3 py-1.5 rounded text-xs">
@@ -437,7 +435,6 @@ const Dashboard = () => {
   // Script editor state
   const [expandedScript, setExpandedScript] = useState<string | null>(null);
   const [addingScript, setAddingScript] = useState(false);
-  const [newScriptKey, setNewScriptKey] = useState('');
   const [newScriptDraft, setNewScriptDraft] = useState<BotScript>({
     name: '', desc: '', trigger: '', aliases: [], type: 'misc', response: '', target: 'chat', code: '', defaultArgument: ''
   });
@@ -628,13 +625,12 @@ const Dashboard = () => {
   };
 
   const handleAddScript = () => {
-    const key = newScriptKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const key = newScriptDraft.trigger.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
     if (!key || botInfo.scripts[key]) return;
     setBotInfo((prev) => ({
       ...prev,
       scripts: { ...prev.scripts, [key]: { ...newScriptDraft, name: newScriptDraft.name || key } }
     }));
-    setNewScriptKey('');
     setNewScriptDraft({ name: '', desc: '', trigger: '', aliases: [], type: 'misc', response: '', target: 'chat', code: '', defaultArgument: '' });
     setAddingScript(false);
     setExpandedScript(key);
@@ -917,8 +913,6 @@ const Dashboard = () => {
             setExpandedScript={setExpandedScript}
             addingScript={addingScript}
             setAddingScript={setAddingScript}
-            newScriptKey={newScriptKey}
-            setNewScriptKey={setNewScriptKey}
             newScriptDraft={newScriptDraft}
             setNewScriptDraft={setNewScriptDraft}
             handleScriptFieldChange={handleScriptFieldChange}
