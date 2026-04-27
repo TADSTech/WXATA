@@ -3,10 +3,10 @@
 ## Architecture
 
 ```
-Frontend (Vercel)                  Backend (Oracle Cloud VPS)
-https://wxata.vercel.app  ──WSS──► wss://YOUR_ORACLE_IP:5000
-                           ──HTTP─► http://YOUR_ORACLE_IP:5000/health
-                                    Persistent volumes ✅  PM2 managed ✅
+Frontend (Vercel)                    Backend (Oracle Cloud VPS)
+https://wxata.tadstech.dev  ──WSS──► wss://wxata-api.tadstech.dev
+                             ──HTTP─► https://wxata-api.tadstech.dev/health
+                                      Caddy TLS ✅  Docker + PM2 ✅  Persistent volumes ✅
 ```
 
 ---
@@ -31,29 +31,42 @@ Everything below runs on the free tier.
 
 ### 2. Open firewall ports
 
-Oracle has two layers of firewall. You need to open port **5000** in both.
+Oracle has **two independent firewall layers**. Both must allow a port or traffic is blocked.
 
 #### A — Oracle Security List (cloud console)
 
-1. Go to **Networking → Virtual Cloud Networks → your VCN → Security Lists → Default**
-2. **Add Ingress Rule**:
-   - Source CIDR: `0.0.0.0/0`
-   - IP Protocol: TCP
-   - Destination Port: `5000`
-3. Save
+1. Go to **Compute → Instances → your instance → Primary VNIC → Subnet → Security List**
+   > Make sure you're editing the Security List attached to **this specific subnet**, not just any list in the VCN.
+2. Add these **Ingress Rules**:
 
-#### B — OS firewall (iptables / ufw inside the VM)
+| Source CIDR | Protocol | Dest Port | Purpose |
+|---|---|---|---|
+| `0.0.0.0/0` | TCP | `22` | SSH (usually pre-added) |
+| `0.0.0.0/0` | TCP | `80` | Caddy ACME cert challenge |
+| `0.0.0.0/0` | TCP | `443` | HTTPS / WSS |
+| `0.0.0.0/0` | TCP | `5000` | Backend direct access (optional after Caddy) |
+
+#### B — OS firewall (iptables inside the VM)
+
+Oracle Ubuntu images use iptables with a default `REJECT all` rule. New rules must be inserted **before** that rule or they're ignored.
+
+Run this single command to add all ports correctly:
 
 ```bash
-# Oracle Ubuntu images use iptables by default, not ufw
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 5000 -j ACCEPT
+sudo iptables -D INPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT 2>/dev/null; \
+sudo iptables -D INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT 2>/dev/null; \
+sudo iptables -D INPUT -m state --state NEW -p tcp --dport 5000 -j ACCEPT 2>/dev/null; \
+sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 5000 -j ACCEPT && \
+sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT && \
+sudo iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT && \
 sudo netfilter-persistent save
 ```
 
-If you prefer ufw:
+> **Why position 5?** The default chain has a `REJECT all` rule at line 5. Inserting at 5 pushes it down and ensures your ACCEPT rules are evaluated first.
+
+Verify the order is correct (ACCEPT rules must appear before REJECT):
 ```bash
-sudo ufw allow 5000/tcp
-sudo ufw reload
+sudo iptables -L INPUT --line-numbers -n
 ```
 
 ---
@@ -64,37 +77,31 @@ sudo ufw reload
 ssh -i ~/.ssh/your_key ubuntu@YOUR_ORACLE_IP
 ```
 
+**Tip — copy/paste in SSH terminal:**
+- Windows Terminal / PowerShell: `Ctrl+Shift+V` to paste
+- Older cmd window: right-click = paste
+- Recommended: use **VS Code Remote SSH** extension for a full editor experience
+
 ---
 
 ### 4. Install Docker & Docker Compose
 
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Docker
-curl -fsSL https://get.docker.com | sudo bash
-
-# Add your user to the docker group (no sudo needed after re-login)
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Install Docker Compose plugin
-sudo apt install -y docker-compose-plugin
-
-# Verify
-docker --version
-docker compose version
+sudo apt update && sudo apt upgrade -y && \
+curl -fsSL https://get.docker.com | sudo bash && \
+sudo usermod -aG docker $USER && \
+sudo apt install -y docker-compose-plugin && \
+docker --version && docker compose version
 ```
+
+Log out and back in (or run `newgrp docker`) so the group change takes effect.
 
 ---
 
 ### 5. Clone the repo
 
 ```bash
-cd ~
-git clone https://github.com/TADSTech/WXATA.git wxata
-cd wxata
+cd ~ && git clone https://github.com/TADSTech/WXATA.git WXATA && cd WXATA
 ```
 
 ---
@@ -102,144 +109,137 @@ cd wxata
 ### 6. Configure environment
 
 ```bash
-# Create the backend .env from the example
 cp backend/.env.example backend/.env
-
-# Edit if you want a different port (default 5000 is fine)
-nano backend/.env
 ```
 
-The only required variable is `PORT=5000`. Everything else has safe defaults.
+The defaults are fine. `PORT=5000` is the only required value.
 
 ---
 
 ### 7. Build and start with Docker Compose
 
 ```bash
-# Build the image and start in the background
 docker compose up -d --build
-
-# Watch logs
 docker compose logs -f wxata
 ```
 
-The container starts PM2 in no-daemon mode (`pm2-runtime`).
-PM2 manages the Bun process inside the container.
+The container runs PM2 in no-daemon mode (`pm2-runtime`). PM2 manages the Bun process inside.
 
 ---
 
-### 8. Verify it's running
+### 8. Verify the backend is running
 
 ```bash
-# Container status
 docker compose ps
-
-# Health check
 curl http://localhost:5000/health
-
-# PM2 info
 curl http://localhost:5000/pm2
-
-# Live PM2 logs from inside the container
-docker compose exec wxata pm2 logs wxata
 ```
 
 ---
 
 ### 9. Set up TLS with Caddy (required for wss://)
 
-Your frontend is on HTTPS (`wxata.tadstech.dev`). Browsers **block** plain `ws://` connections from HTTPS pages (Mixed Content policy). You need `wss://` — Caddy handles this automatically with a free Let's Encrypt cert.
+Browsers **block** plain `ws://` connections from HTTPS pages (Mixed Content policy).
+You need `wss://` — which requires TLS — which requires a domain name.
 
-#### A — Point a (sub)domain at your Oracle IP
+#### Option A — You have a domain (recommended)
 
-In your DNS provider, add an **A record**:
+**Step 1: Add a DNS A record**
+
+In your DNS provider, point a subdomain at your Oracle IP:
 ```
-wxata-api.tadstech.dev  →  129.151.247.139
-```
-Or reuse the same domain with a path — whatever you prefer. Wait for DNS to propagate (~1–5 min with low TTL).
-
-#### B — Open port 80 and 443 in Oracle Security List + iptables
-
-Port 80 is needed for the ACME HTTP challenge (cert issuance). Port 443 is the TLS endpoint.
-
-In Oracle Console → Security List → Add Ingress Rules:
-- TCP port `80`  (source `0.0.0.0/0`)
-- TCP port `443` (source `0.0.0.0/0`)
-
-In the VM:
-```bash
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 7 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo netfilter-persistent save
+Type:  A
+Name:  wxata-api          (gives you wxata-api.yourdomain.com)
+Value: YOUR_ORACLE_IP
+TTL:   300
 ```
 
-#### C — Install Caddy
+> If using **Cloudflare**: set the record to **DNS only** (grey cloud). The orange proxy cloud breaks WebSocket on the free plan.
+
+**Step 2: Install Caddy**
 
 ```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install -y caddy
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/installer.sh' | sudo bash && \
+sudo apt install -y caddy && caddy version
 ```
 
-#### D — Configure Caddy
+**Step 3: Configure Caddy**
 
-Edit the Caddyfile (one is included in the repo):
 ```bash
 sudo nano /etc/caddy/Caddyfile
 ```
 
-Replace the entire contents with:
+Replace the entire file with (swap in your actual domain):
 ```
-wxata-api.tadstech.dev {
+wxata-api.yourdomain.com {
     reverse_proxy localhost:5000
 }
 ```
 
-Then reload:
 ```bash
 sudo systemctl reload caddy
-sudo systemctl status caddy   # confirm it's running
+sudo journalctl -u caddy -f   # watch for "certificate obtained successfully"
 ```
 
-Caddy will automatically obtain and renew the TLS cert.
+Caddy auto-provisions and renews the Let's Encrypt cert. No manual cert management needed.
 
-#### E — Update Vercel environment variable
+**Step 4: Update Vercel**
 
-In your Vercel project settings, change:
+In your Vercel project → Settings → Environment Variables:
 ```
-VITE_BACKEND_URL=wss://wxata-api.tadstech.dev
+VITE_BACKEND_URL=wss://wxata-api.yourdomain.com
 ```
 
-Trigger a redeploy. The dashboard will now connect over `wss://` and the Mixed Content error is gone.
+Trigger a redeploy. Mixed Content error is gone.
 
 ---
 
-### 10. Verify everything
+#### Option B — No domain (free subdomain via DuckDNS)
+
+[DuckDNS](https://www.duckdns.org) gives you a free `*.duckdns.org` subdomain that you can point at any IP.
+
+1. Go to [duckdns.org](https://www.duckdns.org) → sign in with Google/GitHub
+2. Create a subdomain, e.g. `wxata-yourname` → set the IP to your Oracle IP
+3. You now have `wxata-yourname.duckdns.org` → `YOUR_ORACLE_IP`
+4. Follow **Option A** steps 2–4 using `wxata-yourname.duckdns.org` as your domain
+
+This is completely free and works identically to a paid domain for this use case.
+
+---
+
+#### Option C — No domain, no TLS (local/dev only)
+
+If your frontend is also running locally (not on Vercel HTTPS), plain `ws://` works fine:
+```
+VITE_BACKEND_URL=ws://YOUR_ORACLE_IP:5000
+```
+
+This does **not** work from an HTTPS frontend. Browsers will block it.
+
+---
+
+### 10. Verify everything end-to-end
 
 ```bash
-# Backend running?
-docker compose ps
-curl http://localhost:5000/health
+# Backend healthy?
+curl https://wxata-api.yourdomain.com/health
 
-# TLS working?
-curl https://wxata-api.tadstech.dev/health
-
-# WebSocket reachable?
-# Open browser devtools on wxata.tadstech.dev/dashboard — no Mixed Content errors
+# WebSocket port reachable? (run from your local machine)
+# Windows: Test-NetConnection -ComputerName YOUR_ORACLE_IP -Port 443
+# Linux/Mac: nc -zv YOUR_ORACLE_IP 443
 ```
+
+Then open your dashboard in the browser — no Mixed Content errors, WebSocket connects.
 
 ---
 
 ## How Dashboard Actions Work with PM2
 
-| Dashboard Button | What happens in code | Exit code | PM2 behaviour |
-|---|---|---|---|
-| **Restart** | Destroys WA connection, `process.exit(0)` | `0` | PM2 restarts the process automatically |
-| **Terminate** | Destroys WA connection, `process.exit(2)` | `2` | PM2 stops — does **not** restart (`stop_exit_codes: [2]`) |
-| **Logout** | Clears session files, then same as Restart | `0` | PM2 restarts; bot will show QR/pairing on next connect |
+| Dashboard Button | Exit code | PM2 behaviour |
+|---|---|---|
+| **Restart** | `0` | PM2 sees normal exit → restarts automatically |
+| **Terminate** | `2` | PM2 sees it in `stop_exit_codes` → stops, does **not** restart |
+| **Logout** | `0` | Clears WA session, then restarts — bot shows QR/pairing on reconnect |
 
 ---
 
@@ -248,12 +248,11 @@ curl https://wxata-api.tadstech.dev/health
 ### Docker Compose
 
 ```bash
-docker compose up -d          # start (detached)
+docker compose up -d --build  # rebuild image and restart (use after git pull)
 docker compose down           # stop and remove containers
-docker compose restart wxata  # restart container
+docker compose restart wxata  # quick restart without rebuild
 docker compose logs -f wxata  # tail logs
-docker compose pull           # pull latest image (after git pull + rebuild)
-docker compose up -d --build  # rebuild and restart
+docker compose ps             # status
 ```
 
 ### PM2 (inside the container)
@@ -270,32 +269,31 @@ docker compose exec wxata pm2 monit
 ## Updating the Bot
 
 ```bash
-cd ~/wxata
+cd ~/WXATA
 git pull
-docker compose up -d --build   # rebuilds image with new code, restarts container
+docker compose up -d --build
 ```
 
-Your data (WhatsApp session, SQLite DB, botinfo.json) lives in Docker named volumes
-and is **not affected** by rebuilds.
+Data lives in Docker named volumes and is **not affected** by rebuilds.
 
 ---
 
 ## Persistent Data — What's Stored Where
 
-| Data | Docker Volume | Host path (inside VM) |
+| Data | Docker Volume | Mount point |
 |---|---|---|
-| WhatsApp session | `wxata_auth` → `/data/auth_info` | managed by Docker |
-| SQLite database | `wxata_db` → `/data/db` | managed by Docker |
-| botinfo / warns / vars | `wxata_data` → `/data` | managed by Docker |
-| PM2 logs | `wxata_logs` → `/app/logs` | managed by Docker |
+| WhatsApp session | `wxata_auth` | `/data/auth_info` |
+| SQLite database | `wxata_db` | `/data/db` |
+| botinfo / warns / vars | `wxata_data` | `/data` |
+| PM2 logs | `wxata_logs` | `/app/logs` |
 
-To back up your session:
+**Backup session:**
 ```bash
 docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
   tar czf /backup/auth_backup.tar.gz /data
 ```
 
-To restore:
+**Restore session:**
 ```bash
 docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
   tar xzf /backup/auth_backup.tar.gz -C /
@@ -305,50 +303,53 @@ docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \
 
 ## Bare VPS (without Docker)
 
-If you prefer to run directly on the VM without Docker:
-
 ```bash
 # Install Bun
-curl -fsSL https://bun.sh/install | bash
-source ~/.bashrc
+curl -fsSL https://bun.sh/install | bash && source ~/.bashrc
 
 # Install Node + PM2
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
-sudo apt install -y nodejs
-sudo npm install -g pm2
+sudo apt install -y nodejs && sudo npm install -g pm2
 
 # Install deps
-cd ~/wxata
-bun install
-cd backend && bun install && cd ..
+cd ~/WXATA && bun install && cd backend && bun install && cd ..
 
 # Start
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 startup   # run the command it prints
+pm2 start ecosystem.config.cjs && pm2 save && pm2 startup
 ```
 
 ---
 
 ## Troubleshooting
 
-**Dashboard can't connect**
-- Check port 5000 is open: `curl http://YOUR_ORACLE_IP:5000/health` from your local machine
-- Oracle Security List AND iptables both need the port open (see step 2)
-- Check container is running: `docker compose ps`
+**`ws://` blocked / Mixed Content error in browser**
+- Your frontend is on HTTPS — you must use `wss://`
+- Set up Caddy (Option A or B above) and update `VITE_BACKEND_URL` in Vercel
+
+**Caddy can't get cert — `NXDOMAIN`**
+- DNS A record doesn't exist or hasn't propagated yet
+- Check: `nslookup wxata-api.yourdomain.com` from any machine — should return your Oracle IP
+- Wait a few minutes and reload: `sudo systemctl reload caddy`
+
+**Caddy can't get cert — `Error getting validation data`**
+- Port 80 is blocked — Let's Encrypt can't reach your VM for the ACME challenge
+- Check Oracle Security List has port 80 open
+- Check iptables: `sudo iptables -L INPUT --line-numbers -n` — ACCEPT rules for 80/443 must appear **before** the REJECT rule
+- Fix: re-run the iptables command from step 2B
+
+**Port open in Oracle Security List but still blocked**
+- The Security List must be attached to the **subnet your instance is on**
+- Navigate: Instance → Primary VNIC → Subnet → Security List (don't just edit any list in the VCN)
+
+**Dashboard can't connect to backend**
+- Test port from your machine: `Test-NetConnection -ComputerName YOUR_IP -Port 443`
+- Check Caddy is running: `sudo systemctl status caddy`
+- Check backend is running: `docker compose ps`
 
 **Bot crashes on startup**
-- Check logs: `docker compose logs wxata`
-- Usually a missing `botinfo.json` — the app creates it automatically from defaults on first run
-
-**QR code needed after restart**
-- Session is in the `wxata_auth` Docker volume — it persists across restarts and rebuilds
-- Only need to re-scan if you ran **Logout** from the dashboard or manually deleted the volume
-
-**PM2 not restarting after dashboard Restart**
-- Confirm you're running via `docker compose` (uses `pm2-runtime`)
-- Check: `curl http://localhost:5000/pm2` — `managed: true` means PM2 is active
-
-**Container keeps restarting**
 - `docker compose logs wxata` — look for the error
-- If it's a port conflict: `sudo lsof -i :5000`
+- `botinfo.json` is auto-created from defaults on first run — not an issue
+
+**QR code needed after container restart**
+- Session is in the `wxata_auth` Docker volume — persists across restarts and rebuilds
+- Only need to re-scan after **Logout** from dashboard or manual volume deletion

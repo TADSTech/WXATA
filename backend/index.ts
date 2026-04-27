@@ -657,7 +657,20 @@ function sanitizeBotInfo(input: Partial<BotInfo> & Record<string, unknown>): Bot
     (accumulator, [name, script]) => {
       const normalizedName = name.trim();
       if (normalizedName) {
-        accumulator[normalizedName] = sanitizeBotScript(script, normalizedName);
+        // For system scripts defined in DEFAULT_BOT_INFO, always backfill missing code/aliases
+        // from the default. This ensures a stale botinfo.json on disk (e.g. Docker volume)
+        // always gets the latest script logic without requiring a manual file edit.
+        const defaultScript = DEFAULT_BOT_INFO.scripts[normalizedName];
+        const merged: Partial<BotScript> = defaultScript
+          ? {
+              ...script,
+              // Preserve user customisations for non-code fields, but always use latest code
+              code: script.code?.trim() ? script.code : defaultScript.code,
+              aliases: (script.aliases && script.aliases.length > 0) ? script.aliases : defaultScript.aliases,
+              type: script.type ?? defaultScript.type,
+            }
+          : script;
+        accumulator[normalizedName] = sanitizeBotScript(merged, normalizedName);
       }
       return accumulator;
     },
@@ -668,12 +681,11 @@ function sanitizeBotInfo(input: Partial<BotInfo> & Record<string, unknown>): Bot
     scripts.summoner = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.summoner, 'summoner');
   }
 
-  if (!scripts.menu) {
-    scripts.menu = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.menu, 'menu');
-  }
-
-  if (!scripts.perm) {
-    scripts.perm = sanitizeBotScript(DEFAULT_BOT_INFO.scripts.perm, 'perm');
+  // Ensure all default system scripts are present — add any that are missing entirely
+  for (const [key, defaultScript] of Object.entries(DEFAULT_BOT_INFO.scripts)) {
+    if (!scripts[key]) {
+      scripts[key] = sanitizeBotScript(defaultScript, key);
+    }
   }
 
   return {
@@ -1028,10 +1040,18 @@ function extractMessageText(message: unknown): string | undefined {
     extendedTextMessage?: { text?: string };
     imageMessage?: { caption?: string };
     videoMessage?: { caption?: string };
+    audioMessage?: { caption?: string };
+    documentMessage?: { caption?: string; fileName?: string };
+    stickerMessage?: { isAnimated?: boolean };
     ephemeralMessage?: { message?: unknown };
     viewOnceMessage?: { message?: unknown };
     viewOnceMessageV2?: { message?: unknown };
     viewOnceMessageV2Extension?: { message?: unknown };
+    documentWithCaptionMessage?: { message?: unknown };
+    buttonsResponseMessage?: { selectedDisplayText?: string };
+    listResponseMessage?: { title?: string };
+    templateButtonReplyMessage?: { selectedDisplayText?: string };
+    interactiveResponseMessage?: { nativeFlowResponseMessage?: { paramsJson?: string } };
   };
 
   return (
@@ -1039,10 +1059,17 @@ function extractMessageText(message: unknown): string | undefined {
     content.extendedTextMessage?.text ??
     content.imageMessage?.caption ??
     content.videoMessage?.caption ??
+    content.audioMessage?.caption ??
+    content.documentMessage?.caption ??
+    content.documentMessage?.fileName ??
+    content.buttonsResponseMessage?.selectedDisplayText ??
+    content.listResponseMessage?.title ??
+    content.templateButtonReplyMessage?.selectedDisplayText ??
     extractMessageText(content.ephemeralMessage?.message) ??
     extractMessageText(content.viewOnceMessage?.message) ??
     extractMessageText(content.viewOnceMessageV2?.message) ??
-    extractMessageText(content.viewOnceMessageV2Extension?.message)
+    extractMessageText(content.viewOnceMessageV2Extension?.message) ??
+    extractMessageText(content.documentWithCaptionMessage?.message)
   );
 }
 
@@ -1338,9 +1365,10 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         dashboard.log('SUCCESS', `Auto-reply [pong] sent to ${remoteJid}`);
       }
 
-      const logMsg = `From: ${remoteJid} | Text: ${text}`;
+      const logMsg = `From: ${remoteJid} | Text: ${text ?? '<media>'}`;
       console.log(`[MSG] ${logMsg}`);
-      dashboard.log('MSG', logMsg);
+      // Only log MSG events that have actual text — media-only messages are too noisy
+      if (text) dashboard.log('MSG', logMsg);
     }
   });
 
