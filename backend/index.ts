@@ -248,18 +248,31 @@ if (mediaMsg) {
     },
     tagall: {
       name: 'Tag All Members',
-      desc: 'Tag everyone in the group',
+      desc: 'Tag everyone in the group. Args: admins = tag admins only | <message> = custom header',
       trigger: 'ta',
       aliases: ['tagall', 'tag'],
       type: 'group',
       response: '',
       target: 'chat',
       code: `if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, "This command can only be used in groups.");
+
 const groupMetadata = await sock.groupMetadata(remoteJid);
-const participants = groupMetadata.participants;
-let text = "✨ *ATTENTION EVERYONE* ✨\\n\\n";
+const arg = argumentName ? argumentName.trim().toLowerCase() : '';
+const tagAdminsOnly = arg === 'admins' || arg === 'admin';
+
+const pool = tagAdminsOnly
+  ? groupMetadata.participants.filter(p => p.admin)
+  : groupMetadata.participants;
+
+if (pool.length === 0) return sendTrackedMessage(sock, remoteJid, "No admins found in this group.");
+
+const header = tagAdminsOnly
+  ? \`👑 *ATTENTION ADMINS* 👑\\n\\n\`
+  : (argumentName ? \`📢 *\${argumentName.trim()}*\\n\\n\` : \`✨ *ATTENTION EVERYONE* ✨\\n\\n\`);
+
+let text = header;
 const mentions = [];
-for (let mem of participants) {
+for (const mem of pool) {
   text += \`@\${mem.id.split('@')[0]} \`;
   mentions.push(mem.id);
 }
@@ -1277,7 +1290,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
 
           for (const trig of allTriggers) {
             const triggerPattern = escapeRegex(trig.trim());
-            const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(\\S+))?.*$`, 'i');
+            // Capture everything after the trigger as the argument (not just one word)
+            const triggerRegex = new RegExp(`^${prefixPattern}\\s*${triggerPattern}(?:\\s+(.+))?$`, 'i');
             const m = normalizedText.match(triggerRegex);
             if (m) {
               triggerMatch = m;
