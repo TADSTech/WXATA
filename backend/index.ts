@@ -402,13 +402,6 @@ await sock.sendMessage(remoteJid, {
 
 const groupMetadata = await sock.groupMetadata(remoteJid);
 
-// Match bot by number — sock.user.id may be a @lid on linked devices
-const botRawNumber = sock.user.id.split(':')[0].split('@')[0];
-const botParticipant = groupMetadata.participants.find(p =>
-  p.id.split('@')[0] === botRawNumber || p.id.split(':')[0] === botRawNumber
-);
-if (!botParticipant?.admin) return sendTrackedMessage(sock, remoteJid, "❌ Permission Denied: I must be a Group Admin.");
-
 const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
 const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);
 if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user's message or tag them to T-Kick.");
@@ -451,7 +444,7 @@ let url = argumentName.trim();
 if (!url.startsWith('http')) url = 'https://' + url;
 await sendTrackedMessage(sock, remoteJid, '📸 *Capturing screenshot...*');
 try {
-  const ssUrl = \`https://api.screenshotone.com/take?url=\${encodeURIComponent(url)}&viewport_width=1280&viewport_height=900&format=jpg&image_quality=80\`;
+  const ssUrl = \`https://pageshot.site/v1/screenshot?url=\${encodeURIComponent(url)}&width=1280&height=900&format=jpg\`;
   await sock.sendMessage(remoteJid, { image: { url: ssUrl }, caption: \`📸 *\${url}*\` });
 } catch(e) {
   await sendTrackedMessage(sock, remoteJid, '❌ Failed to capture screenshot. Check the URL and try again.');

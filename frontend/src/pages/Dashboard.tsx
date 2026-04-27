@@ -54,8 +54,12 @@ interface MarketplaceExtension {
   name: string;
   description: string;
   trigger: string;
+  aliases?: string[];
+  type?: string;
+  target?: string;
   response: string;
   code?: string;
+  defaultArgument?: string;
   downloads: number;
   untrusted?: boolean;
   disabled?: boolean;
@@ -613,7 +617,7 @@ const Dashboard = () => {
   };
 
   const handleMarketplaceInstall = (ext: MarketplaceExtension) => {
-    const key = ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const key = ext.trigger.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     setBotInfo((prev) => ({
       ...prev,
       scripts: {
@@ -622,10 +626,12 @@ const Dashboard = () => {
           name: ext.name,
           desc: ext.description || `Installed: ${ext.name}`,
           trigger: ext.trigger,
+          aliases: ext.aliases || [],
+          type: ext.type || 'misc',
+          target: ext.target || 'chat',
           response: ext.response || '',
           code: ext.code || '',
-          target: 'chat',
-          defaultArgument: 'self'
+          defaultArgument: ext.defaultArgument || 'self',
         }
       }
     }));
