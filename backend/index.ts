@@ -664,8 +664,9 @@ function sanitizeBotInfo(input: Partial<BotInfo> & Record<string, unknown>): Bot
         const merged: Partial<BotScript> = defaultScript
           ? {
               ...script,
-              // Preserve user customisations for non-code fields, but always use latest code
-              code: script.code?.trim() ? script.code : defaultScript.code,
+              // Always use the latest code from DEFAULT_BOT_INFO for system scripts.
+              // This ensures stale or broken code on the volume is always overwritten.
+              code: defaultScript.code,
               aliases: (script.aliases && script.aliases.length > 0) ? script.aliases : defaultScript.aliases,
               type: script.type ?? defaultScript.type,
             }
