@@ -1,12 +1,12 @@
 FROM oven/bun:latest
 
 # ── System deps ───────────────────────────────────────────────────────────────
-# Node.js + npm are required to install PM2 globally.
-# python3/make/g++ are only needed if any native addon uses node-gyp.
-# The backend uses bun:sqlite (built-in), so no native build tools are needed.
+# The oven/bun base image is Debian trixie (slim). We need:
+#   - npm  → to install PM2 globally (nodejs is already in trixie repos)
+#   - curl → used by healthcheck and bun install
+# bun:sqlite is built-in so no python/make/g++ needed.
 RUN apt-get update && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y --no-install-recommends curl nodejs npm && \
     npm install -g pm2 && \
     rm -rf /var/lib/apt/lists/*
 
