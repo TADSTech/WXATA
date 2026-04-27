@@ -1176,22 +1176,24 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
   sock.ev.on('messaging-history.set', async ({ messages }) => {
     if (messages && messages.length > 0) {
       const now = Math.floor(Date.now() / 1000);
-      const cutoff = now - (24 * 60 * 60); // 24 hours in seconds
+      const cutoff = now - (24 * 60 * 60); // only cache last 24h
       let count = 0;
       
       for (const msg of messages) {
+        // Skip status broadcasts — no point caching them
+        if (msg?.key?.remoteJid === 'status@broadcast') continue;
+
         // Extract timestamp, handling both number and Long types
         const ts = msg.messageTimestamp 
           ? (typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp : (msg.messageTimestamp as any).low)
           : 0;
 
         if (msg?.key?.id && ts >= cutoff) {
-          // Convert seconds to ms for db storage
           storeMessage(msg, ts * 1000);
           count++;
         }
       }
-      dashboard.log('INFO', `Cached ${count} historical messages from last 24h (skipped ${messages.length - count} older messages)`);
+      dashboard.log('INFO', `Cached ${count} recent messages for anti-delete (skipped ${messages.length - count} old/status)`);
     }
   });
 
@@ -1616,14 +1618,20 @@ async function startBot() {
             setTimeout(() => process.exit(0), 500);
             break;
           case 'TERMINATE':
-            dashboard.log('WARN', 'Terminating bot process. PM2 will NOT restart (stop_exit_codes: [2]).');
+            dashboard.log('WARN', 'Terminating bot process and clearing session...');
             if (connectionManager) {
+              await connectionManager.logout(); // This clears auth_info
               await connectionManager.destroy();
               connectionManager = null;
+            } else {
+              // Fallback if not fully initialized
+              const fs = require('fs/promises');
+              const AUTH_DIR = fsSync.existsSync('/data') ? '/data/auth_info' : path.resolve(__dirname, 'auth_info');
+              await fs.rm(AUTH_DIR, { recursive: true, force: true }).catch(() => {});
             }
             dashboard.setConnectionStatus('DISCONNECTED');
+            dashboard.log('SUCCESS', 'Session cleared. PM2 will NOT restart (stop_exit_codes: [2]).');
             // Exit code 2 → listed in PM2 stop_exit_codes, so PM2 stops without restarting.
-            // Without PM2 this also cleanly exits the process.
             setTimeout(() => process.exit(2), 500);
             break;
           case 'LOGOUT':
