@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, ChevronRight, ChevronLeft, Menu, X, ExternalLink, Copy, Check, ArrowLeft } from 'lucide-react';
+import { BookOpen, ChevronRight, Menu, X, ExternalLink, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // ── Markdown source files embedded as strings ─────────────────────────────────
 // We embed them here so they work on Vercel without a file server.
@@ -598,7 +598,7 @@ function MarkdownContent({ content }: { content: string }) {
         strong: ({ children }) => (
           <strong className="text-text-main font-bold">{children}</strong>
         ),
-        code: ({ inline, children, ...props }: any) => {
+        code: ({ inline, children }: any) => {
           const code = String(children).replace(/\n$/, '');
           if (inline) {
             return <code className="bg-bg-panel border border-border-strong text-accent-light px-1.5 py-0.5 rounded text-xs font-mono">{code}</code>;
@@ -657,7 +657,15 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 // ── Sidebar nav ───────────────────────────────────────────────────────────────
-const NAV = [
+interface NavItem {
+  id: string;
+  label: string;
+  emoji: string;
+  href?: string;
+  external?: boolean;
+}
+
+const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: 'Getting Started',
     items: [
@@ -834,7 +842,7 @@ const Docs = () => {
             <div className="flex gap-3">
               {page !== 'overview' && (
                 <button onClick={() => setPage('overview')} className="flex items-center gap-1 text-xs text-text-muted hover:text-text-main transition-colors">
-                  <ChevronLeft className="w-3 h-3" /> Overview
+                  <ArrowLeft className="w-3 h-3" /> Overview
                 </button>
               )}
               {page === 'overview' && (

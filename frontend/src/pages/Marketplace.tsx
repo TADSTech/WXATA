@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Download, ArrowLeft, PlusCircle, ShieldAlert, Edit2, Search, Code2, BookOpen, X, ChevronDown, ChevronUp, Zap, Copy, Check } from 'lucide-react';
+import { Package, Download, ArrowLeft, ShieldAlert, Search, Code2, BookOpen, X, ChevronDown, ChevronUp, Zap, Copy, Check } from 'lucide-react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
