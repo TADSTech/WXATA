@@ -66,18 +66,27 @@ export class WXATAConnection {
       },
       // Fingerprinting: Use a more stable, standard browser string
       browser: ['Mac OS', 'Chrome', '121.0.0.0'],
-        connectTimeoutMs: 120000,
-        defaultQueryTimeoutMs: 0,
-        keepAliveIntervalMs: 30000,
+      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 0,
+      keepAliveIntervalMs: 30000,
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
       markOnlineOnConnect: true,
+
+      // Ignore status broadcasts entirely — they flood the buffer with
+      // undecryptable group-cipher messages causing "Buffer timeout reached"
+      // stalls that freeze normal message processing.
+      shouldIgnoreJid: (jid) => {
+        return jid === 'status@broadcast' || jid?.endsWith('@broadcast');
+      },
+
       // Fix for Bun's websocket implementation
       patchMessageBeforeSending: (message) => {
         return message;
       },
-      // Fix for "Waiting for message" sync issues: allows Baileys to request a key retry
-      getMessage: async (key) => {
+      // Return empty message for unknown keys so Baileys doesn't stall
+      // waiting for a retry that will never come.
+      getMessage: async (_key) => {
         return { conversation: '' };
       },
     });

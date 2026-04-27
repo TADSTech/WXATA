@@ -1197,6 +1197,10 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
 
   sock.ev.on('messages.upsert', async (m) => {
     for (const msg of m.messages) {
+      // Skip status broadcasts entirely — they flood the buffer with undecryptable
+      // group-cipher messages and cause "Buffer timeout reached" stalls.
+      if (msg?.key?.remoteJid === 'status@broadcast') continue;
+
       // Always cache every message for anti-delete, regardless of type
       if (msg?.key?.id) storeMessage(msg);
 
