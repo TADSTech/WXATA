@@ -1,8 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Download, ArrowLeft, ShieldAlert, Search, Code2, BookOpen, X, ChevronDown, ChevronUp, Zap, Copy, Check } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, getDocs, addDoc, query, where, doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
 import { useNavigate } from 'react-router-dom';
 
 interface Extension {
@@ -175,10 +174,32 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
   useEffect(() => {
     (async () => {
       try {
-        const q = query(collection(db, 'extensions'), where('status', '==', 'approved'));
-        const snap = await getDocs(q);
-        const list: Extension[] = [];
-        snap.forEach(d => list.push({ id: d.id, ...d.data() } as Extension));
+        const { data, error } = await supabase
+          .from('marketplace_extensions')
+          .select('*')
+          .eq('status', 'approved');
+        if (error) throw error;
+        const list: Extension[] = (data || []).map(d => ({
+          id: d.id,
+          name: d.name,
+          description: d.description,
+          trigger: d.trigger,
+          aliases: d.aliases,
+          type: d.type,
+          target: d.target,
+          response: d.response,
+          code: d.code,
+          defaultArgument: d.default_argument,
+          author: d.author,
+          authorUid: d.author_uid,
+          status: d.status,
+          createdAt: d.created_at,
+          downloads: d.downloads,
+          tags: d.tags,
+          version: d.version,
+          untrusted: d.untrusted,
+          disabled: d.disabled,
+        }));
         setExtensions(list);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
@@ -198,7 +219,10 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
     if (!user) { navigate('/login'); return; }
     setInstalling(ext.id);
     try {
-      await updateDoc(doc(db, 'extensions', ext.id), { downloads: (ext.downloads || 0) + 1 });
+      await supabase
+        .from('marketplace_extensions')
+        .update({ downloads: (ext.downloads || 0) + 1 })
+        .eq('id', ext.id);
       setInstalled(prev => new Set([...prev, ext.id]));
       const username = user.email?.split('@')[0] || 'user';
       navigate(`/dashboard/${username}`, { state: { installExtension: ext } });
@@ -316,12 +340,17 @@ function BuildTab({ user, onPublished }: { user: any; onPublished: () => void })
     if (!trigger.trim() || !name.trim()) { setStatusMsg('Name and trigger are required.'); setStatus('error'); return; }
     setStatus('submitting');
     try {
-      const payload = { name, description: desc, trigger: trigger.trim().toLowerCase(), aliases, type, target, response, code, defaultArgument: defaultArg, tags, version: '1.0.0', author: user.email?.split('@')[0] || 'Unknown', authorUid: user.uid, status: 'pending', createdAt: new Date().toISOString(), downloads: 0 };
+      const payload = { name, description: desc, trigger: trigger.trim().toLowerCase(), aliases, type, target, response, code, default_argument: defaultArg, tags, version: '1.0.0', author: user.email?.split('@')[0] || 'Unknown', status: 'pending', downloads: 0 };
       if (editingId) {
-        await updateDoc(doc(db, 'extensions', editingId), { ...payload, status: 'pending' });
+        await supabase
+          .from('marketplace_extensions')
+          .update({ ...payload, status: 'pending' })
+          .eq('id', editingId);
         setStatusMsg('Updated! Awaiting re-approval.');
       } else {
-        await addDoc(collection(db, 'extensions'), payload);
+        await supabase
+          .from('marketplace_extensions')
+          .insert({ ...payload, author_uid: user.id, created_at: new Date().toISOString() });
         setStatusMsg('Submitted for review! It will appear in the marketplace once approved.');
       }
       setStatus('success');
@@ -618,8 +647,10 @@ export default function Marketplace() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(u => setUser(u));
-    return unsub;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const tabs = [

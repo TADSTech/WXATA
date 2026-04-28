@@ -101,7 +101,7 @@ Log out and back in (or run `newgrp docker`) so the group change takes effect.
 ### 5. Clone the repo
 
 ```bash
-cd ~ && git clone https://github.com/TADSTech/WXATA.git WXATA && cd WXATA
+cd ~ && git clone https://github.com/tadstech/wxata-public.git WXATA && cd WXATA
 ```
 
 ---

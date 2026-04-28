@@ -31,11 +31,14 @@ module.exports = {
       },
 
       // Restart policy
+      // max_restarts is intentionally high — the bot should ALWAYS come back.
+      // PM2 uses exponential backoff via restart_delay so it won't spin-loop.
       autorestart: true,
       watch: false,
-      max_restarts: 10,
-      min_uptime: '5s',
-      restart_delay: 2000,
+      max_restarts: 50,          // was 10 — too low, caused permanent death after crash bursts
+      min_uptime: '10s',         // process must stay up 10s to count as a successful start
+      restart_delay: 5000,       // wait 5s between restarts (prevents spin-loop)
+      exp_backoff_restart_delay: 100, // exponential backoff: 100ms → doubles each restart up to restart_delay
 
       // Exit code 2 = intentional stop from dashboard → do NOT restart
       stop_exit_codes: [2],

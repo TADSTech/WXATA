@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { supabase } from '../supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,15 +11,20 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+
       // Look up the username tied to this uid so we can route to the correct dashboard
-      const q = query(collection(db, 'users'), where('uid', '==', credential.user.uid));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const username = snap.docs[0]!.data().username as string;
-        navigate(`/dashboard/${username}`);
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('username')
+        .eq('uid', session.user.id)
+        .single();
+
+      if (userRow?.username) {
+        navigate(`/dashboard/${userRow.username}`);
       } else {
-        // Fallback: uid-based generic route (handles legacy accounts without a users doc)
+        // Fallback: generic route (handles accounts without a users row)
         navigate('/dashboard/user');
       }
     } catch (err: any) {

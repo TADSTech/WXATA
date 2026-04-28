@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, doc, setDoc, getDocs, query, orderBy, updateDoc, deleteDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
 
 interface UserCode {
   id: string;
@@ -44,14 +43,28 @@ export default function Admin() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPass, setAdminPass] = useState('');
 
+  // License key generator state
+  const [licenseUsername, setLicenseUsername] = useState('');
+  const [generatedLicenseKey, setGeneratedLicenseKey] = useState('');
+  const [licenseError, setLicenseError] = useState('');
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [licenseCopied, setLicenseCopied] = useState(false);
+
   const fetchCodes = async () => {
     try {
-      const q = query(collection(db, 'user_codes'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const fetched: UserCode[] = [];
-      querySnapshot.forEach((doc) => {
-        fetched.push({ id: doc.id, ...doc.data() } as UserCode);
-      });
+      const { data, error } = await supabase
+        .from('user_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const fetched: UserCode[] = (data || []).map((row: any) => ({
+        id: row.id,
+        code: row.code,
+        used: row.used,
+        createdAt: row.created_at,
+        usedBy: row.used_by,
+        usedAt: row.used_at,
+      }));
       setCodesList(fetched);
     } catch (err) {
       console.error('Failed to fetch codes', err);
@@ -62,14 +75,30 @@ export default function Admin() {
 
   const fetchExtensions = async () => {
     try {
-      const q = query(collection(db, 'extensions'));
-      const querySnapshot = await getDocs(q);
+      const { data, error } = await supabase
+        .from('marketplace_extensions')
+        .select('*');
+      if (error) throw error;
       const fetchedPending: Extension[] = [];
       const fetchedApproved: Extension[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = { id: doc.id, ...doc.data() } as Extension;
-        if (data.status === 'pending') fetchedPending.push(data);
-        if (data.status === 'approved') fetchedApproved.push(data);
+      (data || []).forEach((row: any) => {
+        const ext: Extension = {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          trigger: row.trigger,
+          response: row.response,
+          code: row.code,
+          author: row.author,
+          authorUid: row.author_uid,
+          status: row.status,
+          createdAt: row.created_at,
+          downloads: row.downloads,
+          untrusted: row.untrusted,
+          disabled: row.disabled,
+        };
+        if (ext.status === 'pending') fetchedPending.push(ext);
+        if (ext.status === 'approved') fetchedApproved.push(ext);
       });
       setPendingExtensions(fetchedPending);
       setApprovedExtensions(fetchedApproved);
@@ -89,7 +118,11 @@ export default function Admin() {
 
   const handleExtStatus = async (id: string, status: 'approved' | 'rejected') => {
      try {
-        await updateDoc(doc(db, 'extensions', id), { status });
+        const { error } = await supabase
+          .from('marketplace_extensions')
+          .update({ status })
+          .eq('id', id);
+        if (error) throw error;
         fetchExtensions(); // Refresh the list
      } catch(e) {
         console.error(e);
@@ -98,7 +131,11 @@ export default function Admin() {
 
   const handleToggleExtField = async (id: string, field: 'untrusted' | 'disabled', currentValue: boolean | undefined) => {
     try {
-      await updateDoc(doc(db, 'extensions', id), { [field]: !currentValue });
+      const { error } = await supabase
+        .from('marketplace_extensions')
+        .update({ [field]: !currentValue })
+        .eq('id', id);
+      if (error) throw error;
       fetchExtensions();
     } catch(e) {
       console.error(e);
@@ -108,7 +145,11 @@ export default function Admin() {
   const handleDeleteExt = async (id: string) => {
     if (confirm("Are you sure you want to permanently delete this extension from the marketplace?")) {
       try {
-        await deleteDoc(doc(db, 'extensions', id));
+        const { error } = await supabase
+          .from('marketplace_extensions')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
         fetchExtensions();
       } catch(e) {
         console.error(e);
@@ -130,13 +171,17 @@ export default function Admin() {
   const handleSaveEdit = async () => {
     if (!adminEditingExt) return;
     try {
-      await updateDoc(doc(db, 'extensions', adminEditingExt.id), {
-        name: editForm.name,
-        description: editForm.description,
-        trigger: editForm.trigger,
-        response: editForm.response,
-        code: editForm.code
-      });
+      const { error } = await supabase
+        .from('marketplace_extensions')
+        .update({
+          name: editForm.name,
+          description: editForm.description,
+          trigger: editForm.trigger,
+          response: editForm.response,
+          code: editForm.code
+        })
+        .eq('id', adminEditingExt.id);
+      if (error) throw error;
       setAdminEditingExt(null);
       fetchExtensions();
     } catch(e: any) {
@@ -154,6 +199,42 @@ export default function Admin() {
     }
   };
 
+  const handleGenerateLicenseKey = async () => {
+    if (!licenseUsername.trim()) return;
+    setLicenseLoading(true);
+    setLicenseError('');
+    setGeneratedLicenseKey('');
+    try {
+      const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)
+        ?.replace(/^wss?:\/\//, 'https://')
+        ?.replace(/\/ws$/, '') ?? 'http://localhost:5000';
+      const res = await fetch(`${backendUrl}/admin/generate-license`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminPass}`,
+        },
+        body: JSON.stringify({ username: licenseUsername.trim() }),
+      });
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+      }
+      const data = await res.json() as { key: string };
+      setGeneratedLicenseKey(data.key);
+    } catch (err: unknown) {
+      setLicenseError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
+
+  const handleCopyLicenseKey = () => {
+    if (!generatedLicenseKey) return;
+    navigator.clipboard.writeText(generatedLicenseKey);
+    setLicenseCopied(true);
+    setTimeout(() => setLicenseCopied(false), 2000);
+  };
+
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = 'WX-';
@@ -166,11 +247,10 @@ export default function Admin() {
   const saveCode = async () => {
     if (!code) return;
     try {
-      await setDoc(doc(db, 'user_codes', code), {
-        code: code,
-        used: false,
-        createdAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('user_codes')
+        .insert({ code, used: false, created_at: new Date().toISOString() });
+      if (error) throw error;
       setMessage(`Code ${code} saved successfully!`);
       setCode('');
       fetchCodes(); // Refresh the list
@@ -234,6 +314,51 @@ export default function Admin() {
             {message && (
               <div className={`mt-4 p-3 rounded text-sm ${message.startsWith('Error') ? 'bg-red-900/50 text-red-200 border border-red-500' : 'bg-accent-subtle text-accent-light border border-border-strong'}`}>
                 {message}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* License Key Generator Card */}
+        <div className="bg-bg-panel border border-border-strong p-6 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.05)]">
+          <div className="flex-1">
+            <h2 className="text-xl font-bold mb-2 text-indigo-400">Generate License Key</h2>
+            <p className="text-text-muted text-sm mb-4">Generate a HMAC-signed license key for a buyer. Deliver this key to them for use in their <code className="text-accent-light">LICENSE_KEY</code> environment variable.</p>
+            <div className="flex items-center gap-4 mb-4">
+              <input
+                type="text"
+                value={licenseUsername}
+                onChange={e => setLicenseUsername(e.target.value)}
+                placeholder="Enter buyer username"
+                className="flex-1 bg-bg-base border border-border-subtle focus:border-border-strong text-accent-light px-4 py-3 rounded outline-none"
+              />
+              <button
+                onClick={handleGenerateLicenseKey}
+                disabled={!licenseUsername.trim() || licenseLoading}
+                className="bg-accent-subtle hover:bg-accent-subtle text-accent-light px-6 py-3 rounded border border-border-strong transition-colors disabled:opacity-50"
+              >
+                {licenseLoading ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+            {generatedLicenseKey && (
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedLicenseKey}
+                  className="flex-1 bg-bg-base border border-border-subtle text-accent-light px-4 py-3 rounded outline-none font-mono text-xs"
+                />
+                <button
+                  onClick={handleCopyLicenseKey}
+                  className="bg-accent-subtle hover:bg-accent-subtle text-accent-light px-4 py-3 rounded border border-border-strong transition-colors text-sm"
+                >
+                  {licenseCopied ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            )}
+            {licenseError && (
+              <div className="mt-2 p-3 rounded text-sm bg-red-900/50 text-red-200 border border-red-500">
+                {licenseError}
               </div>
             )}
           </div>

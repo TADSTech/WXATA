@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X, Package, Download, ExternalLink, Palette, BookOpen } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { auth, db } from '../firebase';
-import { doc, getDoc, collection, getDocs, query, where, updateDoc, addDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
 import { useTheme } from '../components/ThemeProvider';
 
 interface BotInfo {
@@ -80,12 +79,30 @@ function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplace
   const [installed, setInstalled] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchExtensions = async () => {
       try {
-        const q = query(collection(db, 'extensions'), where('status', '==', 'approved'));
-        const snap = await getDocs(q);
-        const list: MarketplaceExtension[] = [];
-        snap.forEach(d => list.push({ id: d.id, ...d.data() } as MarketplaceExtension));
+        const { data, error } = await supabase
+          .from('marketplace_extensions')
+          .select('*')
+          .eq('status', 'approved');
+        if (error) throw error;
+        const list: MarketplaceExtension[] = (data || []).map((row: Record<string, any>) => ({
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          trigger: row.trigger,
+          aliases: row.aliases,
+          type: row.type,
+          target: row.target,
+          response: row.response,
+          code: row.code,
+          defaultArgument: row.default_argument,
+          downloads: row.downloads,
+          untrusted: row.untrusted,
+          disabled: row.disabled,
+          author: row.author,
+          authorUid: row.author_uid,
+        }));
         list.sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
         setExtensions(list);
       } catch (e) {
@@ -94,13 +111,16 @@ function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplace
         setLoading(false);
       }
     };
-    fetch();
+    fetchExtensions();
   }, []);
 
   const handleInstall = async (ext: MarketplaceExtension) => {
     setInstalling(ext.id);
     try {
-      await updateDoc(doc(db, 'extensions', ext.id), { downloads: (ext.downloads || 0) + 1 });
+      await supabase
+        .from('marketplace_extensions')
+        .update({ downloads: (ext.downloads || 0) + 1 })
+        .eq('id', ext.id);
       onInstall(ext);
       setInstalled(prev => new Set(prev).add(ext.id));
     } catch (e) {
@@ -402,7 +422,7 @@ const Dashboard = () => {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   const handleSignOut = () => {
-    auth.signOut();
+    supabase.auth.signOut();
     navigate('/');
   };
 
@@ -447,25 +467,27 @@ const Dashboard = () => {
 
   // Check auth & fetch user data
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(user => {
-      if (!user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
         navigate('/login');
       } else {
-        // Verify username matched params (skip full check for speed but robust enough)
-        getDoc(doc(db, 'users', username || '')).then(snap => {
-          if (snap.exists() && snap.data().uid === user.uid) {
-            setUserData(snap.data());
-            setIsAuthenticated(true);
-          } else if (username === 'user') { // Generic fallback
-             setUserData({ name: user.email, username: username });
-             setIsAuthenticated(true);
-          } else {
-            navigate('/login');
-          }
-        });
+        const { data: userRow, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username || '')
+          .single();
+        if (!error && userRow && userRow.uid === session.user.id) {
+          setUserData(userRow);
+          setIsAuthenticated(true);
+        } else if (username === 'user') {
+          setUserData({ name: session.user.email, username: username });
+          setIsAuthenticated(true);
+        } else {
+          navigate('/login');
+        }
       }
     });
-    return unsub;
+    return () => subscription.unsubscribe();
   }, [username, navigate]);
 
   useEffect(() => {
@@ -587,7 +609,8 @@ const Dashboard = () => {
   };
 
   const handlePublishScript = async (_key: string, script: BotScript) => {
-    if (!auth.currentUser) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       alert("You must be logged in to publish scripts.");
       return;
     }
@@ -597,18 +620,19 @@ const Dashboard = () => {
     }
     if (confirm(`Publish "${script.name}" to the Marketplace? It will undergo admin review.`)) {
       try {
-        await addDoc(collection(db, 'extensions'), {
+        const { error } = await supabase.from('marketplace_extensions').insert({
           name: script.name,
           description: script.desc,
           trigger: script.trigger,
           response: script.response || '',
           code: script.code || '',
-          author: auth.currentUser.email?.split('@')[0] || 'Unknown',
-          authorUid: auth.currentUser.uid,
+          author: session.user.email?.split('@')[0] || 'Unknown',
+          author_uid: session.user.id,
           status: 'pending',
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
           downloads: 0
         });
+        if (error) throw error;
         alert('Extension submitted successfully! Awaiting admin approval.');
       } catch (err: any) {
         alert('Error: ' + err.message);

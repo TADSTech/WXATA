@@ -1,15 +1,15 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, ChevronRight, Menu, X, ExternalLink, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-// ── Markdown source files embedded as strings ─────────────────────────────────
+// -- Markdown source files embedded as strings ---------------------------------
 // We embed them here so they work on Vercel without a file server.
 
 const DOC_OVERVIEW = `# WXATA Documentation
 
-Welcome to the official documentation for **WXATA** — the WhatsApp Automation & Tactical Assistant.
+Welcome to the official documentation for **WXATA** � the WhatsApp Automation & Tactical Assistant.
 
 WXATA is built on Baileys and Bun, designed for high-performance automation and a premium user experience. Connect your WhatsApp account, install plugins from the Marketplace, and automate anything.
 
@@ -17,11 +17,11 @@ WXATA is built on Baileys and Bun, designed for high-performance automation and 
 
 ## Quick Links
 
-- [Getting Started](#getting-started) — Install and run WXATA locally
-- [Command System](#commands) — All built-in commands
-- [Plugin Development](/docs?page=plugins) — Build your own plugins
-- [Deployment Guide](/docs?page=deployment) — Deploy to Oracle Cloud
-- [Marketplace](/extensions) — Browse community plugins
+- [Getting Started](#getting-started) � Install and run WXATA locally
+- [Command System](#commands) � All built-in commands
+- [Plugin Development](/docs?page=plugins) � Build your own plugins
+- [Deployment Guide](/docs?page=deployment) � Deploy to Oracle Cloud
+- [Marketplace](/extensions) � Browse community plugins
 
 ---
 
@@ -29,11 +29,11 @@ WXATA is built on Baileys and Bun, designed for high-performance automation and 
 
 \`\`\`
 Frontend (Vercel / React)
-  └── WebSocket ──► Backend (Bun + Baileys)
-                        └── WhatsApp Protocol
-                        └── SQLite (message cache)
-                        └── botinfo.json (scripts + config)
-                        └── Firestore (marketplace, auth)
+  +-- WebSocket --? Backend (Bun + Baileys)
+                        +-- WhatsApp Protocol
+                        +-- SQLite (message cache)
+                        +-- botinfo.json (scripts + config)
+                        +-- Firestore (marketplace, auth)
 \`\`\`
 
 The frontend dashboard connects to the backend over a persistent WebSocket. All bot configuration, logs, and QR codes flow through this connection in real time.
@@ -46,7 +46,7 @@ The frontend dashboard connects to the backend over a persistent WebSocket. All 
 
 \`\`\`bash
 # 1. Clone
-git clone https://github.com/TADSTech/WXATA.git
+git clone https://github.com/tadstech/wxata-public.git
 cd WXATA
 
 # 2. Seed config
@@ -57,8 +57,8 @@ bun run install:all
 
 # 4. Run everything
 bun run all
-# Frontend → http://localhost:5173
-# Backend  → ws://localhost:5000
+# Frontend ? http://localhost:5173
+# Backend  ? ws://localhost:5000
 \`\`\`
 
 ### Connecting Your WhatsApp
@@ -96,13 +96,13 @@ Commands are prefix-based (default: \`!\`). Each command has a primary trigger a
 ### Using Commands
 
 \`\`\`
-!mn              → show menu
-!mn detailed     → show menu with descriptions
-!hp st           → help for sticker command
-!ta              → tag everyone
-!ta admins       → tag admins only
-!ta Meeting now  → tag everyone with custom message
-!vs              → show system variables
+!mn              ? show menu
+!mn detailed     ? show menu with descriptions
+!hp st           ? help for sticker command
+!ta              ? tag everyone
+!ta admins       ? tag admins only
+!ta Meeting now  ? tag everyone with custom message
+!vs              ? show system variables
 !vs set WARN_MESSAGE You have been warned ({count}/3)
 \`\`\`
 
@@ -112,18 +112,18 @@ Commands are prefix-based (default: \`!\`). Each command has a primary trigger a
 
 WXATA uses a 3-tier permission model:
 
-1. **Root (Sudo)** — configured in \`botinfo.json → root.target\`. Full access to all commands.
-2. **Allowed Numbers** — specific phone numbers that can use the bot anywhere.
-3. **Allowed Chats** — specific group or DM JIDs where the bot responds to everyone.
+1. **Root (Sudo)** � configured in \`botinfo.json ? root.target\`. Full access to all commands.
+2. **Allowed Numbers** � specific phone numbers that can use the bot anywhere.
+3. **Allowed Chats** � specific group or DM JIDs where the bot responds to everyone.
 
 ### Managing Permissions
 
 \`\`\`
-!pm chat          → allow everyone in current chat
-!pm all           → allow everyone everywhere (⚠️ risky)
-!pm +2341234567   → allow a specific number
-!pm revoke chat   → revoke current chat
-!pm revoke all    → revoke global access
+!pm chat          ? allow everyone in current chat
+!pm all           ? allow everyone everywhere (?? risky)
+!pm +2341234567   ? allow a specific number
+!pm revoke chat   ? revoke current chat
+!pm revoke all    ? revoke global access
 \`\`\`
 
 ---
@@ -134,13 +134,13 @@ Use \`!vs\` to view and set configurable variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| \`WARN_MESSAGE\` | \`⚠️ You have been warned! ({count}/3)\` | Warning message template |
-| \`TAGALL_MESSAGE\` | \`✨ *ATTENTION EVERYONE* ✨\` | Default tagall header |
-| \`TAGADMINS_MESSAGE\` | \`👑 *ATTENTION ADMINS* 👑\` | Tagall admins header |
+| \`WARN_MESSAGE\` | \`?? You have been warned! ({count}/3)\` | Warning message template |
+| \`TAGALL_MESSAGE\` | \`? *ATTENTION EVERYONE* ?\` | Default tagall header |
+| \`TAGADMINS_MESSAGE\` | \`?? *ATTENTION ADMINS* ??\` | Tagall admins header |
 | \`DB_RETENTION_DAYS\` | \`3\` | Message cache retention |
 
 \`\`\`
-!vs set WARN_MESSAGE ⚠️ Warning {count}/3 for @{user}
+!vs set WARN_MESSAGE ?? Warning {count}/3 for @{user}
 !vs reset WARN_MESSAGE
 \`\`\`
 `;
@@ -177,14 +177,14 @@ A plugin is a JavaScript snippet that runs when a user sends a specific command.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| \`trigger\` | ✅ | Command word. User types \`!trigger\` |
-| \`response\` | ✅ | Static text. Empty string \`""\` if using code |
-| \`target\` | ✅ | \`"chat"\` or \`"self"\` |
+| \`trigger\` | ? | Command word. User types \`!trigger\` |
+| \`response\` | ? | Static text. Empty string \`""\` if using code |
+| \`target\` | ? | \`"chat"\` or \`"self"\` |
 | \`name\` | recommended | Display name in menus |
 | \`desc\` | recommended | Shown in \`!mn detailed\` |
 | \`aliases\` | optional | Extra triggers |
 | \`type\` | optional | Category for menu grouping |
-| \`code\` | optional | JS code — overrides response |
+| \`code\` | optional | JS code � overrides response |
 | \`defaultArgument\` | optional | Used when no arg provided |
 
 ---
@@ -193,7 +193,7 @@ A plugin is a JavaScript snippet that runs when a user sends a specific command.
 
 These variables are **automatically injected** into your plugin code. Do not declare them.
 
-### \`sock\` — WhatsApp Socket
+### \`sock\` � WhatsApp Socket
 
 \`\`\`js
 // Send text
@@ -204,7 +204,7 @@ await sock.sendMessage(remoteJid, { image: { url: 'https://...' }, caption: 'Cap
 
 // Get group info
 const meta = await sock.groupMetadata(remoteJid);
-// meta.participants → [{ id: '234...@s.whatsapp.net', admin: 'admin' | null }]
+// meta.participants ? [{ id: '234...@s.whatsapp.net', admin: 'admin' | null }]
 
 // Tag members
 await sock.sendMessage(remoteJid, {
@@ -213,13 +213,13 @@ await sock.sendMessage(remoteJid, {
 });
 
 // React to message
-await sock.sendMessage(remoteJid, { react: { text: '👍', key: msg.key } });
+await sock.sendMessage(remoteJid, { react: { text: '??', key: msg.key } });
 
 // Kick from group
 await sock.groupParticipantsUpdate(remoteJid, ['234...@s.whatsapp.net'], 'remove');
 \`\`\`
 
-### \`msg\` — Message Object
+### \`msg\` � Message Object
 
 \`\`\`js
 msg.key.remoteJid      // Chat JID
@@ -232,21 +232,21 @@ const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
 \`\`\`
 
-### \`remoteJid\` — Chat ID
+### \`remoteJid\` � Chat ID
 
 \`\`\`js
 remoteJid.endsWith('@g.us')           // true = group
 remoteJid.endsWith('@s.whatsapp.net') // true = DM
 \`\`\`
 
-### \`argumentName\` — Command Argument
+### \`argumentName\` � Command Argument
 
 \`\`\`js
 // User types: !weather Lagos
-argumentName  // → "Lagos"
+argumentName  // ? "Lagos"
 
 // User types: !ta Hello everyone
-argumentName  // → "Hello everyone"
+argumentName  // ? "Hello everyone"
 
 // Safe usage
 const arg = argumentName?.trim() || '';
@@ -260,7 +260,7 @@ Sends text and logs to dashboard. Use this instead of \`sock.sendMessage\` for t
 await sendTrackedMessage(sock, remoteJid, 'Hello!');
 \`\`\`
 
-### \`botInfo\` — Bot Config
+### \`botInfo\` � Bot Config
 
 \`\`\`js
 botInfo.prefix              // "!"
@@ -268,7 +268,7 @@ botInfo.scripts             // all installed scripts
 botInfo.permissions.numbers // allowed numbers
 \`\`\`
 
-### \`require\` — Node.js Require
+### \`require\` � Node.js Require
 
 \`\`\`js
 const axios = require('axios');
@@ -277,7 +277,7 @@ const path = require('path');
 const os = require('os');
 \`\`\`
 
-### \`__rootdir\` — Data Directory
+### \`__rootdir\` � Data Directory
 
 \`\`\`js
 const configPath = path.resolve(__rootdir, 'myplugin.json');
@@ -297,23 +297,23 @@ await sendTrackedMessage(sock, remoteJid, argumentName);
 \`\`\`js
 const axios = require('axios');
 if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !weather <city>');
-await sendTrackedMessage(sock, remoteJid, '🔍 Fetching...');
+await sendTrackedMessage(sock, remoteJid, '?? Fetching...');
 try {
   const res = await axios.get(\`https://wttr.in/\${encodeURIComponent(argumentName)}?format=3\`);
-  await sendTrackedMessage(sock, remoteJid, \`🌤️ \${res.data}\`);
+  await sendTrackedMessage(sock, remoteJid, \`??? \${res.data}\`);
 } catch (e) {
-  await sendTrackedMessage(sock, remoteJid, '❌ Failed to fetch weather.');
+  await sendTrackedMessage(sock, remoteJid, '? Failed to fetch weather.');
 }
 \`\`\`
 
 ### Admin Check
 \`\`\`js
-if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, '❌ Groups only.');
+if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, '? Groups only.');
 const meta = await sock.groupMetadata(remoteJid);
 const senderJid = msg.key.participant || msg.key.remoteJid;
 const isAdmin = meta.participants.find(p => p.id === senderJid)?.admin;
-if (!isAdmin && !msg.key.fromMe) return sendTrackedMessage(sock, remoteJid, '❌ Admins only.');
-await sendTrackedMessage(sock, remoteJid, '✅ Done.');
+if (!isAdmin && !msg.key.fromMe) return sendTrackedMessage(sock, remoteJid, '? Admins only.');
+await sendTrackedMessage(sock, remoteJid, '? Done.');
 \`\`\`
 
 ### Persistent Config
@@ -329,7 +329,7 @@ const arg = argumentName?.trim().toLowerCase() || '';
 if (arg.startsWith('set ')) {
   config.value = arg.slice(4).trim();
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-  return sendTrackedMessage(sock, remoteJid, \`✅ Set to: \${config.value}\`);
+  return sendTrackedMessage(sock, remoteJid, \`? Set to: \${config.value}\`);
 }
 await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 \`\`\`
@@ -338,12 +338,12 @@ await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 
 ## Best Practices
 
-1. **Handle missing args** — always check \`if (!argumentName)\` and return usage
-2. **Wrap API calls** — use try/catch for all network requests
-3. **Use sendTrackedMessage for text** — prevents echo loops, logs to dashboard
-4. **Use sock.sendMessage for media** — images, videos, stickers, reactions
-5. **Config files in __rootdir** — \`path.resolve(__rootdir, 'myplugin.json')\`
-6. **Check group context** — \`remoteJid.endsWith('@g.us')\` before group ops
+1. **Handle missing args** � always check \`if (!argumentName)\` and return usage
+2. **Wrap API calls** � use try/catch for all network requests
+3. **Use sendTrackedMessage for text** � prevents echo loops, logs to dashboard
+4. **Use sock.sendMessage for media** � images, videos, stickers, reactions
+5. **Config files in __rootdir** � \`path.resolve(__rootdir, 'myplugin.json')\`
+6. **Check group context** � \`remoteJid.endsWith('@g.us')\` before group ops
 
 ---
 
@@ -352,7 +352,7 @@ await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 1. Build and test in the Dashboard
 2. Click **Publish to Marketplace** on the script card
 3. Fill in metadata and submit
-4. Admin reviews → approved → visible to all users
+4. Admin reviews ? approved ? visible to all users
 
 ---
 
@@ -361,8 +361,8 @@ await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 If you are an AI generating a WXATA plugin:
 
 1. Output a valid JSON object matching the Plugin Schema
-2. The \`code\` field is the body of an async function — no wrapper needed
-3. All context variables are pre-injected — do not declare them
+2. The \`code\` field is the body of an async function � no wrapper needed
+3. All context variables are pre-injected � do not declare them
 4. Use \`await\` for all async operations
 5. Always wrap network calls in try/catch
 6. Available packages: \`axios\`, \`@whiskeysockets/baileys\`, \`wa-sticker-formatter\`, \`fs\`, \`path\`, \`os\`
@@ -379,7 +379,7 @@ If you are an AI generating a WXATA plugin:
   "type": "fun",
   "target": "chat",
   "response": "",
-  "code": "const axios = require('axios');\ntry {\n  const res = await axios.get('https://v2.jokeapi.dev/joke/Any?safe-mode&type=single');\n  await sendTrackedMessage(sock, remoteJid, \`😂 \${res.data.joke}\`);\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Failed.');\n}"
+  "code": "const axios = require('axios');\ntry {\n  const res = await axios.get('https://v2.jokeapi.dev/joke/Any?safe-mode&type=single');\n  await sendTrackedMessage(sock, remoteJid, \`?? \${res.data.joke}\`);\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '? Failed.');\n}"
 }
 \`\`\`
 `;
@@ -390,28 +390,28 @@ const DOC_DEPLOYMENT = `# Deployment Guide
 
 \`\`\`
 Frontend (Vercel)                    Backend (Oracle Cloud VPS)
-https://wxata.tadstech.dev  ──WSS──► wss://wxata-api.tadstech.dev
-                                      Caddy TLS ✅  Docker + PM2 ✅
+https://wxata.tadstech.dev  --WSS--? wss://wxata-api.tadstech.dev
+                                      Caddy TLS ?  Docker + PM2 ?
 \`\`\`
 
 ---
 
 ## Oracle Cloud Free Tier Setup
 
-Oracle Always Free gives you a real Ubuntu VM (1 OCPU / 6 GB RAM — free forever).
+Oracle Always Free gives you a real Ubuntu VM (1 OCPU / 6 GB RAM � free forever).
 
 ### 1. Create the VM
 
-1. Log in → **Compute → Instances → Create Instance**
+1. Log in ? **Compute ? Instances ? Create Instance**
 2. Image: **Ubuntu 22.04**
-3. Shape: \`VM.Standard.A1.Flex\` — 1 OCPU / 6 GB RAM
+3. Shape: \`VM.Standard.A1.Flex\` � 1 OCPU / 6 GB RAM
 4. Networking: keep default VCN, enable **Assign public IPv4**
 5. Upload your SSH key
 6. Note the **Public IP** once running
 
 ### 2. Open Firewall Ports
 
-Oracle has two firewall layers — both must be configured.
+Oracle has two firewall layers � both must be configured.
 
 **Oracle Security List (cloud console):**
 
@@ -448,7 +448,7 @@ sudo apt install -y docker-compose-plugin
 ### 4. Clone and Start
 
 \`\`\`bash
-cd ~ && git clone https://github.com/TADSTech/WXATA.git WXATA && cd WXATA
+cd ~ && git clone https://github.com/tadstech/wxata-public.git WXATA && cd WXATA
 cp backend/.env.example backend/.env
 docker compose up -d --build
 docker compose logs -f wxata
@@ -458,7 +458,7 @@ docker compose logs -f wxata
 
 Browsers block \`ws://\` from HTTPS pages. You need \`wss://\` via a domain + TLS.
 
-**Option A — Own domain:**
+**Option A � Own domain:**
 
 \`\`\`bash
 # Install Caddy
@@ -475,14 +475,14 @@ sudo nano /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 \`\`\`
 
-**Option B — Free subdomain (DuckDNS):**
+**Option B � Free subdomain (DuckDNS):**
 
-1. Go to [duckdns.org](https://www.duckdns.org) → create subdomain → point to your Oracle IP
+1. Go to [duckdns.org](https://www.duckdns.org) ? create subdomain ? point to your Oracle IP
 2. Use \`wxata-yourname.duckdns.org\` as your domain in the Caddyfile
 
 ### 6. Update Vercel
 
-In Vercel project settings → Environment Variables:
+In Vercel project settings ? Environment Variables:
 \`\`\`
 VITE_BACKEND_URL=wss://wxata-api.yourdomain.com
 \`\`\`
@@ -541,24 +541,24 @@ docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \\
 ## Troubleshooting
 
 **Mixed Content / ws:// blocked**
-→ Set up Caddy + domain, use \`wss://\` in VITE_BACKEND_URL
+? Set up Caddy + domain, use \`wss://\` in VITE_BACKEND_URL
 
 **Caddy NXDOMAIN**
-→ DNS A record not set or not propagated yet. Check: \`nslookup your.domain.com\`
+? DNS A record not set or not propagated yet. Check: \`nslookup your.domain.com\`
 
 **Caddy validation error**
-→ Port 80 blocked. Check Oracle Security List AND iptables order.
+? Port 80 blocked. Check Oracle Security List AND iptables order.
 
 **iptables rules ignored**
-→ Rules added after the REJECT rule. Re-run the iptables command above.
+? Rules added after the REJECT rule. Re-run the iptables command above.
 
 **Bot disconnects after a few minutes**
-→ Status broadcasts flooding the buffer. Fixed in latest version — update and rebuild.
+? Status broadcasts flooding the buffer. Fixed in latest version � update and rebuild.
 `;
 
 export { DOC_OVERVIEW, DOC_PLUGINS, DOC_DEPLOYMENT };
 
-// ── Markdown renderer with custom styling ─────────────────────────────────────
+// -- Markdown renderer with custom styling -------------------------------------
 function MarkdownContent({ content }: { content: string }) {
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -579,7 +579,7 @@ function MarkdownContent({ content }: { content: string }) {
         ),
         h2: ({ children }) => (
           <h2 className="text-lg font-bold text-text-main mt-10 mb-4 flex items-center gap-2">
-            <span className="text-accent-primary">▸</span> {children}
+            <span className="text-accent-primary">?</span> {children}
           </h2>
         ),
         h3: ({ children }) => (
@@ -639,7 +639,7 @@ function MarkdownContent({ content }: { content: string }) {
         ),
         li: ({ children }) => (
           <li className="text-sm text-text-muted flex gap-2 items-start">
-            <span className="text-accent-primary mt-0.5 shrink-0">→</span>
+            <span className="text-accent-primary mt-0.5 shrink-0">?</span>
             <span>{children}</span>
           </li>
         ),
@@ -656,7 +656,7 @@ function MarkdownContent({ content }: { content: string }) {
   );
 }
 
-// ── Sidebar nav ───────────────────────────────────────────────────────────────
+// -- Sidebar nav ---------------------------------------------------------------
 interface NavItem {
   id: string;
   label: string;
@@ -669,22 +669,22 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: 'Getting Started',
     items: [
-      { id: 'overview', label: 'Overview', emoji: '🏠' },
-      { id: 'deployment', label: 'Deployment', emoji: '🚀' },
+      { id: 'overview', label: 'Overview', emoji: '??' },
+      { id: 'deployment', label: 'Deployment', emoji: '??' },
     ],
   },
   {
     section: 'Development',
     items: [
-      { id: 'plugins', label: 'Plugin Development', emoji: '🔌' },
-      { id: 'marketplace', label: 'Marketplace', emoji: '📦', href: '/extensions' },
+      { id: 'plugins', label: 'Plugin Development', emoji: '??' },
+      { id: 'marketplace', label: 'Marketplace', emoji: '??', href: '/extensions' },
     ],
   },
   {
     section: 'Resources',
     items: [
-      { id: 'telegram', label: 'Telegram Community', emoji: '💬', href: 'https://t.me/+dR5zABepmkNhYjQ0', external: true },
-      { id: 'github', label: 'GitHub', emoji: '⚙️', href: 'https://github.com/TADSTech/WXATA', external: true },
+      { id: 'telegram', label: 'Telegram Community', emoji: '??', href: 'https://t.me/+dR5zABepmkNhYjQ0', external: true },
+      { id: 'github', label: 'GitHub', emoji: '??', href: 'https://github.com/tadstech/wxata-public', external: true },
     ],
   },
 ];
@@ -695,7 +695,7 @@ const PAGES: Record<string, string> = {
   deployment: DOC_DEPLOYMENT,
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
+// -- Main component ------------------------------------------------------------
 const Docs = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -779,7 +779,7 @@ const Docs = () => {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="https://github.com/TADSTech/WXATA" target="_blank" rel="noopener noreferrer" className="text-xs text-text-muted hover:text-text-main transition-colors hidden sm:flex items-center gap-1">
+            <a href="https://github.com/tadstech/wxata-public" target="_blank" rel="noopener noreferrer" className="text-xs text-text-muted hover:text-text-main transition-colors hidden sm:flex items-center gap-1">
               GitHub <ExternalLink className="w-3 h-3" />
             </a>
             <button onClick={() => navigate('/extensions')} className="text-xs bg-accent-primary hover:bg-accent-hover text-white px-3 py-1.5 rounded font-bold transition-colors">
@@ -837,7 +837,7 @@ const Docs = () => {
           {/* Page navigation */}
           <div className="mt-12 pt-6 border-t border-border-strong flex justify-between items-center">
             <div className="text-xs text-text-muted">
-              Last updated: April 2026 · <a href="https://github.com/TADSTech/WXATA" target="_blank" rel="noopener noreferrer" className="text-accent-light hover:underline">Edit on GitHub</a>
+              Last updated: April 2026 � <a href="https://github.com/tadstech/wxata-public" target="_blank" rel="noopener noreferrer" className="text-accent-light hover:underline">Edit on GitHub</a>
             </div>
             <div className="flex gap-3">
               {page !== 'overview' && (

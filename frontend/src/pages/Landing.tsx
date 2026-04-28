@@ -6,6 +6,7 @@ import {
   Terminal, Shield, Zap, Package, ChevronRight, ChevronLeft,
   Eye, Radio, Tag, Code2, MessageSquare
 } from 'lucide-react';
+import { SocialBanner } from '../components/SocialBanner';
 
 // ── Horizontal scroll container ───────────────────────────────────────────────
 function useHorizontalScroll() {
@@ -141,6 +142,13 @@ const Landing = () => {
           </motion.button>
           <motion.button 
             whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/pricing')} 
+            className="text-sm font-bold text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest hidden md:block"
+          >
+            Pricing
+          </motion.button>
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
             onClick={() => navigate('/login')} 
             className="text-sm font-bold text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest"
           >
@@ -148,7 +156,7 @@ const Landing = () => {
           </motion.button>
           <motion.button 
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/register')} 
+            onClick={() => navigate('/pricing')} 
             className="px-5 py-2 bg-accent-primary hover:bg-accent-hover text-bg-base text-xs font-black rounded transition-all uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.3)]"
           >
             Get Started
@@ -380,7 +388,7 @@ const Landing = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/register')}
+                onClick={() => navigate('/pricing')}
                 className="px-10 py-4 bg-accent-primary hover:bg-accent-hover text-bg-base font-black rounded transition-all text-sm uppercase tracking-widest"
               >
                 Create Account
@@ -392,6 +400,10 @@ const Landing = () => {
               >
                 Sign In
               </motion.button>
+            </div>
+
+            <div className="w-full max-w-md mx-auto">
+              <SocialBanner variant="landing" />
             </div>
 
             <div className="pt-4 text-xs text-text-muted font-mono space-y-1">

@@ -6,15 +6,19 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^25.6.0",
-    "@types/ws": "^8.18.1"
+    "@types/nodemailer": "^6.4.17",
+    "@types/ws": "^8.18.1",
+    "fast-check": "^3.22.0"
   },
   "peerDependencies": {
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
+    "@supabase/supabase-js": "^2.39.0",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "axios": "^1.15.2",
+    "nodemailer": "^6.9.16",
     "pino": "^10.3.1",
     "qrcode-terminal": "^0.12.0",
     "wa-sticker-formatter": "^4.4.4",

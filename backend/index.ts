@@ -1,3 +1,4 @@
+import { validateLicense } from './licenseValidator';
 import { WXATAConnection } from './connection';
 // @ts-ignore
 import * as qrcode from 'qrcode-terminal';
@@ -1582,6 +1583,7 @@ async function ensureConfigFiles(): Promise<void> {
 }
 
 async function startBot() {
+  await validateLicense();
   dashboard.log('INFO', 'Initializing WXATA Backend System...');
   console.log('🚀 Initializing WXATA Backend...');
   await ensureConfigFiles();
@@ -1725,4 +1727,26 @@ async function startBot() {
 
 startBot().catch((err) => {
   console.error('CRITICAL: Failed to start WXATA system', err);
+});
+
+// ── Global error handlers — ensure PM2 always gets a clean exit code ─────────
+// Without these, an unhandled rejection can leave the process in a zombie state
+// where it appears running but is actually broken (no reconnects, no commands).
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[WXATA] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+  // Do NOT exit — let the bot keep running. Baileys handles its own reconnects.
+  // Only exit if the rejection is truly fatal (e.g. OOM).
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[WXATA] Uncaught Exception:', err);
+  // Exit with code 1 so PM2 restarts the process cleanly.
+  // This is safer than continuing with an unknown corrupted state.
+  setTimeout(() => process.exit(1), 500);
+});
+
+// Graceful shutdown on SIGTERM (Docker stop, PM2 graceful reload)
+process.on('SIGTERM', () => {
+  console.log('[WXATA] SIGTERM received — shutting down gracefully...');
+  setTimeout(() => process.exit(0), 1000);
 });

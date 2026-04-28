@@ -1,6 +1,78 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import pino from 'pino';
+import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
+import { generateLicenseKey } from './licenseValidator';
+
+// ---------------------------------------------------------------------------
+// Supabase service-role client (lazy — initialized on first use)
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabaseAdmin: ReturnType<typeof createClient<any>> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSupabaseAdmin(): ReturnType<typeof createClient<any>> {
+  if (!_supabaseAdmin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _supabaseAdmin = createClient<any>(
+      process.env.SUPABASE_URL ?? '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+    );
+  }
+  return _supabaseAdmin;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: generate a 16-char cryptographically random alphanumeric user code
+// ---------------------------------------------------------------------------
+export function generateUserCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(16);
+  let result = '';
+  for (let i = 0; i < 16; i++) {
+    result += chars[bytes[i]! % chars.length];
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: send credentials email via Nodemailer
+// ---------------------------------------------------------------------------
+export async function sendCredentialsEmail(
+  to: string,
+  userCode: string,
+  licenseKey: string
+): Promise<void> {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM ?? 'WXATA <noreply@wxata.app>',
+    to,
+    subject: 'Your WXATA Access Credentials',
+    text: [
+      'Thank you for your purchase!',
+      '',
+      `Registration Code: ${userCode}`,
+      `License Key: ${licenseKey}`,
+      '',
+      'Visit https://wxata.tadstech.dev/register to create your account.',
+      'Use the registration code above during sign-up.',
+      '',
+      'For Docker deployments, set LICENSE_KEY in your .env file.',
+      '',
+      'Need help? DM us on WhatsApp: https://wa.me/2347041029093',
+    ].join('\n'),
+  });
+}
 
 const logger = pino({ level: 'warn' });
 
@@ -61,6 +133,125 @@ class DashboardServer {
         return;
       }
 
+      // ── POST /webhooks/paystack ─────────────────────────────────────────────
+      if (req.method === 'POST' && req.url === '/webhooks/paystack') {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', async () => {
+          const rawBody = Buffer.concat(chunks).toString('utf-8');
+
+          // Verify HMAC-SHA512 signature
+          const paystackSecret = process.env.PAYSTACK_SECRET_KEY ?? '';
+          const expectedSig = crypto
+            .createHmac('sha512', paystackSecret)
+            .update(rawBody)
+            .digest('hex');
+          const receivedSig = req.headers['x-paystack-signature'] as string | undefined;
+
+          if (!receivedSig || receivedSig !== expectedSig) {
+            res.writeHead(401);
+            res.end('Unauthorized');
+            return;
+          }
+
+          let event: { event: string; data: Record<string, unknown> };
+          try {
+            event = JSON.parse(rawBody);
+          } catch {
+            res.writeHead(400);
+            res.end('Bad Request');
+            return;
+          }
+
+          // Respond within 5 seconds using Promise.race
+          const processEvent = async () => {
+            const hmacSecret = process.env.LICENSE_HMAC_SECRET ?? '';
+            const customerEmail = (event.data?.customer as Record<string, unknown>)?.email as string ?? '';
+
+            if (event.event === 'charge.success' || event.event === 'subscription.create') {
+              const userCode = generateUserCode();
+              const licenseKey = generateLicenseKey(customerEmail, hmacSecret);
+
+              const { error: dbError } = await getSupabaseAdmin().from('user_codes').insert({
+                code: userCode,
+                used: false,
+                suspended: false,
+                created_at: new Date().toISOString(),
+              });
+
+              if (dbError) {
+                logger.error({ dbError }, 'Paystack webhook: Supabase insert failed');
+                throw new Error('DB write failed');
+              }
+
+              await sendCredentialsEmail(customerEmail, userCode, licenseKey);
+            } else if (event.event === 'subscription.disable' || event.event === 'invoice.payment_failed') {
+              const { error: dbError } = await getSupabaseAdmin()
+                .from('user_codes')
+                .update({ suspended: true })
+                .eq('used_by', customerEmail);
+
+              if (dbError) {
+                logger.error({ dbError }, 'Paystack webhook: suspend update failed');
+                throw new Error('DB update failed');
+              }
+
+              // Send payment failure notification
+              await sendCredentialsEmail(customerEmail, 'SUSPENDED', 'N/A');
+            }
+            // Unknown event types: acknowledge silently
+          };
+
+          const timeout = new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 4500)
+          );
+
+          try {
+            await Promise.race([processEvent(), timeout]);
+            res.writeHead(200);
+            res.end('OK');
+          } catch (err) {
+            logger.error({ err }, 'Paystack webhook processing error');
+            res.writeHead(500);
+            res.end('Internal Server Error');
+          }
+        });
+        return;
+      }
+
+      // ── POST /admin/generate-license ────────────────────────────────────────
+      if (req.method === 'POST' && req.url === '/admin/generate-license') {
+        const authHeader = req.headers['authorization'] ?? '';
+        const adminSecret = process.env.ADMIN_SECRET ?? '';
+        if (!authHeader.startsWith('Bearer ') || authHeader.slice(7) !== adminSecret) {
+          res.writeHead(401);
+          res.end('Unauthorized');
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as { username?: string };
+            const username = body.username?.trim();
+            if (!username) {
+              res.writeHead(400);
+              res.end(JSON.stringify({ error: 'username is required' }));
+              return;
+            }
+            const hmacSecret = process.env.LICENSE_HMAC_SECRET ?? '';
+            const key = generateLicenseKey(username, hmacSecret);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ key }));
+          } catch {
+            res.writeHead(400);
+            res.end('Bad Request');
+          }
+        });
+        return;
+      }
+
       res.writeHead(404);
       res.end('Not found');
     });
@@ -69,21 +260,23 @@ class DashboardServer {
       console.log(`🌐 Server (HTTP & WS) listening on port ${port}${IS_PM2 ? ' [PM2 managed]' : ''}`);
     });
 
-    // ── Self-ping keep-alive (Render free tier only) ──────────────────────────
-    const selfUrl = process.env.RENDER_EXTERNAL_URL
-      ? `${process.env.RENDER_EXTERNAL_URL}/health`
-      : null;
+    // ── Self-ping keep-alive ──────────────────────────────────────────────────
+    // Pings the local /health endpoint every 10 minutes.
+    // On Render free tier this prevents the dyno from sleeping.
+    // On Oracle VPS this keeps the event loop active and prevents the OS
+    // from killing an "idle" process (common with systemd/OOM killer).
+    const externalUrl = process.env.RENDER_EXTERNAL_URL ?? process.env.SELF_URL ?? null;
+    const selfUrl = externalUrl ? `${externalUrl}/health` : `http://127.0.0.1:${port}/health`;
 
-    if (selfUrl) {
-      setInterval(() => {
-        http.get(selfUrl, (res) => {
-          logger.debug(`Self-ping: ${res.statusCode}`);
-        }).on('error', (err) => {
-          logger.warn({ err }, 'Self-ping failed');
-        });
-      }, 10 * 60 * 1000);
-      console.log(`🔁 Self-ping keep-alive active → ${selfUrl}`);
-    }
+    setInterval(() => {
+      http.get(selfUrl, (res) => {
+        logger.debug(`Self-ping: ${res.statusCode}`);
+        res.resume(); // consume response body to free socket
+      }).on('error', (err) => {
+        logger.warn({ err }, 'Self-ping failed');
+      });
+    }, 10 * 60 * 1000); // every 10 minutes
+    console.log(`🔁 Self-ping keep-alive active → ${selfUrl}`);
 
     // ── WebSocket server ──────────────────────────────────────────────────────
     this.wss = new WebSocketServer({ server: httpServer });

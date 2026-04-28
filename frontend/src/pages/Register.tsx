@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { auth, db } from '../firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
+import { SocialBanner } from '../components/SocialBanner';
+
+const WHATSAPP_LINK = 'https://wa.me/2347041029093';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -20,46 +21,80 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 1. Verify user_code
-      const codeRef = doc(db, 'user_codes', userCode);
-      const codeSnap = await getDoc(codeRef);
+      // 1. Verify user_code exists and is valid
+      const { data: codeData, error: codeError } = await supabase
+        .from('user_codes')
+        .select('id, used, suspended')
+        .eq('code', userCode)
+        .single();
 
-      if (!codeSnap.exists()) {
-        throw new Error('Invalid User Code.');
+      if (codeError || !codeData) {
+        throw new Error(`Invalid User Code. DM us to purchase access: ${WHATSAPP_LINK}`);
       }
 
-      const codeData = codeSnap.data();
+      if (codeData.suspended) {
+        throw new Error(`This code has been suspended. Contact us: ${WHATSAPP_LINK}`);
+      }
+
       if (codeData.used) {
-        throw new Error('User Code has already been used.');
+        throw new Error(`This code has already been used. DM us if you need help: ${WHATSAPP_LINK}`);
       }
 
-      // 2. Check if username is taken (simplified, for robust implementation use a batched write or specific collection)
-      const userRef = doc(db, 'users', username);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
+      // 2. Check if username is taken
+      const { data: existingUser, error: usernameError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (usernameError) {
+        throw new Error('Error checking username availability. Please try again.');
+      }
+
+      if (existingUser) {
         throw new Error('Username is already taken.');
       }
 
       // 3. Create auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-      // 4. Save user document
-      await setDoc(userRef, {
-        uid: user.uid,
+      if (signUpError || !authData.user) {
+        throw new Error(signUpError?.message ?? 'Failed to create account. Please try again.');
+      }
+
+      const uid = authData.user.id;
+
+      // 4. Insert user record
+      const { error: insertError } = await supabase.from('users').insert({
+        uid,
         name,
         username,
         email,
-        userCode,
-        createdAt: new Date().toISOString()
+        user_code: userCode,
+        created_at: new Date().toISOString(),
       });
 
+      if (insertError) {
+        throw new Error('Failed to save user profile. Please contact support.');
+      }
+
       // 5. Mark code as used
-      await updateDoc(codeRef, {
-        used: true,
-        usedBy: email,
-        usedAt: new Date().toISOString()
-      });
+      const { error: updateError } = await supabase
+        .from('user_codes')
+        .update({
+          used: true,
+          used_by: email,
+          used_at: new Date().toISOString(),
+        })
+        .eq('id', codeData.id);
+
+      if (updateError) {
+        // Non-fatal: user is created, just log the issue
+        console.error('Failed to mark user_code as used:', updateError);
+      }
 
       navigate(`/dashboard/${username}`);
     } catch (err: any) {
@@ -73,50 +108,60 @@ export default function Register() {
     <div className="min-h-screen bg-bg-base text-text-main flex items-center justify-center p-4">
       <div className="bg-bg-base border border-border-strong p-8 rounded-xl w-full max-w-md">
         <h2 className="text-3xl font-bold text-accent-primary mb-6 text-center">Register</h2>
-        {error && <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded mb-4">{error}</div>}
-        <form onSubmit={handleRegister} className="space-y-4">
+        {error && (
+          <div className="bg-red-900/50 border border-red-500 text-red-200 p-3 rounded mb-4 break-words">
+            {error}
+          </div>
+        )}
+        <SocialBanner variant="register" />
+        <form onSubmit={handleRegister} className="space-y-4 mt-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Full Name</label>
-            <input 
+            <input
               type="text" required value={name} onChange={(e) => setName(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Username</label>
-            <input 
+            <input
               type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Email</label>
-            <input 
+            <input
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Password</label>
-            <input 
+            <input
               type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-text-muted">Registration Code</label>
-            <input 
+            <input
               type="text" required value={userCode} onChange={(e) => setUserCode(e.target.value)}
               placeholder="Provided by administrator"
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
-          <button disabled={loading} type="submit" className="w-full bg-accent-primary hover:bg-accent-hover text-bg-base font-bold py-2 px-4 rounded transition-colors disabled:opacity-50">
+          <button
+            disabled={loading}
+            type="submit"
+            className="w-full bg-accent-primary hover:bg-accent-hover text-bg-base font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+          >
             {loading ? 'Creating Account...' : 'Register'}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-text-muted">
-          Already have an account? <Link to="/login" className="text-accent-primary hover:underline">Log in</Link>
+          Already have an account?{' '}
+          <Link to="/login" className="text-accent-primary hover:underline">Log in</Link>
         </p>
       </div>
     </div>
