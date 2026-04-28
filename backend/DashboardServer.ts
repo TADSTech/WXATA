@@ -43,7 +43,8 @@ export function generateUserCode(): string {
 export async function sendCredentialsEmail(
   to: string,
   userCode: string,
-  licenseKey: string
+  licenseKey: string,
+  tier: 'self-host' | 'hosted' = 'self-host'
 ): Promise<void> {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -54,22 +55,73 @@ export async function sendCredentialsEmail(
     },
   });
 
+  const selfHostInstructions = [
+    '── SELF-HOST SETUP ──────────────────────────────────────────',
+    '',
+    '1. Clone the bot binary repository:',
+    '   git clone https://github.com/tadstech/wxata-public.git',
+    '   cd wxata-public',
+    '',
+    '2. Copy the example env file and fill in your values:',
+    '   cp .env.example .env',
+    '',
+    '3. Set your License Key in .env:',
+    `   LICENSE_KEY=${licenseKey}`,
+    '',
+    '4. Start the bot with Docker:',
+    '   docker compose up -d',
+    '',
+    '5. Open the dashboard at http://your-server-ip:5000',
+    '   Connect your WhatsApp via QR code or phone pairing.',
+    '',
+    '6. Create your dashboard account at:',
+    '   https://wxata.tadstech.dev/register',
+    `   Use this Registration Code: ${userCode}`,
+    '',
+    'Full deployment guide: https://wxata.tadstech.dev/docs',
+    '─────────────────────────────────────────────────────────────',
+  ].join('\n');
+
+  const hostedInstructions = [
+    '── HOSTED SETUP ─────────────────────────────────────────────',
+    '',
+    'Your bot is managed and hosted for you — no server setup needed.',
+    '',
+    '1. Create your dashboard account at:',
+    '   https://wxata.tadstech.dev/register',
+    `   Use this Registration Code: ${userCode}`,
+    '',
+    '2. Once logged in, your bot dashboard is live at:',
+    '   https://wxata.tadstech.dev/dashboard/<your-username>',
+    '',
+    '3. Connect your WhatsApp from the dashboard using QR or phone pairing.',
+    '',
+    'Your License Key (keep this safe — do not share it):',
+    `   ${licenseKey}`,
+    '',
+    'Full guide: https://wxata.tadstech.dev/docs',
+    '─────────────────────────────────────────────────────────────',
+  ].join('\n');
+
+  const instructions = tier === 'self-host' ? selfHostInstructions : hostedInstructions;
+  const subject = tier === 'self-host'
+    ? 'Your WXATA Self-Host Access — Bot Binary + License Key'
+    : 'Your WXATA Hosted Access — Dashboard Credentials';
+
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? 'WXATA <noreply@wxata.app>',
     to,
-    subject: 'Your WXATA Access Credentials',
+    subject,
     text: [
-      'Thank you for your purchase!',
+      'Thank you for your purchase! Here are your credentials:',
       '',
-      `Registration Code: ${userCode}`,
-      `License Key: ${licenseKey}`,
+      `Registration Code : ${userCode}`,
+      `License Key       : ${licenseKey}`,
       '',
-      'Visit https://wxata.tadstech.dev/register to create your account.',
-      'Use the registration code above during sign-up.',
-      '',
-      'For Docker deployments, set LICENSE_KEY in your .env file.',
+      instructions,
       '',
       'Need help? DM us on WhatsApp: https://wa.me/2347041029093',
+      'Or on X: https://x.com/tads_tech',
     ].join('\n'),
   });
 }
@@ -171,6 +223,9 @@ class DashboardServer {
             if (event.event === 'charge.success' || event.event === 'subscription.create') {
               const userCode = generateUserCode();
               const licenseKey = generateLicenseKey(customerEmail, hmacSecret);
+              // charge.success = one-time Self-Host purchase
+              // subscription.create = Hosted recurring subscription
+              const tier = event.event === 'charge.success' ? 'self-host' : 'hosted';
 
               const { error: dbError } = await getSupabaseAdmin().from('user_codes').insert({
                 code: userCode,
@@ -184,7 +239,7 @@ class DashboardServer {
                 throw new Error('DB write failed');
               }
 
-              await sendCredentialsEmail(customerEmail, userCode, licenseKey);
+              await sendCredentialsEmail(customerEmail, userCode, licenseKey, tier);
             } else if (event.event === 'subscription.disable' || event.event === 'invoice.payment_failed') {
               const { error: dbError } = await getSupabaseAdmin()
                 .from('user_codes')
@@ -197,7 +252,25 @@ class DashboardServer {
               }
 
               // Send payment failure notification
-              await sendCredentialsEmail(customerEmail, 'SUSPENDED', 'N/A');
+              const suspendTransporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: Number(process.env.SMTP_PORT ?? 587),
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+              });
+              await suspendTransporter.sendMail({
+                from: process.env.SMTP_FROM ?? 'WXATA <noreply@wxata.app>',
+                to: customerEmail,
+                subject: 'WXATA — Payment Failed / Subscription Suspended',
+                text: [
+                  'Your WXATA subscription payment failed or was cancelled.',
+                  '',
+                  'Your bot access has been suspended.',
+                  '',
+                  'To reactivate, please update your payment method or contact us:',
+                  'WhatsApp: https://wa.me/2347041029093',
+                  'X: https://x.com/tads_tech',
+                ].join('\n'),
+              });
             }
             // Unknown event types: acknowledge silently
           };
