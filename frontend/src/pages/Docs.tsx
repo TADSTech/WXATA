@@ -9,7 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const DOC_OVERVIEW = `# WXATA Documentation
 
-Welcome to the official documentation for **WXATA** — the WhatsApp Automation & Tactical Assistant.
+Welcome to the official documentation for **WXATA** ï¿½ the WhatsApp Automation & Tactical Assistant.
 
 WXATA is built on Baileys and Bun, designed for high-performance automation and a premium user experience. Connect your WhatsApp account, install plugins from the Marketplace, and automate anything.
 
@@ -17,11 +17,11 @@ WXATA is built on Baileys and Bun, designed for high-performance automation and 
 
 ## Quick Links
 
-- [Getting Started](#getting-started) — Install and run WXATA locally
-- [Command System](#commands) — All built-in commands
-- [Plugin Development](/docs?page=plugins) — Build your own plugins
-- [Deployment Guide](/docs?page=deployment) — Deploy to Oracle Cloud
-- [Marketplace](/extensions) — Browse community plugins
+- [Getting Started](#getting-started) ï¿½ Install and run WXATA locally
+- [Command System](#commands) ï¿½ All built-in commands
+- [Plugin Development](/docs?page=plugins) ï¿½ Build your own plugins
+- [Deployment Guide](/docs?page=deployment) ï¿½ Deploy to Oracle Cloud
+- [Marketplace](/extensions) ï¿½ Browse community plugins
 
 ---
 
@@ -112,9 +112,9 @@ Commands are prefix-based (default: \`!\`). Each command has a primary trigger a
 
 WXATA uses a 3-tier permission model:
 
-1. **Root (Sudo)** — configured in \`botinfo.json ? root.target\`. Full access to all commands.
-2. **Allowed Numbers** — specific phone numbers that can use the bot anywhere.
-3. **Allowed Chats** — specific group or DM JIDs where the bot responds to everyone.
+1. **Root (Sudo)** ï¿½ configured in \`botinfo.json ? root.target\`. Full access to all commands.
+2. **Allowed Numbers** ï¿½ specific phone numbers that can use the bot anywhere.
+3. **Allowed Chats** ï¿½ specific group or DM JIDs where the bot responds to everyone.
 
 ### Managing Permissions
 
@@ -184,7 +184,7 @@ A plugin is a JavaScript snippet that runs when a user sends a specific command.
 | \`desc\` | recommended | Shown in \`!mn detailed\` |
 | \`aliases\` | optional | Extra triggers |
 | \`type\` | optional | Category for menu grouping |
-| \`code\` | optional | JS code — overrides response |
+| \`code\` | optional | JS code ï¿½ overrides response |
 | \`defaultArgument\` | optional | Used when no arg provided |
 
 ---
@@ -193,7 +193,7 @@ A plugin is a JavaScript snippet that runs when a user sends a specific command.
 
 These variables are **automatically injected** into your plugin code. Do not declare them.
 
-### \`sock\` — WhatsApp Socket
+### \`sock\` ï¿½ WhatsApp Socket
 
 \`\`\`js
 // Send text
@@ -219,7 +219,7 @@ await sock.sendMessage(remoteJid, { react: { text: '??', key: msg.key } });
 await sock.groupParticipantsUpdate(remoteJid, ['234...@s.whatsapp.net'], 'remove');
 \`\`\`
 
-### \`msg\` — Message Object
+### \`msg\` ï¿½ Message Object
 
 \`\`\`js
 msg.key.remoteJid      // Chat JID
@@ -232,14 +232,14 @@ const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
 \`\`\`
 
-### \`remoteJid\` — Chat ID
+### \`remoteJid\` ï¿½ Chat ID
 
 \`\`\`js
 remoteJid.endsWith('@g.us')           // true = group
 remoteJid.endsWith('@s.whatsapp.net') // true = DM
 \`\`\`
 
-### \`argumentName\` — Command Argument
+### \`argumentName\` ï¿½ Command Argument
 
 \`\`\`js
 // User types: !weather Lagos
@@ -260,7 +260,7 @@ Sends text and logs to dashboard. Use this instead of \`sock.sendMessage\` for t
 await sendTrackedMessage(sock, remoteJid, 'Hello!');
 \`\`\`
 
-### \`botInfo\` — Bot Config
+### \`botInfo\` ï¿½ Bot Config
 
 \`\`\`js
 botInfo.prefix              // "!"
@@ -268,7 +268,7 @@ botInfo.scripts             // all installed scripts
 botInfo.permissions.numbers // allowed numbers
 \`\`\`
 
-### \`require\` — Node.js Require
+### \`require\` ï¿½ Node.js Require
 
 \`\`\`js
 const axios = require('axios');
@@ -277,7 +277,7 @@ const path = require('path');
 const os = require('os');
 \`\`\`
 
-### \`__rootdir\` — Data Directory
+### \`__rootdir\` ï¿½ Data Directory
 
 \`\`\`js
 const configPath = path.resolve(__rootdir, 'myplugin.json');
@@ -338,12 +338,12 @@ await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 
 ## Best Practices
 
-1. **Handle missing args** — always check \`if (!argumentName)\` and return usage
-2. **Wrap API calls** — use try/catch for all network requests
-3. **Use sendTrackedMessage for text** — prevents echo loops, logs to dashboard
-4. **Use sock.sendMessage for media** — images, videos, stickers, reactions
-5. **Config files in __rootdir** — \`path.resolve(__rootdir, 'myplugin.json')\`
-6. **Check group context** — \`remoteJid.endsWith('@g.us')\` before group ops
+1. **Handle missing args** ï¿½ always check \`if (!argumentName)\` and return usage
+2. **Wrap API calls** ï¿½ use try/catch for all network requests
+3. **Use sendTrackedMessage for text** ï¿½ prevents echo loops, logs to dashboard
+4. **Use sock.sendMessage for media** ï¿½ images, videos, stickers, reactions
+5. **Config files in __rootdir** ï¿½ \`path.resolve(__rootdir, 'myplugin.json')\`
+6. **Check group context** ï¿½ \`remoteJid.endsWith('@g.us')\` before group ops
 
 ---
 
@@ -361,8 +361,8 @@ await sendTrackedMessage(sock, remoteJid, \`Value: \${config.value}\`);
 If you are an AI generating a WXATA plugin:
 
 1. Output a valid JSON object matching the Plugin Schema
-2. The \`code\` field is the body of an async function — no wrapper needed
-3. All context variables are pre-injected — do not declare them
+2. The \`code\` field is the body of an async function ï¿½ no wrapper needed
+3. All context variables are pre-injected ï¿½ do not declare them
 4. Use \`await\` for all async operations
 5. Always wrap network calls in try/catch
 6. Available packages: \`axios\`, \`@whiskeysockets/baileys\`, \`wa-sticker-formatter\`, \`fs\`, \`path\`, \`os\`
@@ -398,20 +398,20 @@ https://wxata.tadstech.dev  --WSS--? wss://wxata-api.tadstech.dev
 
 ## Oracle Cloud Free Tier Setup
 
-Oracle Always Free gives you a real Ubuntu VM (1 OCPU / 6 GB RAM — free forever).
+Oracle Always Free gives you a real Ubuntu VM (1 OCPU / 6 GB RAM ï¿½ free forever).
 
 ### 1. Create the VM
 
 1. Log in ? **Compute ? Instances ? Create Instance**
 2. Image: **Ubuntu 22.04**
-3. Shape: \`VM.Standard.A1.Flex\` — 1 OCPU / 6 GB RAM
+3. Shape: \`VM.Standard.A1.Flex\` ï¿½ 1 OCPU / 6 GB RAM
 4. Networking: keep default VCN, enable **Assign public IPv4**
 5. Upload your SSH key
 6. Note the **Public IP** once running
 
 ### 2. Open Firewall Ports
 
-Oracle has two firewall layers — both must be configured.
+Oracle has two firewall layers ï¿½ both must be configured.
 
 **Oracle Security List (cloud console):**
 
@@ -458,7 +458,7 @@ docker compose logs -f wxata
 
 Browsers block \`ws://\` from HTTPS pages. You need \`wss://\` via a domain + TLS.
 
-**Option A — Own domain:**
+**Option A ï¿½ Own domain:**
 
 \`\`\`bash
 # Install Caddy
@@ -475,7 +475,7 @@ sudo nano /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 \`\`\`
 
-**Option B — Free subdomain (DuckDNS):**
+**Option B ï¿½ Free subdomain (DuckDNS):**
 
 1. Go to [duckdns.org](https://www.duckdns.org) ? create subdomain ? point to your Oracle IP
 2. Use \`wxata-yourname.duckdns.org\` as your domain in the Caddyfile
@@ -553,7 +553,7 @@ docker run --rm -v wxata_auth:/data -v $(pwd):/backup ubuntu \\
 ? Rules added after the REJECT rule. Re-run the iptables command above.
 
 **Bot disconnects after a few minutes**
-? Status broadcasts flooding the buffer. Fixed in latest version — update and rebuild.
+? Status broadcasts flooding the buffer. Fixed in latest version ï¿½ update and rebuild.
 `;
 
 export { DOC_OVERVIEW, DOC_PLUGINS, DOC_DEPLOYMENT };
@@ -837,7 +837,7 @@ const Docs = () => {
           {/* Page navigation */}
           <div className="mt-12 pt-6 border-t border-border-strong flex justify-between items-center">
             <div className="text-xs text-text-muted">
-              Last updated: April 2026 · <a href="https://github.com/tadstech/wxata-public" target="_blank" rel="noopener noreferrer" className="text-accent-light hover:underline">Edit on GitHub</a>
+              Last updated: April 2026 ï¿½ <a href="https://github.com/tadstech/wxata-public" target="_blank" rel="noopener noreferrer" className="text-accent-light hover:underline">Edit on GitHub</a>
             </div>
             <div className="flex gap-3">
               {page !== 'overview' && (
