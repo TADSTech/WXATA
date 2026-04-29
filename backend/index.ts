@@ -419,13 +419,31 @@ try {
   await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'remove');
   setTimeout(async () => {
     try {
+      // Try direct re-add first
       await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
       await sock.sendMessage(remoteJid, {
         text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`,
         mentions: [targetUser]
       });
     } catch (e) {
-      await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]}. They may have privacy settings blocking invites.\` });
+      // Direct add failed (privacy settings) — send invite link instead
+      try {
+        const inviteCode = await sock.groupInviteCode(remoteJid);
+        const inviteLink = \`https://chat.whatsapp.com/\${inviteCode}\`;
+        // Send invite link to the group
+        await sock.sendMessage(remoteJid, {
+          text: \`⚠️ @\${targetUser.split('@')[0]} has privacy settings that prevent direct re-add.\\n\\nHere's the group invite link:\\n\${inviteLink}\`,
+          mentions: [targetUser]
+        });
+        // Also DM the kicked user with the invite link
+        try {
+          await sock.sendMessage(targetUser, {
+            text: \`You were temporarily removed from *\${groupMetadata.subject}* and can rejoin here:\\n\${inviteLink}\`
+          });
+        } catch (_) { /* DM may fail if user blocked bot */ }
+      } catch (inviteErr) {
+        await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]} and could not generate invite link. Please add them manually.\`, mentions: [targetUser] });
+      }
     }
   }, 5 * 60 * 1000);
 } catch (e) {
@@ -622,6 +640,11 @@ function sanitizeBotScript(input: Partial<BotScript> | undefined, fallbackName: 
     name,
     desc,
     trigger: typeof input?.trigger === 'string' && input.trigger.trim() ? input.trigger.trim() : fallbackName,
+    aliases: Array.isArray(input?.aliases)
+      ? input!.aliases.filter((a): a is string => typeof a === 'string' && !!a.trim()).map(a => a.trim())
+      : typeof input?.aliases === 'string' && (input.aliases as string).trim()
+        ? (input.aliases as string).split(',').map(a => a.trim()).filter(Boolean)
+        : [],
     response: typeof input?.response === 'string' ? input.response : 'WXATA summoned successfully.',
     target: typeof input?.target === 'string' && input.target.trim() ? input.target.trim() : 'self',
     code: typeof input?.code === 'string' && input.code.trim() ? input.code.trim() : undefined,
@@ -1230,7 +1253,7 @@ function resolveScriptResponse(script: BotScript, argumentName: string | undefin
   return argumentConfig?.response?.trim() || script.response;
 }
 
-function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>) {
+function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createConnection']>>, onMessage?: () => void) {
   sock.ev.on('messaging-history.set', async ({ messages }) => {
     if (messages && messages.length > 0) {
       const now = Math.floor(Date.now() / 1000);
@@ -1257,9 +1280,14 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
 
   sock.ev.on('messages.upsert', async (m) => {
     for (const msg of m.messages) {
-      // Skip status broadcasts entirely — they flood the buffer with undecryptable
-      // group-cipher messages and cause "Buffer timeout reached" stalls.
-      if (msg?.key?.remoteJid === 'status@broadcast') continue;
+      // Error boundary: a single malformed message must never crash the entire batch
+      try {
+        // Skip status broadcasts entirely — they flood the buffer with undecryptable
+        // group-cipher messages and cause "Buffer timeout reached" stalls.
+        if (msg?.key?.remoteJid === 'status@broadcast') continue;
+
+      // Reset watchdog on every real message received
+      onMessage?.();
 
       // Always cache every message for anti-delete, regardless of type
       if (msg?.key?.id) storeMessage(msg);
@@ -1434,6 +1462,12 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
       console.log(`[MSG] ${logMsg}`);
       // Only log MSG events that have actual text — media-only messages are too noisy
       if (text) dashboard.log('MSG', logMsg);
+      } catch (err: any) {
+        // Error boundary: log and continue — one bad message must not crash the batch
+        const msgId = (msg as any)?.key?.id ?? 'unknown';
+        dashboard.log('ERROR', `messages.upsert: unhandled error on msg ${msgId}: ${err?.message ?? err}`);
+        console.error(`[WXATA] messages.upsert error (msg ${msgId}):`, err);
+      }
     }
   });
 
@@ -1442,6 +1476,8 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
     const rPath = require('path');
     
     for (const update of messageUpdates) {
+      // Error boundary: isolate each update so one bad entry can't abort the rest
+      try {
       // A revoke/delete sets message to null. messageStubType may be 0, undefined, or absent.
       // The reliable signal is message === null on the update patch.
       const isRevoke = update.update?.message === null;
@@ -1512,6 +1548,11 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection['createCo
         } catch(textErr: any) {
           dashboard.log('ERROR', `Anti-delete: complete failure — ${textErr.message}`);
         }
+      }
+      } catch (err: any) {
+        // Error boundary: log and continue processing remaining updates
+        dashboard.log('ERROR', `messages.update: unhandled error on update ${update?.key?.id ?? 'unknown'}: ${err?.message ?? err}`);
+        console.error('[WXATA] messages.update error:', err);
       }
     }
   });
@@ -1602,6 +1643,49 @@ async function startBot() {
   let hasSentWelcome = false;
   let lastConnectionParams: { method: string, phoneNumber?: string } | null = null;
 
+  // ── Watchdog — detect and recover from Baileys buffer stalls ─────────────
+  // When Baileys gets stuck processing undecryptable group messages, the
+  // message handler queue freezes. The bot appears connected but doesn't
+  // respond to commands. We detect this by tracking the last time a message
+  // was received and force-reconnecting if it's been too long.
+  let lastMessageAt = Date.now();
+  const WATCHDOG_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes of silence = stalled
+
+  // Export a function so attachMessageHandler can reset the watchdog
+  function resetWatchdog() {
+    lastMessageAt = Date.now();
+  }
+
+  setInterval(async () => {
+    // Only check if we're supposed to be connected
+    if (!connectionManager || !lastConnectionParams) return;
+    const sock = connectionManager.getSocket();
+    if (!sock) return;
+
+    const silentMs = Date.now() - lastMessageAt;
+    if (silentMs > WATCHDOG_TIMEOUT_MS) {
+      dashboard.log('WARN', `Watchdog: No messages for ${Math.round(silentMs / 1000)}s — force reconnecting...`);
+      console.log(`🔁 Watchdog triggered after ${Math.round(silentMs / 1000)}s silence — reconnecting`);
+      lastMessageAt = Date.now(); // Reset before reconnect to avoid loop
+
+      try {
+        await connectionManager.destroy();
+        connectionManager = new WXATAConnection({
+          phoneNumber: lastConnectionParams.phoneNumber,
+          usePairingCode: lastConnectionParams.method === 'PHONE',
+          onQR: (qr) => { dashboard.sendQR(qr); qrcode.generate(qr, { small: true }); },
+          onPairingCode: (code) => { dashboard.sendPairingCode(code); },
+          onSocketCreated: (sock) => { attachMessageHandler(sock, resetWatchdog); },
+          onOpen: () => { dashboard.log('SUCCESS', 'Watchdog reconnect successful'); },
+          onLogout: () => { dashboard.log('WARN', 'Session expired during watchdog reconnect'); },
+        });
+        await connectionManager.createConnection();
+      } catch (err) {
+        dashboard.log('ERROR', `Watchdog reconnect failed: ${err}`);
+      }
+    }
+  }, 60_000); // Check every minute
+
   dashboard.onCommand(async (payload) => {
     try {
       if (payload.command === 'START_CONNECTION') {
@@ -1625,7 +1709,7 @@ async function startBot() {
             dashboard.sendPairingCode(code);
           },
           onSocketCreated: (sock) => {
-            attachMessageHandler(sock);
+            attachMessageHandler(sock, resetWatchdog);
           },
           onOpen: () => {
             dashboard.log('SUCCESS', 'Bot is now fully operational');

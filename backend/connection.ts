@@ -68,7 +68,8 @@ export class WXATAConnection {
       browser: ['Mac OS', 'Chrome', '121.0.0.0'],
       connectTimeoutMs: 120000,
       defaultQueryTimeoutMs: 0,
-      keepAliveIntervalMs: 30000,
+      keepAliveIntervalMs: 15000,    // more frequent pings to detect stalls earlier
+      retryRequestDelayMs: 250,      // faster retry on failed requests
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
       markOnlineOnConnect: true,
@@ -130,12 +131,12 @@ export class WXATAConnection {
         dashboard.log('ERROR', `Connection closed: ${statusCode}`);
 
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-          logger.warn(`Auth failure (${statusCode}). Clearing session and restarting clean...`);
-          dashboard.log('WARN', 'Auth failure. Resetting session...');
+          logger.warn(`Auth failure (${statusCode}). Clearing session and stopping — manual re-pair required.`);
+          dashboard.log('WARN', 'Auth failure (401/logged out). Session cleared. Please re-pair from the dashboard.');
           await this.clearSession();
-          this.reconnectAttempts = 0; // Reset backoff
+          this.reconnectAttempts = 0;
           if (this.options.onLogout) this.options.onLogout();
-          setTimeout(() => this.createConnection(), 2000);
+          // Do NOT reconnect — credentials are gone. The dashboard must issue a new START_CONNECTION.
         } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
           logger.error('Connection replaced by another session. Stopping reconnects to prevent conflict loops.');
           dashboard.log('ERROR', 'Session taken over by another instance. Please restart the container if this is unexpected.');
