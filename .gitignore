@@ -15,11 +15,6 @@ logs
 *.log
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# dotenv
-.env
-.env.*
-!.env.example
-
 # caches
 .eslintcache
 .cache
