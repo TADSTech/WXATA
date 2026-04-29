@@ -192,7 +192,9 @@ export default function Admin() {
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPass === 'ROOT_ACCESS') { // Standard placeholder admin pass
+    const correctPass = import.meta.env.VITE_ADMIN_PASS as string | undefined;
+    // Falls back to ROOT_ACCESS if env var not set (dev convenience)
+    if (adminPass === (correctPass || 'ROOT_ACCESS')) {
       setIsAdminUnlocked(true);
     } else {
       alert('Unauthorized');
