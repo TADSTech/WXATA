@@ -47,7 +47,7 @@ export default function Confirm() {
         .from('users')
         .select('username')
         .eq('uid', session.user.id)
-        .single();
+        .maybeSingle();
 
       setUsername(userRow?.username ?? '');
       setState('success');

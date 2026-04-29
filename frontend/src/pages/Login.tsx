@@ -25,7 +25,7 @@ export default function Login() {
           .from('users')
           .select('email')
           .eq('username', input)
-          .single();
+          .maybeSingle();
 
         if (lookupError || !userRow) {
           throw new Error('No account found with that username.');
@@ -45,7 +45,7 @@ export default function Login() {
         .from('users')
         .select('username')
         .eq('uid', session.user.id)
-        .single();
+        .maybeSingle();
 
       if (userRow?.username) {
         navigate(`/dashboard/${userRow.username}`);
