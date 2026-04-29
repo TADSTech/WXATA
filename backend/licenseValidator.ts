@@ -27,14 +27,16 @@ export function generateLicenseKey(username: string, secret: string): string {
  * Returns true if the key is valid, false otherwise.
  */
 export function validateLicenseKey(key: string, secret: string): boolean {
-  const colonIdx = key.indexOf(':');
+  const cleanKey = key.trim();
+  const cleanSecret = secret.trim();
+  const colonIdx = cleanKey.indexOf(':');
   if (colonIdx === -1) return false;
-  const username = key.slice(0, colonIdx);
-  const providedHmac = key.slice(colonIdx + 1);
+  const username = cleanKey.slice(0, colonIdx);
+  const providedHmac = cleanKey.slice(colonIdx + 1);
   if (!username || !providedHmac) return false;
 
   const expectedHmac = crypto
-    .createHmac('sha256', secret)
+    .createHmac('sha256', cleanSecret)
     .update(username)
     .digest('hex');
 
@@ -53,8 +55,9 @@ export function validateLicenseKey(key: string, secret: string): boolean {
 // ---------------------------------------------------------------------------
 
 export async function validateLicense(): Promise<void> {
-  const licenseKey = process.env.LICENSE_KEY;
-  const hmacSecret = process.env.LICENSE_HMAC_SECRET;
+  // Trim to remove any trailing whitespace/carriage returns from .env parsing
+  const licenseKey = process.env.LICENSE_KEY?.trim();
+  const hmacSecret = process.env.LICENSE_HMAC_SECRET?.trim();
 
   // Skip validation in development mode
   if (process.env.NODE_ENV === 'development') {

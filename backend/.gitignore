@@ -10,11 +10,6 @@ dist
 logs
 *.log
 
-# dotenv
-.env
-.env.*
-!.env.example
-
 # caches
 .eslintcache
 .cache
