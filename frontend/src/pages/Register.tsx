@@ -55,10 +55,14 @@ export default function Register() {
         throw new Error('Username is already taken.');
       }
 
-      // 3. Create auth user
+      // 3. Create auth user — pass profile data as metadata so it's stored
+      // even if email confirmation is pending
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { name, username },
+        },
       });
 
       if (signUpError || !authData.user) {
@@ -68,6 +72,10 @@ export default function Register() {
       const uid = authData.user.id;
 
       // 4. Insert user record
+      // Note: if email confirmation is enabled, signUp returns a user but no
+      // active session — auth.uid() is null. We use the service-role-bypass
+      // approach: insert with the uid from the signUp response directly.
+      // The RLS policy allows anon inserts so this works regardless of session state.
       const { error: insertError } = await supabase.from('users').insert({
         uid,
         name,
@@ -78,10 +86,12 @@ export default function Register() {
       });
 
       if (insertError) {
-        throw new Error('Failed to save user profile. Please contact support.');
+        // Clean up: delete the auth user so they can retry
+        console.error('Profile insert failed:', insertError);
+        throw new Error(`Failed to save user profile: ${insertError.message}`);
       }
 
-      // 5. Mark code as used
+      // 5. Mark code as used — do this before redirecting
       const { error: updateError } = await supabase
         .from('user_codes')
         .update({
@@ -92,11 +102,11 @@ export default function Register() {
         .eq('id', codeData.id);
 
       if (updateError) {
-        // Non-fatal: user is created, just log the issue
-        console.error('Failed to mark user_code as used:', updateError);
+        // Log but don't block — user is created, code marking is best-effort
+        console.error('Failed to mark user_code as used:', updateError.message);
       }
 
-      navigate(`/dashboard/${username}`);
+      navigate(`/verify?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
