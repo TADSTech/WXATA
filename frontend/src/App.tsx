@@ -8,6 +8,7 @@ import Admin from './pages/Admin';
 import Marketplace from './pages/Marketplace';
 import Docs from './pages/Docs';
 import Pricing from './pages/Pricing';
+import Confirm from './pages/Confirm';
 import './index.css';
 import { ThemeProvider } from './components/ThemeProvider';
 
@@ -27,6 +28,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/confirm" element={<Confirm />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/extensions" element={<Marketplace />} />
         <Route path="/docs" element={<Docs />} />

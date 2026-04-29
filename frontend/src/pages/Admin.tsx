@@ -5,6 +5,7 @@ interface UserCode {
   id: string;
   code: string;
   used: boolean;
+  suspended: boolean;
   createdAt: string;
   usedBy?: string;
   usedAt?: string;
@@ -61,6 +62,7 @@ export default function Admin() {
         id: row.id,
         code: row.code,
         used: row.used,
+        suspended: row.suspended ?? false,
         createdAt: row.created_at,
         usedBy: row.used_by,
         usedAt: row.used_at,
@@ -237,6 +239,35 @@ export default function Admin() {
     setTimeout(() => setLicenseCopied(false), 2000);
   };
 
+  const handleRevokeCode = async (id: string, currentSuspended: boolean) => {
+    const action = currentSuspended ? 'reinstate' : 'suspend';
+    if (!confirm(`${action === 'suspend' ? 'Suspend' : 'Reinstate'} this code?`)) return;
+    try {
+      const { error } = await supabase
+        .from('user_codes')
+        .update({ suspended: !currentSuspended })
+        .eq('id', id);
+      if (error) throw error;
+      fetchCodes();
+    } catch (e: any) {
+      alert('Failed: ' + e.message);
+    }
+  };
+
+  const handleDeleteCode = async (id: string) => {
+    if (!confirm('Permanently delete this code? This cannot be undone.')) return;
+    try {
+      const { error } = await supabase
+        .from('user_codes')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      fetchCodes();
+    } catch (e: any) {
+      alert('Failed: ' + e.message);
+    }
+  };
+
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = 'WX-';
@@ -366,9 +397,38 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Existing Codes List */}
+        {/* Issued Codes Register */}
         <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
-          <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-border-strong pb-2">Issued Codes Register</h2>
+          <div className="flex items-center justify-between mb-4 border-b border-border-strong pb-3">
+            <h2 className="text-xl font-bold text-indigo-400">Issued Codes Register</h2>
+            <button onClick={fetchCodes} className="text-xs text-text-muted hover:text-accent-light border border-border-strong px-3 py-1 rounded transition-colors">
+              ↻ Refresh
+            </button>
+          </div>
+
+          {/* Stats summary */}
+          {!loading && codesList.length > 0 && (() => {
+            const total = codesList.length;
+            const used = codesList.filter(c => c.used && !c.suspended).length;
+            const available = codesList.filter(c => !c.used && !c.suspended).length;
+            const suspended = codesList.filter(c => c.suspended).length;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                {[
+                  { label: 'Total', value: total, color: 'text-text-main', bg: 'bg-bg-base border-border-strong' },
+                  { label: 'Available', value: available, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/30' },
+                  { label: 'Used', value: used, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
+                  { label: 'Suspended', value: suspended, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30' },
+                ].map(s => (
+                  <div key={s.label} className={`border rounded-lg p-3 text-center ${s.bg}`}>
+                    <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
+                    <div className="text-xs text-text-muted uppercase tracking-widest mt-0.5">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {loading ? (
             <p className="text-text-muted">Loading token database...</p>
           ) : codesList.length === 0 ? (
@@ -377,25 +437,48 @@ export default function Admin() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-text-muted border-b border-border-strong">
+                  <tr className="text-text-muted border-b border-border-strong text-xs uppercase tracking-wider">
                     <th className="py-3 px-2">Access Token</th>
                     <th className="py-3 px-2">Status</th>
-                    <th className="py-3 px-2">Claimed By (UID)</th>
+                    <th className="py-3 px-2">Claimed By</th>
+                    <th className="py-3 px-2">Used At</th>
                     <th className="py-3 px-2">Created</th>
+                    <th className="py-3 px-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {codesList.map(c => (
-                    <tr key={c.id} className="border-b border-border-strong/50 hover:bg-bg-panel-hover/30">
-                      <td className="py-3 px-2 font-bold text-accent-light">{c.code}</td>
+                    <tr key={c.id} className="border-b border-border-strong/30 hover:bg-bg-panel-hover/30 transition-colors">
+                      <td className="py-3 px-2 font-mono font-bold text-accent-light tracking-wider">{c.code}</td>
                       <td className="py-3 px-2">
-                        {c.used 
-                          ? <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded text-xs">USED</span> 
-                          : <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded text-xs">AVAILABLE</span>
+                        {c.suspended
+                          ? <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded text-xs font-bold">SUSPENDED</span>
+                          : c.used
+                            ? <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-1 rounded text-xs font-bold">USED</span>
+                            : <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded text-xs font-bold">AVAILABLE</span>
                         }
                       </td>
-                      <td className="py-3 px-2 text-text-muted font-mono text-xs">{c.usedBy || '-'}</td>
-                      <td className="py-3 px-2 text-text-muted">{new Date(c.createdAt).toLocaleString()}</td>
+                      <td className="py-3 px-2 text-text-muted text-xs font-mono">{c.usedBy || <span className="opacity-30">—</span>}</td>
+                      <td className="py-3 px-2 text-text-muted text-xs">{c.usedAt ? new Date(c.usedAt).toLocaleString() : <span className="opacity-30">—</span>}</td>
+                      <td className="py-3 px-2 text-text-muted text-xs">{new Date(c.createdAt).toLocaleString()}</td>
+                      <td className="py-3 px-2 text-right space-x-1">
+                        <button
+                          onClick={() => handleRevokeCode(c.id, c.suspended)}
+                          className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                            c.suspended
+                              ? 'bg-green-900/30 text-green-400 border-green-500/50 hover:bg-green-800/50'
+                              : 'bg-orange-900/30 text-orange-400 border-orange-500/50 hover:bg-orange-800/50'
+                          }`}
+                        >
+                          {c.suspended ? 'Reinstate' : 'Suspend'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCode(c.id)}
+                          className="text-[10px] bg-red-900/30 hover:bg-red-800/50 border border-red-500/50 text-red-400 px-2 py-1 rounded transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
