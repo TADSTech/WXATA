@@ -467,26 +467,38 @@ const Dashboard = () => {
 
   // Check auth & fetch user data
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // One-time session check on mount — avoids race conditions with onAuthStateChange
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate('/login');
+        return;
+      }
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username || '')
+        .maybeSingle();
+      if (userRow && userRow.uid === session.user.id) {
+        setUserData(userRow);
+        setIsAuthenticated(true);
+      } else if (username === 'user') {
+        setUserData({ name: session.user.email, username: username });
+        setIsAuthenticated(true);
       } else {
-        const { data: userRow, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('username', username || '')
-          .single();
-        if (!error && userRow && userRow.uid === session.user.id) {
-          setUserData(userRow);
-          setIsAuthenticated(true);
-        } else if (username === 'user') {
-          setUserData({ name: session.user.email, username: username });
-          setIsAuthenticated(true);
-        } else {
-          navigate('/login');
-        }
+        navigate('/login');
+      }
+    };
+
+    checkSession();
+
+    // Only listen for SIGNED_OUT to redirect — don't react to token refreshes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        navigate('/login');
       }
     });
+
     return () => subscription.unsubscribe();
   }, [username, navigate]);
 

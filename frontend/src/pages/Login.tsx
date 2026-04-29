@@ -27,8 +27,11 @@ export default function Login() {
           .eq('username', input)
           .maybeSingle();
 
-        if (lookupError || !userRow) {
-          throw new Error('No account found with that username.');
+        if (lookupError) {
+          throw new Error(`Username lookup failed: ${lookupError.message}`);
+        }
+        if (!userRow) {
+          throw new Error(`No account found with username "${input}". Check the spelling or use your email instead.`);
         }
         emailToUse = userRow.email;
       }
