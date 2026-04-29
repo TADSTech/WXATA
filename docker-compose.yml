@@ -6,6 +6,8 @@ services:
       args:
         PORT: 5000
     container_name: wxata
+    env_file:
+      - backend/.env 
     restart: unless-stopped          # Docker restarts on crash; PM2 handles in-process restarts
     ports:
       - "5000:5000"                  # WebSocket + HTTP health endpoint
