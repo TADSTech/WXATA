@@ -977,7 +977,7 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
 
 // ─── Dashboard (main component) ───────────────────────────────────────────────
 
-const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000';
+const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
 
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',

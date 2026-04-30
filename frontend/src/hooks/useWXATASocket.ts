@@ -35,6 +35,9 @@ export function useWXATASocket(url: string): WXATASocketState {
   const socketRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
+    // Don't open a new connection if we're intentionally closed
+    if (intentionalClose.current) return;
+
     const resolvedUrl = upgradeUrl(url);
     const ws = new WebSocket(resolvedUrl);
     socketRef.current = ws;
@@ -86,9 +89,15 @@ export function useWXATASocket(url: string): WXATASocketState {
 
   useEffect(() => {
     intentionalClose.current = false;
-    connect();
+
+    // Small delay to avoid React StrictMode double-invoke closing the socket
+    // before it has a chance to open
+    const initTimer = setTimeout(() => {
+      connect();
+    }, 0);
 
     return () => {
+      clearTimeout(initTimer);
       // Mark as intentional so the onclose handler skips reconnect
       intentionalClose.current = true;
 
