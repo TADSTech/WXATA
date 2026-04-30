@@ -6,7 +6,7 @@
 #   sudo caddy run --config /root/WXATA/Caddyfile
 # Or as a systemd service (see deployment.md).
 
-YOUR_DOMAIN {
+wxata-api.tadstech.dev {
     # Forward all traffic (HTTP + WebSocket upgrades) to the backend
     reverse_proxy localhost:5000
 }
