@@ -163,9 +163,86 @@ await sock.sendMessage(remoteJid, {
       desc: 'Grant bot permissions: chat | all | +number',
       trigger: 'pm',
       aliases: ['perm', 'pms'],
-      type: 'admin',
+      type: 'core',
       response: 'Permission updated.',
       target: 'chat'
+    },
+    dc: {
+      name: 'Documentation',
+      desc: 'Get a link to the WXATA documentation',
+      trigger: 'dc',
+      aliases: ['docs', 'doc'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `await sendTrackedMessage(sock, remoteJid, '📚 *WXATA Documentation*\\n\\nhttps://wxata.tadstech.dev/docs');`
+    },
+    owner: {
+      name: 'Bot Owner',
+      desc: 'Send the bot owner contact card',
+      trigger: 'owner',
+      aliases: ['ow'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `const ownerNumber = botInfo.root.target.replace(/\\D/g, '');
+if (!ownerNumber) return sendTrackedMessage(sock, remoteJid, '❌ Owner number not configured.');
+try {
+  await sock.sendMessage(remoteJid, {
+    contacts: {
+      displayName: 'Bot Owner',
+      contacts: [{
+        vcard: \`BEGIN:VCARD\\nVERSION:3.0\\nFN:Bot Owner\\nTEL;type=CELL;type=VOICE;waid=\${ownerNumber}:+\${ownerNumber}\\nEND:VCARD\`
+      }]
+    }
+  });
+} catch (err) {
+  dashboard.log('ERROR', \`!owner vCard send failed: \${err?.message ?? err}\`);
+  await sendTrackedMessage(sock, remoteJid, '❌ Failed to send owner contact.');
+}`
+    },
+    antibc: {
+      name: 'Anti-Broadcast',
+      desc: 'Toggle anti-broadcast filter. Usage: !antibc on | off | message <text>',
+      trigger: 'antibc',
+      aliases: ['abc'],
+      type: 'core',
+      response: '',
+      target: 'chat',
+      code: `const isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;
+if (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied.');
+
+const fs = require('fs');
+const rPath = require('path');
+const cfgPath = rPath.resolve(__rootdir, 'antibc.json');
+let cfg = { enabled: false, message: 'remove me from broadcast' };
+try {
+  if (fs.existsSync(cfgPath)) {
+    const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    if (typeof parsed.enabled === 'boolean') cfg.enabled = parsed.enabled;
+    if (typeof parsed.message === 'string') cfg.message = parsed.message;
+  }
+} catch(e) {}
+
+const arg = argumentName ? argumentName.trim().toLowerCase() : '';
+
+if (arg === 'on') {
+  cfg.enabled = true;
+  try { fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2)); } catch(e) { return sendTrackedMessage(sock, remoteJid, '❌ Failed to save config.'); }
+  return sendTrackedMessage(sock, remoteJid, '✅ Anti-Broadcast *ON*');
+} else if (arg === 'off') {
+  cfg.enabled = false;
+  try { fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2)); } catch(e) { return sendTrackedMessage(sock, remoteJid, '❌ Failed to save config.'); }
+  return sendTrackedMessage(sock, remoteJid, '❌ Anti-Broadcast *OFF*');
+} else if (arg.startsWith('message ')) {
+  const newMsg = argumentName.trim().slice(8).trim();
+  if (!newMsg) return sendTrackedMessage(sock, remoteJid, '❌ Please provide a message text.');
+  cfg.message = newMsg;
+  try { fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2)); } catch(e) { return sendTrackedMessage(sock, remoteJid, '❌ Failed to save config.'); }
+  return sendTrackedMessage(sock, remoteJid, \`✅ Anti-Broadcast message updated: "\${newMsg}"\`);
+} else {
+  return sendTrackedMessage(sock, remoteJid, \`*Anti-Broadcast Status*\\nEnabled: \${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\\nMessage: "\${cfg.message}"\\n\\nUsage: !antibc on | off | message <text>\`);
+}`
     },
     summoner: {
       name: 'System Ping',
@@ -426,21 +503,26 @@ try {
         mentions: [targetUser]
       });
     } catch (e) {
-      // Direct add failed (privacy settings) — send invite link instead
+      // Direct add failed (privacy settings) — send invite link to the person via DM
       try {
         const inviteCode = await sock.groupInviteCode(remoteJid);
         const inviteLink = \`https://chat.whatsapp.com/\${inviteCode}\`;
-        // Send invite link to the group
-        await sock.sendMessage(remoteJid, {
-          text: \`⚠️ @\${targetUser.split('@')[0]} has privacy settings that prevent direct re-add.\\n\\nHere's the group invite link:\\n\${inviteLink}\`,
-          mentions: [targetUser]
-        });
-        // Also DM the kicked user with the invite link
+        // DM the kicked user with the invite link
         try {
           await sock.sendMessage(targetUser, {
-            text: \`You were temporarily removed from *\${groupMetadata.subject}* and can rejoin here:\\n\${inviteLink}\`
+            text: \`You have been invited to join the group once again\\n\${inviteLink}\`
           });
-        } catch (_) { /* DM may fail if user blocked bot */ }
+          await sock.sendMessage(remoteJid, {
+            text: \`✅ @\${targetUser.split('@')[0]} has been sent a re-invite link via DM.\`,
+            mentions: [targetUser]
+          });
+        } catch (_) {
+          // DM failed — post link in group as last resort
+          await sock.sendMessage(remoteJid, {
+            text: \`⚠️ Could not DM @\${targetUser.split('@')[0]}. Here is the re-invite link:\\n\${inviteLink}\`,
+            mentions: [targetUser]
+          });
+        }
       } catch (inviteErr) {
         await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]} and could not generate invite link. Please add them manually.\`, mentions: [targetUser] });
       }
@@ -561,6 +643,23 @@ if (arg.toLowerCase().startsWith('set ')) {
   const key = parts[0].toUpperCase();
   const value = parts.slice(1).join(' ');
   if (!key || !value) return sendTrackedMessage(sock, remoteJid, '❌ Usage: !vs set <KEY> <value>');
+
+  // Special case: PREFIX updates botinfo.json directly
+  if (key === 'PREFIX') {
+    const trimmedPrefix = value.trim();
+    if (!trimmedPrefix) return sendTrackedMessage(sock, remoteJid, '❌ Prefix cannot be empty.');
+    const botInfoPath = path.resolve(__rootdir, 'botinfo.json');
+    try {
+      const raw = fs.readFileSync(botInfoPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      parsed.prefix = trimmedPrefix;
+      fs.writeFileSync(botInfoPath, JSON.stringify(parsed, null, 2));
+      return sendTrackedMessage(sock, remoteJid, \`✅ *PREFIX* updated to: \${trimmedPrefix}\\n_Restart or send any command to apply._\`);
+    } catch(e) {
+      return sendTrackedMessage(sock, remoteJid, \`❌ Failed to update prefix: \${e?.message ?? e}\`);
+    }
+  }
+
   configVars[key] = value;
   fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
   return sendTrackedMessage(sock, remoteJid, \`✅ *\${key}* set to: \${value}\`);
@@ -569,6 +668,21 @@ if (arg.toLowerCase().startsWith('set ')) {
 // !vs reset KEY
 if (arg.toLowerCase().startsWith('reset ')) {
   const key = arg.slice(6).trim().toUpperCase();
+
+  // Special case: reset PREFIX back to '!'
+  if (key === 'PREFIX') {
+    const botInfoPath = path.resolve(__rootdir, 'botinfo.json');
+    try {
+      const raw = fs.readFileSync(botInfoPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      parsed.prefix = '!';
+      fs.writeFileSync(botInfoPath, JSON.stringify(parsed, null, 2));
+      return sendTrackedMessage(sock, remoteJid, '🔄 *PREFIX* reset to default: !');
+    } catch(e) {
+      return sendTrackedMessage(sock, remoteJid, \`❌ Failed to reset prefix: \${e?.message ?? e}\`);
+    }
+  }
+
   delete configVars[key];
   fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
   return sendTrackedMessage(sock, remoteJid, \`🔄 *\${key}* reset to default.\`);

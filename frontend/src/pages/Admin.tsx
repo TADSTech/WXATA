@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 
+// Inline error banner component used throughout the admin panel
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss?: () => void }) {
+  return (
+    <div className="flex items-start gap-2 mt-3 p-3 rounded text-sm bg-red-900/50 text-red-200 border border-red-500">
+      <span className="flex-1">{message}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-red-300 hover:text-red-100 ml-2 font-bold leading-none">✕</button>
+      )}
+    </div>
+  );
+}
+
 interface UserCode {
   id: string;
   code: string;
@@ -44,6 +56,11 @@ export default function Admin() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPass, setAdminPass] = useState('');
 
+  // Inline error banners for codes and extensions operations
+  const [codesError, setCodesError] = useState('');
+  const [extError, setExtError] = useState('');
+  const [editError, setEditError] = useState('');
+
   // License key generator state
   const [licenseUsername, setLicenseUsername] = useState('');
   const [generatedLicenseKey, setGeneratedLicenseKey] = useState('');
@@ -68,8 +85,8 @@ export default function Admin() {
         usedAt: row.used_at,
       }));
       setCodesList(fetched);
-    } catch (err) {
-      console.error('Failed to fetch codes', err);
+    } catch (err: any) {
+      setCodesError('Failed to fetch codes: ' + (err?.message ?? String(err)));
     } finally {
       setLoading(false);
     }
@@ -104,8 +121,8 @@ export default function Admin() {
       });
       setPendingExtensions(fetchedPending);
       setApprovedExtensions(fetchedApproved);
-    } catch (err) {
-      console.error('Failed to fetch extensions', err);
+    } catch (err: any) {
+      setExtError('Failed to fetch extensions: ' + (err?.message ?? String(err)));
     } finally {
       setExtLoading(false);
     }
@@ -126,8 +143,8 @@ export default function Admin() {
           .eq('id', id);
         if (error) throw error;
         fetchExtensions(); // Refresh the list
-     } catch(e) {
-        console.error(e);
+     } catch(e: any) {
+        setExtError('Failed to update extension status: ' + (e?.message ?? String(e)));
      }
   };
 
@@ -139,8 +156,8 @@ export default function Admin() {
         .eq('id', id);
       if (error) throw error;
       fetchExtensions();
-    } catch(e) {
-      console.error(e);
+    } catch(e: any) {
+      setExtError('Failed to update extension: ' + (e?.message ?? String(e)));
     }
   };
 
@@ -153,8 +170,8 @@ export default function Admin() {
           .eq('id', id);
         if (error) throw error;
         fetchExtensions();
-      } catch(e) {
-        console.error(e);
+      } catch(e: any) {
+        setExtError('Failed to delete extension: ' + (e?.message ?? String(e)));
       }
     }
   };
@@ -185,10 +202,10 @@ export default function Admin() {
         .eq('id', adminEditingExt.id);
       if (error) throw error;
       setAdminEditingExt(null);
+      setEditError('');
       fetchExtensions();
     } catch(e: any) {
-      console.error(e);
-      alert('Failed to save edit: ' + e.message);
+      setEditError('Failed to save edit: ' + (e?.message ?? String(e)));
     }
   };
 
@@ -250,7 +267,7 @@ export default function Admin() {
       if (error) throw error;
       fetchCodes();
     } catch (e: any) {
-      alert('Failed: ' + e.message);
+      setCodesError('Failed to update code: ' + (e?.message ?? String(e)));
     }
   };
 
@@ -264,7 +281,7 @@ export default function Admin() {
       if (error) throw error;
       fetchCodes();
     } catch (e: any) {
-      alert('Failed: ' + e.message);
+      setCodesError('Failed to delete code: ' + (e?.message ?? String(e)));
     }
   };
 
@@ -282,7 +299,7 @@ export default function Admin() {
     try {
       const { error } = await supabase
         .from('user_codes')
-        .insert({ code, used: false, created_at: new Date().toISOString() });
+        .insert({ code, used: false, suspended: false, created_at: new Date().toISOString() });
       if (error) throw error;
       setMessage(`Code ${code} saved successfully!`);
       setCode('');
@@ -406,6 +423,8 @@ export default function Admin() {
             </button>
           </div>
 
+          {codesError && <ErrorBanner message={codesError} onDismiss={() => setCodesError('')} />}
+
           {/* Stats summary */}
           {!loading && codesList.length > 0 && (() => {
             const total = codesList.length;
@@ -490,6 +509,7 @@ export default function Admin() {
         {/* Pending Extensions List */}
         <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
           <h2 className="text-xl font-bold mb-4 text-indigo-400 border-b border-border-strong pb-2">Pending Marketplace Extensions</h2>
+          {extError && <ErrorBanner message={extError} onDismiss={() => setExtError('')} />}
           {extLoading ? (
             <p className="text-text-muted">Loading extensions database...</p>
           ) : pendingExtensions.length === 0 ? (
@@ -539,6 +559,7 @@ export default function Admin() {
         {/* Approved Marketplace Extensions */}
         <div className="bg-bg-panel border border-border-strong p-6 rounded-lg">
           <h2 className="text-xl font-bold mb-4 text-accent-light border-b border-border-strong pb-2">Active Marketplace Extensions</h2>
+          {extError && <ErrorBanner message={extError} onDismiss={() => setExtError('')} />}
           {extLoading ? (
             <p className="text-text-muted">Loading extensions database...</p>
           ) : approvedExtensions.length === 0 ? (
@@ -664,19 +685,22 @@ export default function Admin() {
                 />
               </div>
 
-              <div className="flex gap-4 pt-4 border-t border-border-strong">
-                <button 
-                  onClick={handleSaveEdit}
-                  className="flex-1 bg-accent-primary hover:bg-accent-hover text-text-main font-bold py-3 px-4 rounded transition-colors"
-                >
-                  Save Changes
-                </button>
-                <button 
-                  onClick={() => setAdminEditingExt(null)}
-                  className="flex-1 bg-bg-panel-hover hover:bg-gray-700 text-text-muted font-bold py-3 px-4 rounded transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="flex flex-col gap-4 pt-4 border-t border-border-strong">
+                {editError && <ErrorBanner message={editError} onDismiss={() => setEditError('')} />}
+                <div className="flex gap-4">
+                  <button 
+                    onClick={handleSaveEdit}
+                    className="flex-1 bg-accent-primary hover:bg-accent-hover text-text-main font-bold py-3 px-4 rounded transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                  <button 
+                    onClick={() => { setAdminEditingExt(null); setEditError(''); }}
+                    className="flex-1 bg-bg-panel-hover hover:bg-gray-700 text-text-muted font-bold py-3 px-4 rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>

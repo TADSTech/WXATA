@@ -3,6 +3,11 @@ import React, { Component, useEffect } from 'react';
 // Module-level Set to track already-injected zone IDs (prevents duplicates across re-renders)
 const injectedZones = new Set<string>();
 
+/** Reset the injected zones set — for use in tests only */
+export function _resetInjectedZones() {
+  injectedZones.clear();
+}
+
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 
 interface AdErrorBoundaryState {

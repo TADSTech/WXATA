@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, act } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import * as fc from 'fast-check';
 import React, { Component } from 'react';
-import AdUnit from '../components/AdUnit';
+import AdUnit, { _resetInjectedZones } from '../components/AdUnit';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,6 +27,7 @@ function countAllScripts(zoneId: string): number {
 /** Remove all injected ad scripts from the document */
 function cleanupAdScripts() {
   document.querySelectorAll('script[data-zone-id]').forEach(s => s.remove());
+  _resetInjectedZones();
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +60,7 @@ describe('Property 1: Popunder script injection is idempotent', () => {
 
           // Simulate N click interactions
           for (let i = 0; i < n; i++) {
-            act(() => {
-              fireEvent.click(document);
-            });
+            fireEvent.click(document);
           }
 
           // Exactly one script should exist for this zoneId
@@ -160,9 +159,7 @@ describe('AdUnit unit tests', () => {
     const zoneId = 'test-inject-after-click';
     const { unmount } = render(<AdUnit adType="popunder" zoneId={zoneId} />);
 
-    act(() => {
-      fireEvent.click(document);
-    });
+    fireEvent.click(document);
 
     expect(countAllScripts(zoneId)).toBe(1);
     unmount();

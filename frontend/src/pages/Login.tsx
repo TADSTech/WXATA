@@ -78,10 +78,11 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">
-              Username or Email
+            <label htmlFor="login-identifier" className="block text-sm font-medium mb-1 text-text-muted">
+              Email
             </label>
             <input
+              id="login-identifier"
               type="text"
               required
               autoComplete="username"
@@ -92,8 +93,9 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Password</label>
+            <label htmlFor="login-password" className="block text-sm font-medium mb-1 text-text-muted">Password</label>
             <input
+              id="login-password"
               type="password"
               required
               autoComplete="current-password"

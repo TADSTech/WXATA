@@ -31,6 +31,8 @@ backend/auth_info/
 
 # Runtime data files — generated on first run from *.example.json templates
 botinfo.json
+antidel.json
+antibc.json
 backend/antidel.json
 backend/antibc.json
 warns.json
@@ -44,5 +46,10 @@ db/
 
 
 root.env
+
+# Dev artifacts — scratch files and one-off refactor scripts
+scratch/
+refactor_v2.js
+frontend/refactor_themes.js
 
 wxata-public/

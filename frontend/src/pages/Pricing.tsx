@@ -8,34 +8,37 @@ import { SocialBanner } from '../components/SocialBanner';
 // Types
 // ---------------------------------------------------------------------------
 
+interface FlutterwaveOptions {
+  public_key: string;
+  tx_ref: string;
+  amount: number;
+  currency: string;
+  customer: {
+    email: string;
+    name: string;
+  };
+  callback: (response: { status: string; transaction_id?: string; tx_ref: string }) => void;
+  onclose: () => void;
+}
+
 interface PricingCardProps {
   tier: 'self-host' | 'hosted';
   name: string;
   price: string;
   priceNote: string;
   features: string[];
-  paystackKey: string | undefined;
-  paystackAmount?: number;
-  paystackPlan?: string;
+  flwKey: string | undefined;
+  flwAmount?: number;
   userEmail: string;
+  userName: string;
 }
 
 // ---------------------------------------------------------------------------
-// Paystack inline JS type shim
+// Flutterwave inline JS type shim
 // ---------------------------------------------------------------------------
 declare global {
   interface Window {
-    PaystackPop?: {
-      setup: (opts: {
-        key: string;
-        email: string;
-        amount?: number;
-        plan?: string;
-        currency: string;
-        callback: (response: { reference: string }) => void;
-        onClose: () => void;
-      }) => { openIframe: () => void };
-    };
+    FlutterwaveCheckout?: (opts: FlutterwaveOptions) => void;
   }
 }
 
@@ -49,27 +52,35 @@ function PricingCard({
   price,
   priceNote,
   features,
-  paystackKey,
-  paystackAmount,
-  paystackPlan,
+  flwKey,
+  flwAmount,
   userEmail,
+  userName,
 }: PricingCardProps) {
-  const handlePaystack = () => {
-    if (!window.PaystackPop || !paystackKey) return;
-    const handler = window.PaystackPop.setup({
-      key: paystackKey,
-      email: userEmail || 'buyer@example.com',
-      ...(paystackAmount ? { amount: paystackAmount } : {}),
-      ...(paystackPlan ? { plan: paystackPlan } : {}),
+  const [paid, setPaid] = useState(false);
+
+  const handleFlutterwave = () => {
+    if (!window.FlutterwaveCheckout || !flwKey || !flwAmount) return;
+    const txRef = `WXATA-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    window.FlutterwaveCheckout({
+      public_key: flwKey,
+      tx_ref: txRef,
+      amount: flwAmount,
       currency: 'NGN',
-      callback: (response) => {
-        console.log('Payment complete:', response.reference);
+      customer: {
+        email: userEmail || 'buyer@example.com',
+        name: userName || 'WXATA Customer',
       },
-      onClose: () => {
+      callback: (response) => {
+        console.log('Payment complete:', response.tx_ref, response.status);
+        if (response.status === 'successful' || response.status === 'completed') {
+          setPaid(true);
+        }
+      },
+      onclose: () => {
         console.log('Payment window closed');
       },
     });
-    handler.openIframe();
   };
 
   return (
@@ -107,14 +118,21 @@ function PricingCard({
           Buy Now — WhatsApp
         </a>
 
-        {/* Paystack CTA — only when key is configured */}
-        {paystackKey && (
+        {/* Flutterwave CTA — only when key is configured */}
+        {flwKey && !paid && (
           <button
-            onClick={handlePaystack}
+            onClick={handleFlutterwave}
             className="px-6 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded-xl transition-colors text-sm uppercase tracking-widest"
           >
-            Pay with Paystack
+            Pay with Flutterwave
           </button>
+        )}
+
+        {/* Inline confirmation after successful payment */}
+        {paid && (
+          <div className="px-6 py-3 bg-green-900/40 border border-green-600/50 text-green-400 font-bold rounded-xl text-sm text-center">
+            ✓ Payment successful! Check your email for credentials.
+          </div>
         )}
       </div>
     </motion.div>
@@ -127,20 +145,20 @@ function PricingCard({
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined;
-  const paystackPlanHostedInitial = import.meta.env.VITE_PAYSTACK_PLAN_HOSTED_INITIAL as string | undefined;
+  const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY as string | undefined;
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
 
-  // Inject Paystack inline JS once when key is present
+  // Inject Flutterwave inline JS once when key is present
   useEffect(() => {
-    if (!paystackKey) return;
-    if (document.getElementById('paystack-inline-js')) return;
+    if (!flwKey) return;
+    if (document.getElementById('flw-inline-js')) return;
     const script = document.createElement('script');
-    script.id = 'paystack-inline-js';
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.id = 'flw-inline-js';
+    script.src = 'https://checkout.flutterwave.com/v3.js';
     script.async = true;
     document.body.appendChild(script);
-  }, [paystackKey]);
+  }, [flwKey]);
 
   return (
     <div className="min-h-screen bg-bg-base text-text-main font-sans">
@@ -181,14 +199,21 @@ export default function Pricing() {
         </p>
       </motion.div>
 
-      {/* Email input for Paystack (only shown when Paystack is enabled) */}
-      {paystackKey && (
+      {/* Email + name inputs for Flutterwave (only shown when Flutterwave is enabled) */}
+      {flwKey && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="flex justify-center mb-6 px-4"
+          className="flex flex-col items-center gap-3 mb-6 px-4"
         >
+          <input
+            type="text"
+            placeholder="Your name for payment"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full max-w-sm bg-bg-panel border border-border-strong rounded-xl px-4 py-2 text-text-main text-sm focus:outline-none focus:border-accent-primary"
+          />
           <input
             type="email"
             placeholder="Your email for payment receipt"
@@ -214,9 +239,10 @@ export default function Pricing() {
             'Plugin marketplace access',
             'Community support',
           ]}
-          paystackKey={paystackKey}
-          paystackAmount={2500000}
+          flwKey={flwKey}
+          flwAmount={25000}
           userEmail={email}
+          userName={name}
         />
 
         <PricingCard
@@ -232,9 +258,10 @@ export default function Pricing() {
             'Uptime monitoring',
             'Priority response',
           ]}
-          paystackKey={paystackKey}
-          paystackPlan={paystackPlanHostedInitial}
+          flwKey={flwKey}
+          flwAmount={30000}
           userEmail={email}
+          userName={name}
         />
       </div>
 

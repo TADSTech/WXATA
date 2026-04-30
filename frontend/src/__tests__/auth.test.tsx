@@ -3,6 +3,7 @@
  * Requirements: 7.2, 7.6, 7.7
  */
 
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -19,6 +20,7 @@ vi.mock('../supabase', () => {
   const mockSignInWithPassword = vi.fn();
   const mockOnAuthStateChange = vi.fn();
   const mockSignOut = vi.fn();
+  const mockGetSession = vi.fn();
 
   return {
     supabase: {
@@ -27,6 +29,7 @@ vi.mock('../supabase', () => {
         signInWithPassword: mockSignInWithPassword,
         onAuthStateChange: mockOnAuthStateChange,
         signOut: mockSignOut,
+        getSession: mockGetSession,
       },
       from: mockFrom,
     },
@@ -145,9 +148,11 @@ describe('Sign-up success path', () => {
     // Submit the form
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
 
-    // Assert navigation to dashboard
+    // Assert navigation to verify page
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/dashboard/testuser');
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/verify\?email=/)
+      );
     });
   });
 });
@@ -177,7 +182,7 @@ describe('Sign-in success path', () => {
       error: null,
     });
 
-    // Mock supabase.from('users').select('username').eq(...).single() → username
+    // Mock supabase.from('users').select('username').eq(...).maybeSingle() → username
     mockSupabase.from.mockImplementation((_table: string) => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -185,7 +190,10 @@ describe('Sign-in success path', () => {
         data: { username: 'testuser' },
         error: null,
       }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { username: 'testuser' },
+        error: null,
+      }),
     }));
 
     render(
@@ -229,9 +237,16 @@ describe('Session expiry redirect', () => {
         signInWithPassword: ReturnType<typeof vi.fn>;
         onAuthStateChange: ReturnType<typeof vi.fn>;
         signOut: ReturnType<typeof vi.fn>;
+        getSession: ReturnType<typeof vi.fn>;
       };
       from: ReturnType<typeof vi.fn>;
     };
+
+    // Mock getSession to return null session (simulates expired/missing session)
+    mockSupabase.auth.getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
 
     // Mock onAuthStateChange to immediately call the callback with null session
     mockSupabase.auth.onAuthStateChange.mockImplementation(

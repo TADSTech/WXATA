@@ -4,6 +4,7 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.6, 3.1, 3.5
  */
 
+import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import * as fc from 'fast-check';
