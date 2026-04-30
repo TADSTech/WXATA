@@ -643,6 +643,23 @@ if (arg.toLowerCase().startsWith('set ')) {
   const key = parts[0].toUpperCase();
   const value = parts.slice(1).join(' ');
   if (!key || !value) return sendTrackedMessage(sock, remoteJid, '❌ Usage: !vs set <KEY> <value>');
+
+  // Special case: PREFIX updates botinfo.json directly
+  if (key === 'PREFIX') {
+    const trimmedPrefix = value.trim();
+    if (!trimmedPrefix) return sendTrackedMessage(sock, remoteJid, '❌ Prefix cannot be empty.');
+    const botInfoPath = path.resolve(__rootdir, 'botinfo.json');
+    try {
+      const raw = fs.readFileSync(botInfoPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      parsed.prefix = trimmedPrefix;
+      fs.writeFileSync(botInfoPath, JSON.stringify(parsed, null, 2));
+      return sendTrackedMessage(sock, remoteJid, \`✅ *PREFIX* updated to: \${trimmedPrefix}\\n_Restart or send any command to apply._\`);
+    } catch(e) {
+      return sendTrackedMessage(sock, remoteJid, \`❌ Failed to update prefix: \${e?.message ?? e}\`);
+    }
+  }
+
   configVars[key] = value;
   fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
   return sendTrackedMessage(sock, remoteJid, \`✅ *\${key}* set to: \${value}\`);
@@ -651,6 +668,21 @@ if (arg.toLowerCase().startsWith('set ')) {
 // !vs reset KEY
 if (arg.toLowerCase().startsWith('reset ')) {
   const key = arg.slice(6).trim().toUpperCase();
+
+  // Special case: reset PREFIX back to '!'
+  if (key === 'PREFIX') {
+    const botInfoPath = path.resolve(__rootdir, 'botinfo.json');
+    try {
+      const raw = fs.readFileSync(botInfoPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      parsed.prefix = '!';
+      fs.writeFileSync(botInfoPath, JSON.stringify(parsed, null, 2));
+      return sendTrackedMessage(sock, remoteJid, '🔄 *PREFIX* reset to default: !');
+    } catch(e) {
+      return sendTrackedMessage(sock, remoteJid, \`❌ Failed to reset prefix: \${e?.message ?? e}\`);
+    }
+  }
+
   delete configVars[key];
   fs.writeFileSync(varsFile, JSON.stringify(configVars, null, 2));
   return sendTrackedMessage(sock, remoteJid, \`🔄 *\${key}* reset to default.\`);
