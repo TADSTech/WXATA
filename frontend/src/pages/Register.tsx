@@ -126,36 +126,41 @@ export default function Register() {
         <SocialBanner variant="register" />
         <form onSubmit={handleRegister} className="space-y-4 mt-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Full Name</label>
+            <label htmlFor="reg-name" className="block text-sm font-medium mb-1 text-text-muted">Full Name</label>
             <input
+              id="reg-name"
               type="text" required value={name} onChange={(e) => setName(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Username</label>
+            <label htmlFor="reg-username" className="block text-sm font-medium mb-1 text-text-muted">Username</label>
             <input
+              id="reg-username"
               type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Email</label>
+            <label htmlFor="reg-email" className="block text-sm font-medium mb-1 text-text-muted">Email</label>
             <input
+              id="reg-email"
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Password</label>
+            <label htmlFor="reg-password" className="block text-sm font-medium mb-1 text-text-muted">Password</label>
             <input
+              id="reg-password"
               type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-text-muted">Registration Code</label>
+            <label htmlFor="reg-code" className="block text-sm font-medium mb-1 text-text-muted">Registration Code</label>
             <input
+              id="reg-code"
               type="text" required value={userCode} onChange={(e) => setUserCode(e.target.value)}
               placeholder="Provided by administrator"
               className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"

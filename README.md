@@ -13,9 +13,9 @@ A high-performance WhatsApp automation platform built with **Baileys** and **Bun
 | Runtime | [Bun](https://bun.sh/) |
 | WhatsApp | [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) |
 | Frontend | Vite + React + Tailwind + Framer Motion |
-| Auth/DB | Firebase (Auth + Firestore) |
+| Auth/DB | Supabase (Auth + PostgreSQL) |
 | Local DB | bun:sqlite (message cache for anti-delete) |
-| Deploy | Render (backend) + Vercel (frontend) |
+| Deploy | Oracle VPS (backend) + Vercel (frontend) |
 
 ---
 
@@ -43,8 +43,8 @@ bun run all
 ## Deployment
 
 See **[deployment.md](./deployment.md)** for full instructions covering:
-- Deploying your own backend on Render with a persistent disk
-- Keeping the bot alive on the free tier (built-in self-ping)
+- Deploying your own backend on an Oracle VPS with a persistent disk
+- Keeping the bot alive with PM2 process management
 - Deploying the frontend on Vercel
 - How other developers can self-host their own instance
 
@@ -103,7 +103,6 @@ wxata/
 │   ├── db.ts          # SQLite message cache
 │   └── commands/      # Typed command module system (future)
 ├── botinfo.example.json   # Config template
-├── render.yaml            # Render one-click deploy config
 └── deployment.md          # Full deployment guide
 ```
 

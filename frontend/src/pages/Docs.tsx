@@ -33,10 +33,16 @@ Frontend (Vercel / React)
                         +-- WhatsApp Protocol
                         +-- SQLite (message cache)
                         +-- botinfo.json (scripts + config)
-                        +-- Firestore (marketplace, auth)
+                        +-- PostgreSQL/Supabase (marketplace, auth)
 \`\`\`
 
 The frontend dashboard connects to the backend over a persistent WebSocket. All bot configuration, logs, and QR codes flow through this connection in real time.
+
+---
+
+## Payments
+
+WXATA uses **Flutterwave** as the payment provider for subscription billing. Webhook events are verified by comparing the \`verif-hash\` header against the \`FLW_SECRET_HASH\` environment variable.
 
 ---
 

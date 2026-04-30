@@ -6,6 +6,7 @@
  * Feature: wxata-monetization, Property 4: Invalid user_code error always includes WhatsApp link
  */
 
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -86,7 +87,7 @@ describe('Property 4: Invalid user_code error always includes WhatsApp link', ()
           // Wait for error to appear
           await waitFor(() => {
             const errorEl = document.querySelector('.bg-red-900\\/50');
-            return errorEl !== null;
+            if (!errorEl) throw new Error('Error element not found');
           }, { timeout: 3000 });
 
           const errorEl = document.querySelector('.bg-red-900\\/50');

@@ -185,28 +185,23 @@ class DashboardServer {
         return;
       }
 
-      // ── POST /webhooks/paystack ─────────────────────────────────────────────
-      if (req.method === 'POST' && req.url === '/webhooks/paystack') {
+      // ── POST /webhooks/flutterwave ──────────────────────────────────────────
+      if (req.method === 'POST' && req.url === '/webhooks/flutterwave') {
         const chunks: Buffer[] = [];
         req.on('data', (chunk: Buffer) => chunks.push(chunk));
         req.on('end', async () => {
-          const rawBody = Buffer.concat(chunks).toString('utf-8');
-
-          // Verify HMAC-SHA512 signature
-          const paystackSecret = process.env.PAYSTACK_SECRET_KEY ?? '';
-          const expectedSig = crypto
-            .createHmac('sha512', paystackSecret)
-            .update(rawBody)
-            .digest('hex');
-          const receivedSig = req.headers['x-paystack-signature'] as string | undefined;
-
-          if (!receivedSig || receivedSig !== expectedSig) {
+          // 1. Verify verif-hash header (direct string equality)
+          const receivedHash = req.headers['verif-hash'] as string | undefined;
+          const expectedHash = process.env.FLW_SECRET_HASH ?? '';
+          if (!receivedHash || receivedHash !== expectedHash) {
             res.writeHead(401);
             res.end('Unauthorized');
             return;
           }
 
-          let event: { event: string; data: Record<string, unknown> };
+          // 2. Parse body
+          const rawBody = Buffer.concat(chunks).toString('utf-8');
+          let event: { event: string; data: { status: string; customer: { email: string; name: string }; amount: number; currency: string; tx_ref: string } };
           try {
             event = JSON.parse(rawBody);
           } catch {
@@ -215,64 +210,66 @@ class DashboardServer {
             return;
           }
 
-          // Respond within 5 seconds using Promise.race
+          // 3. Process event with 4.5s timeout
           const processEvent = async () => {
             const hmacSecret = process.env.LICENSE_HMAC_SECRET ?? '';
-            const customerEmail = (event.data?.customer as Record<string, unknown>)?.email as string ?? '';
+            const customerEmail = event.data?.customer?.email ?? '';
 
-            if (event.event === 'charge.success' || event.event === 'subscription.create') {
-              const userCode = generateUserCode();
-              const licenseKey = generateLicenseKey(customerEmail, hmacSecret);
-              // charge.success = one-time Self-Host purchase
-              // subscription.create = Hosted recurring subscription
-              const tier = event.event === 'charge.success' ? 'self-host' : 'hosted';
+            if (event.event === 'charge.completed') {
+              if (event.data.status === 'successful') {
+                // Provision: generate code + license key, insert into DB, send email
+                const userCode = generateUserCode();
+                const licenseKey = generateLicenseKey(customerEmail, hmacSecret);
 
-              const { error: dbError } = await getSupabaseAdmin().from('user_codes').insert({
-                code: userCode,
-                used: false,
-                suspended: false,
-                created_at: new Date().toISOString(),
-              });
+                const { error: dbError } = await getSupabaseAdmin().from('user_codes').insert({
+                  code: userCode,
+                  used: false,
+                  suspended: false,
+                  created_at: new Date().toISOString(),
+                });
 
-              if (dbError) {
-                logger.error({ dbError }, 'Paystack webhook: Supabase insert failed');
-                throw new Error('DB write failed');
+                if (dbError) {
+                  logger.error({ dbError }, 'Flutterwave webhook: Supabase insert failed');
+                  throw new Error('DB write failed');
+                }
+
+                await sendCredentialsEmail(customerEmail, userCode, licenseKey, 'self-host');
+              } else if (event.data.status === 'failed' || event.data.status === 'cancelled') {
+                // Suspend: set suspended=true where used_by = customerEmail
+                const { error: dbError } = await getSupabaseAdmin()
+                  .from('user_codes')
+                  .update({ suspended: true })
+                  .eq('used_by', customerEmail);
+
+                if (dbError) {
+                  logger.error({ dbError }, 'Flutterwave webhook: suspend update failed');
+                  throw new Error('DB update failed');
+                }
+
+                // Send failure notification email
+                const failTransporter = nodemailer.createTransport({
+                  host: process.env.SMTP_HOST,
+                  port: Number(process.env.SMTP_PORT ?? 587),
+                  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                });
+                await failTransporter.sendMail({
+                  from: process.env.SMTP_FROM ?? 'WXATA <noreply@wxata.app>',
+                  to: customerEmail,
+                  subject: 'WXATA — Payment Failed / Access Suspended',
+                  text: [
+                    'Your WXATA payment failed or was cancelled.',
+                    '',
+                    'Your bot access has been suspended.',
+                    '',
+                    'To reactivate, please retry your payment or contact us:',
+                    'WhatsApp: https://wa.me/2347041029093',
+                    'X: https://x.com/tads_tech',
+                  ].join('\n'),
+                });
               }
-
-              await sendCredentialsEmail(customerEmail, userCode, licenseKey, tier);
-            } else if (event.event === 'subscription.disable' || event.event === 'invoice.payment_failed') {
-              const { error: dbError } = await getSupabaseAdmin()
-                .from('user_codes')
-                .update({ suspended: true })
-                .eq('used_by', customerEmail);
-
-              if (dbError) {
-                logger.error({ dbError }, 'Paystack webhook: suspend update failed');
-                throw new Error('DB update failed');
-              }
-
-              // Send payment failure notification
-              const suspendTransporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: Number(process.env.SMTP_PORT ?? 587),
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-              });
-              await suspendTransporter.sendMail({
-                from: process.env.SMTP_FROM ?? 'WXATA <noreply@wxata.app>',
-                to: customerEmail,
-                subject: 'WXATA — Payment Failed / Subscription Suspended',
-                text: [
-                  'Your WXATA subscription payment failed or was cancelled.',
-                  '',
-                  'Your bot access has been suspended.',
-                  '',
-                  'To reactivate, please update your payment method or contact us:',
-                  'WhatsApp: https://wa.me/2347041029093',
-                  'X: https://x.com/tads_tech',
-                ].join('\n'),
-              });
+              // charge.completed with other status: acknowledge silently
             }
-            // Unknown event types: acknowledge silently
+            // Unknown event types: acknowledge silently to prevent Flutterwave retries
           };
 
           const timeout = new Promise<void>((_, reject) =>
@@ -284,7 +281,7 @@ class DashboardServer {
             res.writeHead(200);
             res.end('OK');
           } catch (err) {
-            logger.error({ err }, 'Paystack webhook processing error');
+            logger.error({ err }, 'Flutterwave webhook processing error');
             res.writeHead(500);
             res.end('Internal Server Error');
           }

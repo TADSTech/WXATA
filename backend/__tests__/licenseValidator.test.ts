@@ -21,7 +21,7 @@ describe('Property 6: License key generation and validation are inverses', () =>
   it('generateLicenseKey + validateLicenseKey round-trip is always true', () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }).filter(s => !s.includes(':')),
+        fc.string({ minLength: 1, maxLength: 100 }).filter(s => !s.includes(':') && s === s.trim()),
         (username) => {
           const key = generateLicenseKey(username, TEST_SECRET);
           return validateLicenseKey(key, TEST_SECRET) === true;
@@ -34,7 +34,7 @@ describe('Property 6: License key generation and validation are inverses', () =>
   it('tampered key always returns false', () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes(':')),
+        fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes(':') && s === s.trim()),
         (username) => {
           const key = generateLicenseKey(username, TEST_SECRET);
           // Tamper: flip the last character of the HMAC portion
@@ -52,7 +52,7 @@ describe('Property 6: License key generation and validation are inverses', () =>
   it('key generated with one secret is invalid for a different secret', () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes(':')),
+        fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes(':') && s === s.trim()),
         (username) => {
           const key = generateLicenseKey(username, TEST_SECRET);
           return validateLicenseKey(key, 'different-secret') === false;

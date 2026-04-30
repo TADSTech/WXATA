@@ -1,11 +1,12 @@
 /**
  * Tests for Pricing page
- * Tasks 6.3, 6.4
- * Requirements: 4.2, 4.3, 4.4, 4.5, 4.6, 4.7
+ * Task 10.1
+ * Requirements: 12.2, 12.3, 14.1, 14.2, 14.3, 14.4, 14.5
  *
- * Feature: wxata-monetization, Property 5: Pricing cards always contain WhatsApp CTA
+ * Feature: wxata-production-ready, Property 5: Pricing cards always contain WhatsApp CTA
  */
 
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -21,14 +22,13 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-// Helper to render Pricing with optional env vars
-function renderPricing(paystackKey?: string) {
-  // Temporarily set the env var
-  const original = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-  if (paystackKey !== undefined) {
-    (import.meta.env as Record<string, string>).VITE_PAYSTACK_PUBLIC_KEY = paystackKey;
+// Helper to render Pricing with optional Flutterwave env var
+function renderPricing(flwKey?: string) {
+  const original = import.meta.env.VITE_FLW_PUBLIC_KEY;
+  if (flwKey !== undefined) {
+    (import.meta.env as Record<string, string>).VITE_FLW_PUBLIC_KEY = flwKey;
   } else {
-    delete (import.meta.env as Record<string, string>).VITE_PAYSTACK_PUBLIC_KEY;
+    delete (import.meta.env as Record<string, string>).VITE_FLW_PUBLIC_KEY;
   }
   const result = render(
     <MemoryRouter>
@@ -37,17 +37,17 @@ function renderPricing(paystackKey?: string) {
   );
   // Restore
   if (original !== undefined) {
-    (import.meta.env as Record<string, string>).VITE_PAYSTACK_PUBLIC_KEY = original;
+    (import.meta.env as Record<string, string>).VITE_FLW_PUBLIC_KEY = original;
   } else {
-    delete (import.meta.env as Record<string, string>).VITE_PAYSTACK_PUBLIC_KEY;
+    delete (import.meta.env as Record<string, string>).VITE_FLW_PUBLIC_KEY;
   }
   return result;
 }
 
 // ---------------------------------------------------------------------------
 // Property 5: Pricing cards always contain WhatsApp CTA
-// Feature: wxata-monetization, Property 5: Pricing cards always contain WhatsApp CTA
-// Validates: Requirements 4.3, 4.4
+// Feature: wxata-production-ready, Property 5: Pricing cards always contain WhatsApp CTA
+// Validates: Requirements 14.4
 // ---------------------------------------------------------------------------
 describe('Property 5: Pricing cards always contain WhatsApp CTA', () => {
   beforeEach(() => {
@@ -75,14 +75,17 @@ describe('Property 5: Pricing cards always contain WhatsApp CTA', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4 — Unit tests for Pricing page
-// Requirements: 4.2, 4.4, 4.5, 4.6, 4.7
+// Task 10.1 — Unit tests for Pricing page (Flutterwave)
+// Requirements: 12.2, 12.3, 14.1, 14.2, 14.3, 14.4, 14.5
 // ---------------------------------------------------------------------------
 describe('Pricing page unit tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Ensure no Paystack key by default
-    delete (import.meta.env as Record<string, string>).VITE_PAYSTACK_PUBLIC_KEY;
+    // Ensure no FLW key by default
+    delete (import.meta.env as Record<string, string>).VITE_FLW_PUBLIC_KEY;
+    // Clean up any injected Flutterwave script between tests
+    const existingScript = document.getElementById('flw-inline-js');
+    if (existingScript) existingScript.remove();
   });
 
   it('renders two pricing cards', () => {
@@ -97,21 +100,35 @@ describe('Pricing page unit tests', () => {
     expect(whatsappLinks.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('Paystack buttons absent when VITE_PAYSTACK_PUBLIC_KEY is not set', () => {
+  // Requirement 12.3: Pricing page SHALL NOT render a "Pay with Paystack" button
+  it('Paystack buttons are never rendered', () => {
     const { queryAllByText } = renderPricing(undefined);
     const paystackBtns = queryAllByText(/pay with paystack/i);
     expect(paystackBtns.length).toBe(0);
   });
 
-  it('Paystack buttons present when VITE_PAYSTACK_PUBLIC_KEY is set', () => {
-    const { getAllByText } = renderPricing('pk_test_fake_key');
-    const paystackBtns = getAllByText(/pay with paystack/i);
-    expect(paystackBtns.length).toBeGreaterThanOrEqual(2);
+  it('Paystack buttons absent even when a key is set', () => {
+    const { queryAllByText } = renderPricing('FLWPUBK_TEST-fake');
+    const paystackBtns = queryAllByText(/pay with paystack/i);
+    expect(paystackBtns.length).toBe(0);
+  });
+
+  // Requirement 14.4: When VITE_FLW_PUBLIC_KEY is not set, do not render Flutterwave button
+  it('Flutterwave button absent when VITE_FLW_PUBLIC_KEY is not set', () => {
+    const { queryAllByText } = renderPricing(undefined);
+    const flwBtns = queryAllByText(/pay with flutterwave/i);
+    expect(flwBtns.length).toBe(0);
+  });
+
+  // Requirement 14.2: When key is set, render Flutterwave payment button
+  it('Flutterwave buttons present when VITE_FLW_PUBLIC_KEY is set', () => {
+    const { getAllByText } = renderPricing('FLWPUBK_TEST-fake');
+    const flwBtns = getAllByText(/pay with flutterwave/i);
+    expect(flwBtns.length).toBeGreaterThanOrEqual(2);
   });
 
   it('SocialBanner is present at the bottom', () => {
     const { container } = renderPricing();
-    // SocialBanner renders the X link — check for it
     const xLink = container.querySelector('a[href="https://x.com/tads_tech"]');
     expect(xLink).not.toBeNull();
   });
@@ -124,5 +141,23 @@ describe('Pricing page unit tests', () => {
   it('renders Hosted tier with ₦30,000 price', () => {
     const { getByText } = renderPricing();
     expect(getByText('₦30,000')).toBeTruthy();
+  });
+
+  // Requirement 14.1: Script injection only when key is present
+  it('does not inject Flutterwave script when key is absent', () => {
+    renderPricing(undefined);
+    const script = document.getElementById('flw-inline-js');
+    expect(script).toBeNull();
+  });
+
+  // Requirement 14.4: Email/name inputs only shown when key is set
+  it('email input not shown when VITE_FLW_PUBLIC_KEY is not set', () => {
+    const { queryByPlaceholderText } = renderPricing(undefined);
+    expect(queryByPlaceholderText(/email for payment/i)).toBeNull();
+  });
+
+  it('email input shown when VITE_FLW_PUBLIC_KEY is set', () => {
+    const { getByPlaceholderText } = renderPricing('FLWPUBK_TEST-fake');
+    expect(getByPlaceholderText(/email for payment/i)).toBeTruthy();
   });
 });

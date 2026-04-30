@@ -96,24 +96,24 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...your-service-role-key...
 
 The `/pricing` route is live automatically after the Vercel redeploy. No extra config needed.
 
-To enable Paystack payment buttons (optional):
+To enable Flutterwave payment buttons (optional):
 
+In your Vercel project → Settings → Environment Variables, add:
 ```
-VITE_PAYSTACK_PUBLIC_KEY=pk_live_your_key
-VITE_PAYSTACK_PLAN_HOSTED_INITIAL=PLN_your_plan_id
+VITE_FLW_PUBLIC_KEY=FLWPUBK_your_public_key_here
 ```
 
-Without these, only the WhatsApp CTA buttons show (which is fine for now).
+Without this, only the WhatsApp CTA buttons show (which is fine for now).
 
 ---
 
-### 2.3 Paystack Webhook (for automated payment processing)
+### 2.3 Flutterwave Webhook (for automated payment processing)
 
 **Step 1: Add backend env vars**
 
 In `backend/.env` on Oracle VPS:
 ```env
-PAYSTACK_SECRET_KEY=sk_live_your_paystack_secret
+FLW_SECRET_HASH=your-flutterwave-secret-hash-here
 LICENSE_HMAC_SECRET=<generate a random 32-byte hex string>
 ADMIN_SECRET=<your admin password>
 SMTP_HOST=smtp.gmail.com
@@ -128,11 +128,21 @@ To generate a random `LICENSE_HMAC_SECRET`:
 openssl rand -hex 32
 ```
 
-**Step 2: Register the webhook in Paystack**
+**How webhook verification works**
 
-1. Paystack Dashboard → Settings → API Keys & Webhooks
-2. Add webhook URL: `https://wxata-api.yourdomain.com/webhooks/paystack`
-3. Select events: `charge.success`, `subscription.create`, `subscription.disable`, `invoice.payment_failed`
+When Flutterwave sends a webhook, it includes a `verif-hash` header. The backend verifies the request by comparing this header value directly against `FLW_SECRET_HASH` using string equality:
+
+```
+if (req.headers['verif-hash'] !== process.env.FLW_SECRET_HASH) → 401 Unauthorized
+```
+
+Set `FLW_SECRET_HASH` to any secret string you choose — just make sure it matches exactly what you configure in the Flutterwave dashboard.
+
+**Step 2: Register the webhook in Flutterwave**
+
+1. Flutterwave Dashboard → Settings → Webhooks
+2. Add webhook URL: `https://wxata-api.yourdomain.com/webhooks/flutterwave`
+3. Set the secret hash to the same value as your `FLW_SECRET_HASH` env var
 
 **Step 3: Rebuild and restart**
 
@@ -245,6 +255,6 @@ To prevent this: send at least one message through the bot every 7–10 days, or
 | Pricing page | `https://wxata.tadstech.dev/pricing` |
 | Admin panel | `https://wxata.tadstech.dev/admin` |
 | Backend health | `https://wxata-api.yourdomain.com/health` |
-| Paystack webhook URL | `https://wxata-api.yourdomain.com/webhooks/paystack` |
+| Flutterwave webhook URL | `https://wxata-api.yourdomain.com/webhooks/flutterwave` |
 | Public repo | `https://github.com/tadstech/wxata-public` |
 | WhatsApp support | `https://wa.me/2347041029093` |

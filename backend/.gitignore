@@ -21,6 +21,7 @@ logs
 
 # ── WXATA: per-instance files ─────────────────────────────────────────────────
 auth_info/
+botinfo.json
 antidel.json
 antibc.json
 warns.json

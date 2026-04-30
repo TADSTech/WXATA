@@ -166,6 +166,7 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [authorSearch, setAuthorSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [sort, setSort] = useState<'downloads' | 'newest'>('downloads');
   const [installing, setInstalling] = useState<string | null>(null);
@@ -211,7 +212,8 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
       const q = search.toLowerCase();
       const matchSearch = !q || e.name.toLowerCase().includes(q) || e.trigger.toLowerCase().includes(q) || e.description.toLowerCase().includes(q) || e.tags?.some(t => t.toLowerCase().includes(q));
       const matchType = filterType === 'all' || e.type === filterType;
-      return matchSearch && matchType;
+      const matchAuthor = !authorSearch || e.author.toLowerCase().includes(authorSearch.toLowerCase());
+      return matchSearch && matchType && matchAuthor;
     })
     .sort((a, b) => sort === 'downloads' ? (b.downloads || 0) - (a.downloads || 0) : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -237,6 +239,10 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search plugins..." className="w-full bg-bg-panel border border-border-strong pl-9 pr-3 py-2 text-sm text-text-main outline-none focus:border-accent-primary rounded" />
+        </div>
+        <div className="relative sm:w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          <input value={authorSearch} onChange={e => setAuthorSearch(e.target.value)} placeholder="Filter by author..." className="w-full bg-bg-panel border border-border-strong pl-9 pr-3 py-2 text-sm text-text-main outline-none focus:border-accent-primary rounded" />
         </div>
         <select value={sort} onChange={e => setSort(e.target.value as any)} className="bg-bg-panel border border-border-strong text-text-muted text-sm px-3 py-2 outline-none rounded">
           <option value="downloads">Most Downloaded</option>
@@ -516,7 +522,9 @@ function BuildTab({ user, onPublished }: { user: any; onPublished: () => void })
         {/* JSON export */}
         <div className="space-y-1">
           <p className="text-xs text-text-muted uppercase tracking-widest">Plugin JSON</p>
-          <CodeBlock code={JSON.stringify({ name: preview.name, desc: preview.description, trigger: preview.trigger, aliases: preview.aliases, type: preview.type, target, response, code: code || undefined, defaultArgument: defaultArg || undefined, tags: preview.tags.length ? preview.tags : undefined }, null, 2)} />
+          <div className="overflow-auto max-h-64">
+            <CodeBlock code={JSON.stringify({ name: preview.name, desc: preview.description, trigger: preview.trigger, aliases: preview.aliases, type: preview.type, target, response, code: code || undefined, defaultArgument: defaultArg || undefined, tags: preview.tags.length ? preview.tags : undefined }, null, 2)} />
+          </div>
         </div>
       </div>
     </div>
