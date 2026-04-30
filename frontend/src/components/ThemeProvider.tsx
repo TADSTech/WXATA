@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'midnight' | 'nord' | 'cyberpunk' | 'rose' | 'ocean' | 'forest' | 'minimal' | 'sepia' | 'hacker' | 'sunset';
+export type Theme = 'midnight' | 'nord' | 'cyberpunk' | 'rose' | 'ocean' | 'forest' | 'minimal' | 'sepia' | 'hacker' | 'sunset';
 
 export const KNOWN_THEMES: Theme[] = [
   'midnight', 'nord', 'cyberpunk', 'rose', 'ocean',

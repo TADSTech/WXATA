@@ -8,7 +8,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { useTheme, KNOWN_THEMES } from '../components/ThemeProvider';
+import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useWXATASocket } from '../hooks/useWXATASocket';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -934,7 +934,7 @@ const THEME_META: Record<string, { name: string; color: string }> = {
 
 interface ThemeSwitcherProps {
   theme: string;
-  setTheme: (t: string) => void;
+  setTheme: (t: Theme) => void;
   open: boolean;
   setOpen: (v: boolean) => void;
 }
