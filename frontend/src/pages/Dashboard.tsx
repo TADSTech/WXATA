@@ -977,7 +977,7 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
 
 // ─── Dashboard (main component) ───────────────────────────────────────────────
 
-const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000';
+const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
 
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
@@ -1037,27 +1037,19 @@ const Dashboard = () => {
         navigate('/login');
         return;
       }
-      // Validate username matches session
-      const sessionUsername = session.user.user_metadata?.username as string | undefined
-        ?? session.user.email?.split('@')[0];
-      if (username && sessionUsername && username !== sessionUsername && username !== 'user') {
-        navigate('/login');
-        return;
-      }
+      // Try to find the user row — if found, use it; otherwise just allow access
+      // with the session (avoids blocking users whose metadata doesn't match URL)
       const { data: userRow } = await supabase
         .from('users')
         .select('*')
-        .eq('username', username || '')
+        .eq('uid', session.user.id)
         .maybeSingle();
-      if (userRow && userRow.uid === session.user.id) {
+      if (userRow) {
         setUserData(userRow as Record<string, unknown>);
-        setIsAuthenticated(true);
-      } else if (username === 'user') {
-        setUserData({ name: session.user.email, username });
-        setIsAuthenticated(true);
       } else {
-        navigate('/login');
+        setUserData({ name: session.user.email, username });
       }
+      setIsAuthenticated(true);
     };
 
     checkSession();

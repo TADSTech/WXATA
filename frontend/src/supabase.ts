@@ -6,9 +6,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    storageKey: 'wxata-auth',        // unique key prevents conflicts with other Supabase apps
+    storageKey: "wxata-auth", // unique key prevents conflicts with other Supabase apps
     autoRefreshToken: true,
-    detectSessionInUrl: true,        // picks up token_hash from /confirm URL
-    flowType: 'pkce',                // more secure, avoids implicit flow race conditions
+    detectSessionInUrl: true, // picks up token_hash from /confirm URL
+    flowType: "pkce", // more secure, avoids implicit flow race conditions
   },
 });
