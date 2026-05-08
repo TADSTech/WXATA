@@ -6,15 +6,53 @@ import { supabase } from '../supabase';
 
 type State = 'loading' | 'success' | 'error';
 
+function getBaseUrl(): string {
+  const raw = import.meta.env.VITE_BACKEND_URL as string | undefined;
+  return (
+    raw?.replace(/^wss?:\/\//, 'https://').replace(/\/ws$/, '') ??
+    'http://localhost:5000'
+  );
+}
+
 export default function Confirm() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [state, setState] = useState<State>('loading');
   const [username, setUsername] = useState('');
+  const [developerMode, setDeveloperMode] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const run = async () => {
+      const developerToken = searchParams.get('developer_token');
+
+      if (developerToken) {
+        setDeveloperMode(true);
+        const response = await fetch(`${getBaseUrl()}/api/keys/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: developerToken }),
+        });
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          setErrorMsg(body.error ?? 'Developer verification failed.');
+          setState('error');
+          return;
+        }
+
+        const body = (await response.json()) as { key?: string | null };
+        if (body.key) {
+          localStorage.setItem('developerApiKey', body.key);
+        }
+
+        setState('success');
+        setTimeout(() => {
+          navigate('/developer/dashboard');
+        }, 3000);
+        return;
+      }
+
       // Supabase appends token_hash + type to the confirmation URL.
       // When the user clicks the link, Supabase JS SDK picks up the
       // hash fragment automatically and exchanges it for a session.
@@ -104,11 +142,19 @@ export default function Confirm() {
             >
               <CheckCircle className="w-14 h-14 text-green-400" />
             </motion.div>
-            <h2 className="text-2xl font-black text-text-main">Email confirmed!</h2>
+            <h2 className="text-2xl font-black text-text-main">
+              {developerMode ? 'Developer email confirmed!' : 'Email confirmed!'}
+            </h2>
             <p className="text-text-muted text-sm">
-              {username
-                ? <>Welcome, <span className="text-accent-light font-bold">{username}</span>. Redirecting to your dashboard...</>
-                : 'Account confirmed. Redirecting to login...'}
+              {developerMode ? (
+                <>Your developer profile is ready. Redirecting to the dashboard...</>
+              ) : username ? (
+                <>
+                  Welcome, <span className="text-accent-light font-bold">{username}</span>. Redirecting to your dashboard...
+                </>
+              ) : (
+                'Account confirmed. Redirecting to login...'
+              )}
             </p>
             <div className="w-full bg-border-subtle rounded-full h-1 overflow-hidden">
               <motion.div
@@ -119,10 +165,12 @@ export default function Confirm() {
               />
             </div>
             <button
-              onClick={() => username ? navigate(`/dashboard/${username}`) : navigate('/login')}
+              onClick={() =>
+                developerMode ? navigate('/developer/dashboard') : username ? navigate(`/dashboard/${username}`) : navigate('/login')
+              }
               className="w-full bg-accent-primary hover:bg-accent-hover text-bg-base font-bold py-3 rounded-xl transition-colors text-sm uppercase tracking-widest"
             >
-              Go to Dashboard
+              {developerMode ? 'Go to Developer Dashboard' : 'Go to Dashboard'}
             </button>
           </>
         )}

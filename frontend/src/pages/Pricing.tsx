@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { Check, MessageCircle } from 'lucide-react';
-import { SocialBanner } from '../components/SocialBanner';
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Check, Zap } from "lucide-react";
+import { SocialBanner } from "../components/SocialBanner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,12 +17,16 @@ interface FlutterwaveOptions {
     email: string;
     name: string;
   };
-  callback: (response: { status: string; transaction_id?: string; tx_ref: string }) => void;
+  callback: (response: {
+    status: string;
+    transaction_id?: string;
+    tx_ref: string;
+  }) => void;
   onclose: () => void;
 }
 
 interface PricingCardProps {
-  tier: 'self-host' | 'hosted';
+  tier: "self-host" | "hosted" | "developer";
   name: string;
   price: string;
   priceNote: string;
@@ -31,6 +35,7 @@ interface PricingCardProps {
   flwAmount?: number;
   userEmail: string;
   userName: string;
+  highlight?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +61,7 @@ function PricingCard({
   flwAmount,
   userEmail,
   userName,
+  highlight,
 }: PricingCardProps) {
   const [paid, setPaid] = useState(false);
 
@@ -66,19 +72,22 @@ function PricingCard({
       public_key: flwKey,
       tx_ref: txRef,
       amount: flwAmount,
-      currency: 'NGN',
+      currency: "NGN",
       customer: {
-        email: userEmail || 'buyer@example.com',
-        name: userName || 'WXATA Customer',
+        email: userEmail || "buyer@example.com",
+        name: userName || "WXATA Customer",
       },
       callback: (response) => {
-        console.log('Payment complete:', response.tx_ref, response.status);
-        if (response.status === 'successful' || response.status === 'completed') {
+        console.log("Payment complete:", response.tx_ref, response.status);
+        if (
+          response.status === "successful" ||
+          response.status === "completed"
+        ) {
           setPaid(true);
         }
       },
       onclose: () => {
-        console.log('Payment window closed');
+        console.log("Payment window closed");
       },
     });
   };
@@ -89,17 +98,29 @@ function PricingCard({
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-bg-panel border border-border-strong rounded-2xl p-8 flex flex-col gap-6 w-full max-w-sm"
+      className={`rounded-2xl p-8 flex flex-col gap-6 w-full max-w-sm ${
+        highlight
+          ? "bg-accent-subtle border-2 border-accent-primary shadow-[0_0_30px_rgba(139,92,246,0.2)]"
+          : "bg-bg-panel border border-border-strong"
+      }`}
     >
       <div>
-        <h2 className="text-xl font-black text-accent-light tracking-tight mb-1">{name}</h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-xl font-black text-accent-light tracking-tight">
+            {name}
+          </h2>
+          {highlight && <Zap className="w-5 h-5 text-accent-primary" />}
+        </div>
         <div className="text-4xl font-black text-text-main">{price}</div>
         <div className="text-sm text-text-muted mt-1">{priceNote}</div>
       </div>
 
       <ul className="space-y-2 flex-1">
         {features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-text-muted">
+          <li
+            key={f}
+            className="flex items-start gap-2 text-sm text-text-muted"
+          >
             <Check className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
             {f}
           </li>
@@ -107,17 +128,6 @@ function PricingCard({
       </ul>
 
       <div className="flex flex-col gap-3">
-        {/* Primary CTA — always present */}
-        <a
-          href="https://wa.me/2347041029093"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors text-sm uppercase tracking-widest"
-        >
-          <MessageCircle className="w-4 h-4" />
-          Buy Now — WhatsApp
-        </a>
-
         {/* Flutterwave CTA — only when key is configured */}
         {flwKey && !paid && (
           <button
@@ -126,6 +136,18 @@ function PricingCard({
           >
             Pay with Flutterwave
           </button>
+        )}
+
+        {/* Fallback when Flutterwave not configured — direct WhatsApp */}
+        {!flwKey && !paid && (
+          <a
+            href="https://wa.me/2347041029093"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded-xl transition-colors text-sm uppercase tracking-widest"
+          >
+            Contact Sales
+          </a>
         )}
 
         {/* Inline confirmation after successful payment */}
@@ -146,16 +168,16 @@ function PricingCard({
 export default function Pricing() {
   const navigate = useNavigate();
   const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY as string | undefined;
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
 
   // Inject Flutterwave inline JS once when key is present
   useEffect(() => {
     if (!flwKey) return;
-    if (document.getElementById('flw-inline-js')) return;
-    const script = document.createElement('script');
-    script.id = 'flw-inline-js';
-    script.src = 'https://checkout.flutterwave.com/v3.js';
+    if (document.getElementById("flw-inline-js")) return;
+    const script = document.createElement("script");
+    script.id = "flw-inline-js";
+    script.src = "https://checkout.flutterwave.com/v3.js";
     script.async = true;
     document.body.appendChild(script);
   }, [flwKey]);
@@ -166,7 +188,7 @@ export default function Pricing() {
       <nav className="px-8 py-5 flex justify-between items-center border-b border-border-subtle/50">
         <div
           className="flex items-center gap-2 cursor-pointer"
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
         >
           <div className="w-8 h-8 bg-accent-primary rounded flex items-center justify-center font-black text-bg-base">
             W
@@ -176,7 +198,7 @@ export default function Pricing() {
           </span>
         </div>
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate("/login")}
           className="text-sm font-bold text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest"
         >
           Sign In
@@ -190,12 +212,16 @@ export default function Pricing() {
         transition={{ duration: 0.6 }}
         className="text-center pt-16 pb-10 px-4"
       >
-        <div className="text-accent-light font-mono text-xs tracking-widest mb-3">// PRICING</div>
+        <div className="text-accent-light font-mono text-xs tracking-widest mb-3">
+          // PRICING
+        </div>
         <h1 className="text-5xl md:text-6xl font-black text-text-main tracking-tight mb-4">
           Simple, transparent pricing.
         </h1>
         <p className="text-text-muted text-lg max-w-xl mx-auto">
-          Choose the plan that fits your setup. Pay once or subscribe monthly — both include full access to WXATA.
+          Choose the plan that fits your needs. Whether you're self-hosting a
+          bot, using our managed service, or building with our API — we've got
+          you covered.
         </p>
       </motion.div>
 
@@ -225,44 +251,98 @@ export default function Pricing() {
       )}
 
       {/* Pricing cards */}
-      <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch px-8 pb-16 max-w-4xl mx-auto">
-        <PricingCard
-          tier="self-host"
-          name="Self-Host"
-          price="₦25,000"
-          priceNote="One-time payment"
-          features={[
-            'Full bot source code',
-            'Docker-ready deployment',
-            'Lifetime updates',
-            'Dashboard web UI',
-            'Plugin marketplace access',
-            'Community support',
-          ]}
-          flwKey={flwKey}
-          flwAmount={25000}
-          userEmail={email}
-          userName={name}
-        />
+      <div className="flex flex-col gap-8 justify-center items-center px-8 pb-16 max-w-7xl mx-auto">
+        {/* Bot Tiers */}
+        <div className="w-full">
+          <h2 className="text-2xl font-black text-accent-light mb-8 text-center">
+            WhatsApp Bot Tiers
+          </h2>
+          <div className="flex flex-col lg:flex-row gap-8 justify-center items-stretch">
+            <PricingCard
+              tier="self-host"
+              name="Self-Host Bot"
+              price="₦25,000"
+              priceNote="One-time payment"
+              features={[
+                "Full bot source code",
+                "Docker-ready deployment",
+                "Lifetime updates",
+                "Dashboard web UI",
+                "Extension marketplace",
+                "WhatsApp bot commands",
+              ]}
+              flwKey={flwKey}
+              flwAmount={25000}
+              userEmail={email}
+              userName={name}
+            />
 
-        <PricingCard
-          tier="hosted"
-          name="Hosted"
-          price="₦30,000"
-          priceNote="First month, then ₦5,000/month"
-          features={[
-            'Everything in Self-Host',
-            'Managed hosting on Render',
-            'Automatic deployments',
-            'Monthly support',
-            'Uptime monitoring',
-            'Priority response',
-          ]}
-          flwKey={flwKey}
-          flwAmount={30000}
-          userEmail={email}
-          userName={name}
-        />
+            <PricingCard
+              tier="hosted"
+              name="Hosted Bot"
+              price="₦30,000"
+              priceNote="First month, then ₦5,000/month"
+              features={[
+                "Everything in Self-Host",
+                "Managed hosting on Render",
+                "Automatic deployments",
+                "Dashboard management",
+                "WhatsApp bot commands",
+                "Extension marketplace",
+              ]}
+              flwKey={flwKey}
+              flwAmount={30000}
+              userEmail={email}
+              userName={name}
+            />
+          </div>
+        </div>
+
+        {/* Developer Tiers */}
+        <div className="w-full">
+          <h2 className="text-2xl font-black text-accent-light mb-8 text-center">
+            Developer API Tiers
+          </h2>
+          <div className="flex flex-col lg:flex-row gap-8 justify-center items-stretch">
+            <PricingCard
+              tier="developer"
+              name="Developer Free"
+              price="₦0"
+              priceNote="100 free messages"
+              features={[
+                "Programmatic REST API",
+                "100 free messages to start",
+                "Pay-per-topup options available",
+                "Any programming language",
+                "Full API documentation",
+                "Community support",
+              ]}
+              flwKey={undefined}
+              userEmail={email}
+              userName={name}
+            />
+
+            <PricingCard
+              tier="developer"
+              name="Developer Pro"
+              price="₦3,200"
+              priceNote="Monthly subscription"
+              features={[
+                "10,000 messages per month",
+                "Programmatic REST API",
+                "Priority email support",
+                "Webhook callbacks",
+                "Usage analytics dashboard",
+                "Any programming language",
+              ]}
+              flwKey={flwKey}
+              flwAmount={3200}
+              userEmail={email}
+              userName={name}
+              highlight={true}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Social banner at bottom */}
