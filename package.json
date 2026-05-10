@@ -15,7 +15,11 @@
     "pm2:logs": "pm2 logs wxata",
     "pm2:status": "pm2 status",
     "pm2:delete": "pm2 delete wxata",
-    "build:public": "cd backend && bun build index.ts --outdir ../wxata-public/dist --target node && javascript-obfuscator ../wxata-public/dist/index.js --output ../wxata-public/dist/index.js --compact true --string-array true --string-array-encoding base64 --identifier-names-generator mangled --rename-globals true"
+    "build:public": "cd backend && bun build index.ts --outdir ../wxata-public/dist --target node && javascript-obfuscator ../wxata-public/dist/index.js --output ../wxata-public/dist/index.js --compact true --string-array true --string-array-encoding base64 --identifier-names-generator mangled --rename-globals true",
+    "type-check": "bun run frontend:type-check && bun run backend:type-check",
+    "frontend:type-check": "cd frontend && bun run type-check",
+    "backend:type-check": "cd backend && bun run type-check",
+    "prepare": "husky"
   },
   "keywords": [
     "whatsapp",
@@ -27,6 +31,7 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "husky": "^9.1.7",
     "javascript-obfuscator": "^4.1.1"
   }
 }

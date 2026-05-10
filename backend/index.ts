@@ -506,35 +506,43 @@ try {
   setTimeout(async () => {
     try {
       // Try direct re-add first
-      await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
-      await sock.sendMessage(remoteJid, {
-        text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`,
-        mentions: [targetUser]
-      });
-    } catch (e) {
-      // Direct add failed (privacy settings) — send invite link to the person via DM
-      try {
+      const addRes = await sock.groupParticipantsUpdate(remoteJid, [targetUser], 'add');
+      const status = addRes && addRes[0] ? addRes[0].status : null;
+
+      // In Baileys, 200 means success. Other codes (like 403, 408) mean privacy blocked it.
+      if (status == 200 || status == '200') {
+        await sock.sendMessage(remoteJid, {
+          text: \`✅ @\${targetUser.split('@')[0]} has been re-added automatically.\`,
+          mentions: [targetUser]
+        });
+      } else {
+        // Direct add failed due to privacy settings
         const inviteCode = await sock.groupInviteCode(remoteJid);
         const inviteLink = \`https://chat.whatsapp.com/\${inviteCode}\`;
-        // DM the kicked user with the invite link
+        
         try {
+          // DM the kicked user with the invite link
           await sock.sendMessage(targetUser, {
-            text: \`You have been invited to join the group once again\\n\${inviteLink}\`
+            text: \`⏳ Your timeout is over. You have been invited to join the group again:\\n\\n\${inviteLink}\`
           });
           await sock.sendMessage(remoteJid, {
-            text: \`✅ @\${targetUser.split('@')[0]} has been sent a re-invite link via DM.\`,
+            text: \`✅ @\${targetUser.split('@')[0]} could not be added directly due to privacy settings, but a re-invite link was sent to their DM.\`,
             mentions: [targetUser]
           });
-        } catch (_) {
-          // DM failed — post link in group as last resort
+        } catch (dmErr) {
+          // DM failed - do not send link to group as they can't see it anyway
           await sock.sendMessage(remoteJid, {
-            text: \`⚠️ Could not DM @\${targetUser.split('@')[0]}. Here is the re-invite link:\\n\${inviteLink}\`,
+            text: \`⚠️ Could not automatically re-add or DM @\${targetUser.split('@')[0]}. Admins, please add them manually.\`,
             mentions: [targetUser]
           });
         }
-      } catch (inviteErr) {
-        await sock.sendMessage(remoteJid, { text: \`❌ Failed to re-add @\${targetUser.split('@')[0]} and could not generate invite link. Please add them manually.\`, mentions: [targetUser] });
       }
+    } catch (err) {
+      // Overall error during re-add attempt
+      await sock.sendMessage(remoteJid, {
+        text: \`❌ An error occurred while trying to re-add @\${targetUser.split('@')[0]}. Admins, please add them manually.\`,
+        mentions: [targetUser]
+      });
     }
   }, 5 * 60 * 1000);
 } catch (e) {
@@ -1575,9 +1583,6 @@ function attachMessageHandler(
       let count = 0;
 
       for (const msg of messages) {
-        // Skip status broadcasts — no point caching them
-        if (msg?.key?.remoteJid === "status@broadcast") continue;
-
         // Extract timestamp, handling both number and Long types
         const ts = msg.messageTimestamp
           ? typeof msg.messageTimestamp === "number"
@@ -1601,15 +1606,15 @@ function attachMessageHandler(
     for (const msg of m.messages) {
       // Error boundary: a single malformed message must never crash the entire batch
       try {
-        // Skip status broadcasts entirely — they flood the buffer with undecryptable
+        // Always cache every message for anti-delete, regardless of type
+        if (msg?.key?.id) storeMessage(msg);
+
+        // Skip status broadcasts entirely for command processing — they flood the buffer with undecryptable
         // group-cipher messages and cause "Buffer timeout reached" stalls.
         if (msg?.key?.remoteJid === "status@broadcast") continue;
 
         // Reset watchdog on every real message received
         onMessage?.();
-
-        // Always cache every message for anti-delete, regardless of type
-        if (msg?.key?.id) storeMessage(msg);
 
         if (!msg || (m.type !== "notify" && m.type !== "append")) {
           continue;
@@ -1688,6 +1693,90 @@ function attachMessageHandler(
 
         if (text) {
           const normalizedText = text.trim().toLowerCase();
+
+          // Standalone Special Command: chai! (prefix becomes suffix)
+          // This command is hidden from the menu and botinfo.json
+          const chaiTrigger = `chai${botInfo.prefix.trim()}`.toLowerCase();
+          if (
+            normalizedText === chaiTrigger ||
+            normalizedText.startsWith(chaiTrigger + " ")
+          ) {
+            if (hasPermission) {
+              const rootJid =
+                resolveTargetJid(sock, botInfo.root.target) ??
+                resolveSelfJid(sock);
+              if (rootJid) {
+                const bail = require("@whiskeysockets/baileys");
+                const extractFrom =
+                  msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+                if (!extractFrom) {
+                  await sendTrackedMessage(
+                    sock,
+                    rootJid,
+                    "❌ [Chai] Please reply to a View Once message.",
+                  );
+                } else {
+                  let viewOnce =
+                    extractFrom.viewOnceMessage?.message ||
+                    extractFrom.viewOnceMessageV2?.message ||
+                    extractFrom.viewOnceMessageV2Extension?.message ||
+                    extractFrom;
+                  const mediaMsg =
+                    viewOnce.imageMessage ||
+                    viewOnce.videoMessage ||
+                    viewOnce.audioMessage;
+                  const mediaType = viewOnce.imageMessage
+                    ? "image"
+                    : viewOnce.videoMessage
+                      ? "video"
+                      : "audio";
+
+                  if (mediaMsg) {
+                    try {
+                      const stream = await bail.downloadContentFromMessage(
+                        mediaMsg,
+                        mediaType,
+                      );
+                      let buffer = Buffer.from([]);
+                      for await (const chunk of stream) {
+                        buffer = Buffer.concat([buffer, chunk]);
+                      }
+
+                      const payload: any = {};
+                      payload[mediaType] = buffer;
+                      if ((mediaMsg as any).caption)
+                        payload.caption = (mediaMsg as any).caption;
+
+                      await sock.sendMessage(rootJid, payload);
+                      await sendTrackedMessage(
+                        sock,
+                        rootJid,
+                        `✅ [Chai] Media extracted from ${remoteJid} and sent here.`,
+                      );
+                      dashboard.log(
+                        "SUCCESS",
+                        `Chai command executed by ${remoteJid}`,
+                      );
+                    } catch (err: any) {
+                      await sendTrackedMessage(
+                        sock,
+                        rootJid,
+                        `❌ [Chai] Extraction failed: ${err.message}`,
+                      );
+                    }
+                  } else {
+                    await sendTrackedMessage(
+                      sock,
+                      rootJid,
+                      "❌ [Chai] No valid media found in the quoted message.",
+                    );
+                  }
+                }
+              }
+            }
+            continue; // Skip normal command processing for this message
+          }
 
           for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
             const prefixPattern = escapeRegex(botInfo.prefix.trim());
@@ -1955,42 +2044,75 @@ function attachMessageHandler(
             `Anti-delete: forwarded message from ${sender}`,
           );
         } catch (forwardErr: any) {
-          // Forward failed — extract whatever content we can and send as text
+          // Forward failed — extract whatever content we can and send as media/text
           dashboard.log(
             "WARN",
-            `Anti-delete forward failed (${forwardErr.message}), falling back to text`,
+            `Anti-delete forward failed (${forwardErr.message}), falling back to extraction`,
           );
           try {
-            const msgContent = originalMsg.message;
-            const text =
-              msgContent?.conversation ||
-              msgContent?.extendedTextMessage?.text ||
-              msgContent?.imageMessage?.caption ||
-              msgContent?.videoMessage?.caption ||
-              null;
+            // Unwrap message to find media
+            const getUnwrapped = (content: any): any => {
+              if (!content) return content;
+              if (content.ephemeralMessage?.message) return getUnwrapped(content.ephemeralMessage.message);
+              if (content.viewOnceMessage?.message) return getUnwrapped(content.viewOnceMessage.message);
+              if (content.viewOnceMessageV2?.message) return getUnwrapped(content.viewOnceMessageV2.message);
+              if (content.viewOnceMessageV2Extension?.message) return getUnwrapped(content.viewOnceMessageV2Extension.message);
+              if (content.documentWithCaptionMessage?.message) return getUnwrapped(content.documentWithCaptionMessage.message);
+              return content;
+            };
 
-            let fallback = `🗑️ *Deleted Message*\n👤 From: @${sender.split("@")[0]}\n💬 Chat: ${chatJid}\n`;
-            if (text) {
-              fallback += `\n📝 Content:\n${text}`;
-            } else {
-              const mediaType = msgContent?.imageMessage
-                ? "🖼️ Image"
-                : msgContent?.videoMessage
-                  ? "🎥 Video"
-                  : msgContent?.audioMessage
-                    ? "🎵 Audio"
-                    : msgContent?.stickerMessage
-                      ? "🎭 Sticker"
-                      : msgContent?.documentMessage
-                        ? "📄 Document"
-                        : "❓ Unknown media";
-              fallback += `\n📎 Type: ${mediaType} (media not recoverable)`;
+            const msgContent = getUnwrapped(originalMsg.message);
+            
+            const mediaMsg = msgContent?.imageMessage || msgContent?.videoMessage || msgContent?.audioMessage || msgContent?.stickerMessage || msgContent?.documentMessage;
+            const mediaType = msgContent?.imageMessage ? 'image' : 
+                              msgContent?.videoMessage ? 'video' : 
+                              msgContent?.audioMessage ? 'audio' : 
+                              msgContent?.stickerMessage ? 'sticker' : 
+                              msgContent?.documentMessage ? 'document' : null;
+
+            let fallbackText = `🗑️ *Deleted Message*\n👤 From: @${sender.split("@")[0]}\n💬 Chat: ${chatJid}`;
+            const textContent = extractMessageText(originalMsg.message);
+            if (textContent) {
+               fallbackText += `\n\n📝 Content:\n${textContent}`;
             }
-            await sock.sendMessage(cfg.target, { text: fallback });
-            dashboard.log(
-              "SUCCESS",
-              `Anti-delete: sent fallback text for ${sender}`,
-            );
+
+            if (mediaMsg && mediaType) {
+              try {
+                const bail = require("@whiskeysockets/baileys");
+                const stream = await bail.downloadContentFromMessage(mediaMsg, mediaType);
+                let buffer = Buffer.from([]);
+                for await (const chunk of stream) {
+                  buffer = Buffer.concat([buffer, chunk]);
+                }
+
+                const payload: any = {};
+                payload[mediaType] = buffer;
+                if ((mediaMsg as any).caption) payload.caption = fallbackText;
+                else if (mediaType === 'image' || mediaType === 'video' || mediaType === 'document') {
+                   payload.caption = fallbackText;
+                }
+                
+                await sock.sendMessage(cfg.target, payload);
+                
+                // If it's an audio or sticker, we can't attach a caption directly, so send text separately
+                if (mediaType === 'audio' || mediaType === 'sticker' || !payload.caption) {
+                   await sock.sendMessage(cfg.target, { text: fallbackText });
+                }
+                
+                dashboard.log("SUCCESS", `Anti-delete: sent extracted media for ${sender}`);
+              } catch (mediaErr: any) {
+                fallbackText += `\n\n📎 Type: ${mediaType} (media extraction failed: ${mediaErr.message})`;
+                await sock.sendMessage(cfg.target, { text: fallbackText });
+                dashboard.log("SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
+              }
+            } else {
+               // No media, just text
+               if (!textContent) {
+                  fallbackText += `\n\n❓ Unknown message type or media not recoverable`;
+               }
+               await sock.sendMessage(cfg.target, { text: fallbackText });
+               dashboard.log("SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
+            }
           } catch (textErr: any) {
             dashboard.log(
               "ERROR",

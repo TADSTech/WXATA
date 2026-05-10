@@ -82,10 +82,19 @@ export function getMessageCount(): number {
   return row?.count ?? 0;
 }
 
-// Scheduled prune — runs once every 24 hours automatically
+// Scheduled prune — runs every 12 hours automatically
 setInterval(() => {
   const deleted = pruneOldMessages();
   if (deleted > 0) {
     console.log(`[DB] Scheduled prune: removed ${deleted} messages older than ${retentionDays} days`);
   }
-}, 24 * 60 * 60 * 1000);
+}, 12 * 60 * 60 * 1000);
+
+// Also run an initial prune shortly after startup
+setTimeout(() => {
+  const deleted = pruneOldMessages();
+  if (deleted > 0) {
+    console.log(`[DB] Startup prune: removed ${deleted} messages older than ${retentionDays} days`);
+  }
+}, 10000); // 10 seconds after startup
+
