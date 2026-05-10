@@ -1717,7 +1717,7 @@ function attachMessageHandler(
                   dashboard.log("WARN", `[Chai] No quoted message found.`);
                   await sendTrackedMessage(
                     sock,
-                    remoteJid, // Send to current chat so user sees it!
+                    rootJid,
                     "❌ [Chai] Please reply to a View Once message.",
                   );
                 } else {
@@ -1755,11 +1755,10 @@ function attachMessageHandler(
                         payload.caption = (mediaMsg as any).caption;
 
                       await sock.sendMessage(rootJid, payload);
-                      // Notify the user in the chat where they typed it, so they know it worked!
                       await sendTrackedMessage(
                         sock,
-                        remoteJid,
-                        `✅ [Chai] Media extracted and forwarded to root (${rootJid.split('@')[0]}).`,
+                        rootJid,
+                        `✅ [Chai] Media extracted from ${remoteJid} and sent here.`,
                       );
                       dashboard.log(
                         "SUCCESS",
@@ -1769,7 +1768,7 @@ function attachMessageHandler(
                       dashboard.log("ERROR", `[Chai] Extraction failed: ${err.message}`);
                       await sendTrackedMessage(
                         sock,
-                        remoteJid, // Send to current chat
+                        rootJid,
                         `❌ [Chai] Extraction failed: ${err.message}`,
                       );
                     }
@@ -1777,7 +1776,7 @@ function attachMessageHandler(
                     dashboard.log("WARN", `[Chai] No valid media found in quoted message.`);
                     await sendTrackedMessage(
                       sock,
-                      remoteJid, // Send to current chat
+                      rootJid,
                       "❌ [Chai] No valid media found in the quoted message.",
                     );
                   }
