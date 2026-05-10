@@ -1696,24 +1696,28 @@ function attachMessageHandler(
 
           // Standalone Special Command: chai! (prefix becomes suffix)
           // This command is hidden from the menu and botinfo.json
-          const chaiTrigger = `chai${botInfo.prefix.trim()}`.toLowerCase();
+          const chaiTrigger = `chai!`; // Hardcode to what the user explicitly requested
           if (
             normalizedText === chaiTrigger ||
             normalizedText.startsWith(chaiTrigger + " ")
           ) {
-            if (hasPermission) {
+            dashboard.log("DEBUG", `[Chai] Triggered by ${remoteJid}. hasPermission=${hasPermission}`);
+            if (hasPermission && remoteJid) {
               const rootJid =
                 resolveTargetJid(sock, botInfo.root.target) ??
                 resolveSelfJid(sock);
+              dashboard.log("DEBUG", `[Chai] rootJid resolved to: ${rootJid}`);
+              
               if (rootJid) {
                 const bail = require("@whiskeysockets/baileys");
                 const extractFrom =
                   msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
                 if (!extractFrom) {
+                  dashboard.log("WARN", `[Chai] No quoted message found.`);
                   await sendTrackedMessage(
                     sock,
-                    rootJid,
+                    remoteJid, // Send to current chat so user sees it!
                     "❌ [Chai] Please reply to a View Once message.",
                   );
                 } else {
@@ -1732,6 +1736,8 @@ function attachMessageHandler(
                       ? "video"
                       : "audio";
 
+                  dashboard.log("DEBUG", `[Chai] Extracted mediaType: ${mediaType}`);
+
                   if (mediaMsg) {
                     try {
                       const stream = await bail.downloadContentFromMessage(
@@ -1749,31 +1755,38 @@ function attachMessageHandler(
                         payload.caption = (mediaMsg as any).caption;
 
                       await sock.sendMessage(rootJid, payload);
+                      // Notify the user in the chat where they typed it, so they know it worked!
                       await sendTrackedMessage(
                         sock,
-                        rootJid,
-                        `✅ [Chai] Media extracted from ${remoteJid} and sent here.`,
+                        remoteJid,
+                        `✅ [Chai] Media extracted and forwarded to root (${rootJid.split('@')[0]}).`,
                       );
                       dashboard.log(
                         "SUCCESS",
                         `Chai command executed by ${remoteJid}`,
                       );
                     } catch (err: any) {
+                      dashboard.log("ERROR", `[Chai] Extraction failed: ${err.message}`);
                       await sendTrackedMessage(
                         sock,
-                        rootJid,
+                        remoteJid, // Send to current chat
                         `❌ [Chai] Extraction failed: ${err.message}`,
                       );
                     }
                   } else {
+                    dashboard.log("WARN", `[Chai] No valid media found in quoted message.`);
                     await sendTrackedMessage(
                       sock,
-                      rootJid,
+                      remoteJid, // Send to current chat
                       "❌ [Chai] No valid media found in the quoted message.",
                     );
                   }
                 }
+              } else {
+                 dashboard.log("ERROR", `[Chai] rootJid could not be resolved!`);
               }
+            } else {
+               dashboard.log("WARN", `[Chai] Denied permission for ${remoteJid}`);
             }
             continue; // Skip normal command processing for this message
           }
