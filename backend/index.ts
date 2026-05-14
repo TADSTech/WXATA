@@ -3,6 +3,16 @@ import { WXATAConnection } from "./connection";
 // @ts-ignore
 import * as qrcode from "qrcode-terminal";
 import { dashboard } from "./DashboardServer";
+import { commandHandler } from "./commands/CommandHandler";
+import { FunCommand } from "./commands/games/FunCommand";
+import { RandomCommand } from "./commands/games/RandomCommand";
+import { BrainTeaserCommand } from "./commands/games/BrainTeaserCommand";
+
+// Register games
+commandHandler.register(new FunCommand());
+commandHandler.register(new RandomCommand());
+commandHandler.register(new BrainTeaserCommand());
+
 import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
@@ -1788,6 +1798,31 @@ function attachMessageHandler(
                dashboard.log("WARN", `[Chai] Denied permission for ${remoteJid}`);
             }
             continue; // Skip normal command processing for this message
+          }
+
+          // Modular CommandHandler Hook
+          if (normalizedText.startsWith(botInfo.prefix.toLowerCase().trim())) {
+            const rawAfterPrefix = (text ?? "").slice(botInfo.prefix.length).trim();
+            const spaceIdx = rawAfterPrefix.indexOf(' ');
+            const trigger = (spaceIdx === -1 ? rawAfterPrefix : rawAfterPrefix.slice(0, spaceIdx)).toLowerCase();
+            const argumentName = spaceIdx === -1 ? undefined : rawAfterPrefix.slice(spaceIdx + 1).trim();
+
+            if (commandHandler.has(trigger)) {
+              if (!hasPermission) {
+                dashboard.log("WARN", `Blocked unpermitted modular command "${trigger}" from ${remoteJid}`);
+                continue;
+              }
+              const ctx = {
+                sock,
+                msg,
+                remoteJid: remoteJid!,
+                argumentName,
+                sendTrackedMessage,
+                botInfo
+              };
+              await commandHandler.dispatch(trigger, ctx);
+              continue; // Skip legacy JSON engine
+            }
           }
 
           for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
