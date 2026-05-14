@@ -5,7 +5,10 @@
       "name": "System Menu",
       "desc": "Show professional system menu with stats",
       "trigger": "mn",
-      "aliases": ["menu", "m"],
+      "aliases": [
+        "menu",
+        "m"
+      ],
       "type": "core",
       "response": "",
       "target": "chat",
@@ -15,7 +18,10 @@
       "name": "Help System",
       "desc": "Describe a specific command and its usage",
       "trigger": "hp",
-      "aliases": ["help", "h"],
+      "aliases": [
+        "help",
+        "h"
+      ],
       "type": "core",
       "response": "",
       "target": "chat",
@@ -25,7 +31,10 @@
       "name": "Documentation",
       "desc": "Show link to official documentation",
       "trigger": "dc",
-      "aliases": ["docs", "doc"],
+      "aliases": [
+        "docs",
+        "doc"
+      ],
       "type": "core",
       "response": "",
       "target": "chat",
@@ -35,7 +44,10 @@
       "name": "Permission Manager",
       "desc": "Grant bot permissions: chat | all | +number",
       "trigger": "pm",
-      "aliases": ["perm", "pms"],
+      "aliases": [
+        "perm",
+        "pms"
+      ],
       "type": "admin",
       "response": "Permission updated.",
       "target": "chat"
@@ -44,7 +56,10 @@
       "name": "System Ping",
       "desc": "Check bot network speed and status",
       "trigger": "pg",
-      "aliases": ["ping", "p"],
+      "aliases": [
+        "ping",
+        "p"
+      ],
       "type": "core",
       "response": "",
       "target": "chat",
@@ -54,7 +69,10 @@
       "name": "Media Extractor",
       "desc": "Extract view once media",
       "trigger": "ex",
-      "aliases": ["extract", "e"],
+      "aliases": [
+        "extract",
+        "e"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -64,7 +82,10 @@
       "name": "Status Saver",
       "desc": "Save status media to your chat",
       "trigger": "sv",
-      "aliases": ["save", "s"],
+      "aliases": [
+        "save",
+        "s"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -74,7 +95,10 @@
       "name": "Tag All Members",
       "desc": "Tag everyone in the group",
       "trigger": "ta",
-      "aliases": ["tagall", "tag"],
+      "aliases": [
+        "tagall",
+        "tag"
+      ],
       "type": "group",
       "response": "",
       "target": "chat",
@@ -84,7 +108,10 @@
       "name": "Sticker Maker",
       "desc": "Convert image/video to sticker",
       "trigger": "st",
-      "aliases": ["sticker", "stick"],
+      "aliases": [
+        "sticker",
+        "stick"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -94,7 +121,10 @@
       "name": "Quote Sticker Maker",
       "desc": "Generate quote sticker from text",
       "trigger": "qc",
-      "aliases": ["quote", "q"],
+      "aliases": [
+        "quote",
+        "q"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -104,7 +134,10 @@
       "name": "Message Deleter",
       "desc": "Delete a message",
       "trigger": "dl",
-      "aliases": ["delete", "del"],
+      "aliases": [
+        "delete",
+        "del"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -114,7 +147,9 @@
       "name": "Time Kick",
       "desc": "Kick user and re-add in 5m",
       "trigger": "tk",
-      "aliases": ["tkick"],
+      "aliases": [
+        "tkick"
+      ],
       "type": "admin",
       "response": "",
       "target": "chat",
@@ -124,7 +159,10 @@
       "name": "Web Screenshot",
       "desc": "Take web page screenshot",
       "trigger": "ss",
-      "aliases": ["screenshot", "snap"],
+      "aliases": [
+        "screenshot",
+        "snap"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -134,7 +172,10 @@
       "name": "User Warner",
       "desc": "Warn 3x then kick",
       "trigger": "wn",
-      "aliases": ["warn", "w"],
+      "aliases": [
+        "warn",
+        "w"
+      ],
       "type": "admin",
       "response": "",
       "target": "chat",
@@ -144,7 +185,10 @@
       "name": "Anti-Delete System",
       "desc": "Forward deleted msgs",
       "trigger": "ad",
-      "aliases": ["antidel", "anti"],
+      "aliases": [
+        "antidel",
+        "anti"
+      ],
       "type": "tools",
       "response": "",
       "target": "chat",
@@ -154,11 +198,52 @@
       "name": "System Variables",
       "desc": "View/set bot config vars",
       "trigger": "vs",
-      "aliases": ["vars", "v"],
+      "aliases": [
+        "vars",
+        "v"
+      ],
       "type": "admin",
       "response": "",
       "target": "chat",
       "code": "const fs = require('fs');\nconst path = require('path');\nconst os = require('os');\nconst varsFile = path.resolve(__rootdir, 'vars.json');\n\nconst isSudo = botInfo.permissions.numbers?.includes(remoteJid.split('@')[0]) || msg.key?.fromMe;\nif (!isSudo) return sendTrackedMessage(sock, remoteJid, '❌ Permission Denied. Sudo only.');\n\nlet configVars = {};\nif (fs.existsSync(varsFile)) {\n  try { configVars = JSON.parse(fs.readFileSync(varsFile, 'utf8')); } catch(e) {}\n}\n\nlet text = '⚙️ *WXATA SYSTEM VARS*\n\n';\ntext += `🔹 *Prefix:* ${botInfo.prefix}\n`;\ntext += `🔹 *Allow All:* ${botInfo.permissions.allowAll}\n`;\ntext += `🔹 *OS:* ${os.platform()} (${os.release()})\n`;\ntext += `🔹 *Node:* ${process.version}\n`;\ntext += `🔹 *Arch:* ${os.arch()}\n`;\ntext += `🔹 *RAM:* ${((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024).toFixed(2)}GB / ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(0)}GB\n`;\n\nreturn sendTrackedMessage(sock, remoteJid, text);"
+    },
+    "trivia": {
+      "name": "Trivia Quiz",
+      "desc": "Play a global trivia quiz! Infinite questions and leaderboard. (!trivia start | lb)",
+      "trigger": "trivia",
+      "aliases": [
+        "quiz",
+        "tv"
+      ],
+      "type": "fun",
+      "response": "",
+      "target": "chat",
+      "code": "const axios = require('axios');\nconst fs = require('fs');\nconst path = require('path');\nconst file = path.resolve(__rootdir, 'trivia_game.json');\nlet state = { chats: {}, scores: {} };\ntry { if(fs.existsSync(file)) state = JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) {}\n\nconst arg = argumentName ? argumentName.trim().toLowerCase() : '';\nconst chat = remoteJid;\nconst user = msg.key?.participant || remoteJid;\nconst username = msg.pushName || user.split('@')[0];\n\nif (arg === 'lb' || arg === 'leaderboard') {\n    let scores = Object.entries(state.scores).sort((a,b)=>b[1]-a[1]).slice(0, 10);\n    if (!scores.length) return sendTrackedMessage(sock, chat, \"No scores yet!\");\n    let text = \"🏆 *TRIVIA LEADERBOARD* 🏆\\n\\n\";\n    scores.forEach((s, i) => text += `${i+1}. @${s[0].split('@')[0]} - ${s[1]} pts\\n`);\n    return sock.sendMessage(chat, { text, mentions: scores.map(s => s[0]) });\n}\n\nif (!arg || arg === 'start') {\n    if (state.chats[chat]) return sendTrackedMessage(sock, chat, \"A game is already running! Answer using !trivia <A|B|C|D>\");\n    try {\n        const res = await axios.get('https://opentdb.com/api.php?amount=1&type=multiple');\n        const q = res.data.results[0];\n        let options = [...q.incorrect_answers, q.correct_answer].sort(() => Math.random() - 0.5);\n        state.chats[chat] = {\n            q: q.question.replace(/&quot;/g, '\"').replace(/&#039;/g, \"'\").replace(/&amp;/g, '&').replace(/&Ouml;/g, 'Ö').replace(/&ldquo;/g, '\"').replace(/&rdquo;/g, '\"'),\n            ans: String.fromCharCode(65 + options.indexOf(q.correct_answer)),\n            opts: options\n        };\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        let text = `🎯 *TRIVIA TIME* 🎯\\n\\n*Difficulty:* ${q.difficulty}\\n*Category:* ${q.category}\\n\\n*${state.chats[chat].q}*\\n\\n`;\n        options.forEach((o, i) => {\n            const opt = o.replace(/&quot;/g, '\"').replace(/&#039;/g, \"'\").replace(/&amp;/g, '&').replace(/&Ouml;/g, 'Ö').replace(/&ldquo;/g, '\"').replace(/&rdquo;/g, '\"');\n            text += `*${String.fromCharCode(65 + i)}.* ${opt}\\n`;\n        });\n        text += \"\\n_Reply with !trivia <A|B|C|D>_\";\n        return sendTrackedMessage(sock, chat, text);\n    } catch (e) {\n        return sendTrackedMessage(sock, chat, \"❌ Failed to fetch question. Try again later.\");\n    }\n}\n\nif (state.chats[chat]) {\n    const active = state.chats[chat];\n    if (['a','b','c','d'].includes(arg)) {\n        if (arg.toUpperCase() === active.ans) {\n            state.scores[user] = (state.scores[user] || 0) + 1;\n            delete state.chats[chat];\n            fs.writeFileSync(file, JSON.stringify(state, null, 2));\n            return sock.sendMessage(chat, { text: `✅ *Correct, @${user.split('@')[0]}!* The answer was ${active.ans}.\\n\\nYou now have ${state.scores[user]} points.`, mentions: [user] });\n        } else {\n            return sendTrackedMessage(sock, chat, `❌ Incorrect! Try again.`);\n        }\n    } else {\n        return sendTrackedMessage(sock, chat, `⚠️ Active trivia running! Use !trivia <A|B|C|D> or !trivia lb`);\n    }\n} else {\n    return sendTrackedMessage(sock, chat, `Type !trivia start to play!`);\n}"
+    },
+    "guess": {
+      "name": "Guess The Number",
+      "desc": "Guess the random number. Find it in fewest attempts! (!guess start | lb)",
+      "trigger": "guess",
+      "aliases": [
+        "gs"
+      ],
+      "type": "fun",
+      "response": "",
+      "target": "chat",
+      "code": "const fs = require('fs');\nconst path = require('path');\nconst file = path.resolve(__rootdir, 'guess_game.json');\nlet state = { chats: {}, scores: {} };\ntry { if(fs.existsSync(file)) state = JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) {}\n\nconst arg = argumentName ? argumentName.trim().toLowerCase() : '';\nconst chat = remoteJid;\nconst user = msg.key?.participant || remoteJid;\n\nif (arg === 'lb' || arg === 'leaderboard') {\n    let scores = Object.entries(state.scores).sort((a,b)=>b[1]-a[1]).slice(0, 10);\n    if (!scores.length) return sendTrackedMessage(sock, chat, \"No scores yet!\");\n    let text = \"🏆 *GUESS LEADERBOARD* 🏆\\n\\n\";\n    scores.forEach((s, i) => text += `${i+1}. @${s[0].split('@')[0]} - ${s[1]} wins\\n`);\n    return sock.sendMessage(chat, { text, mentions: scores.map(s => s[0]) });\n}\n\nif (!arg || arg === 'start') {\n    if (state.chats[chat]) return sendTrackedMessage(sock, chat, `A game is running! Guess the number between 1 and 100! (e.g. !guess 50)`);\n    state.chats[chat] = {\n        num: Math.floor(Math.random() * 100) + 1,\n        attempts: 0\n    };\n    fs.writeFileSync(file, JSON.stringify(state, null, 2));\n    return sendTrackedMessage(sock, chat, `🎲 *GUESS THE NUMBER* 🎲\\n\\nI'm thinking of a number between 1 and 100.\\n\\n_Reply with !guess <number>_`);\n}\n\nif (state.chats[chat]) {\n    const guess = parseInt(arg);\n    if (isNaN(guess)) return sendTrackedMessage(sock, chat, \"Please guess a valid number!\");\n    \n    state.chats[chat].attempts++;\n    const target = state.chats[chat].num;\n    \n    if (guess === target) {\n        state.scores[user] = (state.scores[user] || 0) + 1;\n        const attempts = state.chats[chat].attempts;\n        delete state.chats[chat];\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        return sock.sendMessage(chat, { text: `🎉 *BINGO, @${user.split('@')[0]}!*\\n\\nYou guessed the number ${target} in ${attempts} attempts!\\nTotal Wins: ${state.scores[user]}`, mentions: [user] });\n    } else if (guess < target) {\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        return sendTrackedMessage(sock, chat, `🔼 Higher! (Attempt ${state.chats[chat].attempts})`);\n    } else {\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        return sendTrackedMessage(sock, chat, `🔽 Lower! (Attempt ${state.chats[chat].attempts})`);\n    }\n} else {\n    return sendTrackedMessage(sock, chat, `Type !guess start to play!`);\n}"
+    },
+    "math": {
+      "name": "Math Challenge",
+      "desc": "Brain teaser math game with leaderboard. (!math start | lb)",
+      "trigger": "math",
+      "aliases": [
+        "calc",
+        "mt"
+      ],
+      "type": "fun",
+      "response": "",
+      "target": "chat",
+      "code": "const fs = require('fs');\nconst path = require('path');\nconst file = path.resolve(__rootdir, 'math_game.json');\nlet state = { chats: {}, scores: {} };\ntry { if(fs.existsSync(file)) state = JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) {}\n\nconst arg = argumentName ? argumentName.trim().toLowerCase() : '';\nconst chat = remoteJid;\nconst user = msg.key?.participant || remoteJid;\n\nif (arg === 'lb' || arg === 'leaderboard') {\n    let scores = Object.entries(state.scores).sort((a,b)=>b[1]-a[1]).slice(0, 10);\n    if (!scores.length) return sendTrackedMessage(sock, chat, \"No scores yet!\");\n    let text = \"🏆 *MATH LEADERBOARD* 🏆\\n\\n\";\n    scores.forEach((s, i) => text += `${i+1}. @${s[0].split('@')[0]} - ${s[1]} pts\\n`);\n    return sock.sendMessage(chat, { text, mentions: scores.map(s => s[0]) });\n}\n\nif (!arg || arg === 'start') {\n    if (state.chats[chat]) return sendTrackedMessage(sock, chat, \"Finish the current math problem first! (Reply with !math <number>)\");\n    const ops = ['+', '-', '*'];\n    const op = ops[Math.floor(Math.random() * ops.length)];\n    let a = Math.floor(Math.random() * 50) + 1;\n    let b = Math.floor(Math.random() * 50) + 1;\n    let ans = 0;\n    if (op === '*') {\n        a = Math.floor(Math.random() * 12) + 2;\n        b = Math.floor(Math.random() * 12) + 2;\n        ans = a * b;\n    } else if (op === '+') {\n        ans = a + b;\n    } else {\n        if (a < b) { let temp = a; a = b; b = temp; }\n        ans = a - b;\n    }\n    \n    state.chats[chat] = { q: `${a} ${op} ${b}`, ans: ans };\n    fs.writeFileSync(file, JSON.stringify(state, null, 2));\n    return sendTrackedMessage(sock, chat, `🧠 *MATH CHALLENGE* 🧠\\n\\nSolve this:\\n*${a} ${op} ${b} = ?*\\n\\n_Reply with !math <answer>_`);\n}\n\nif (state.chats[chat]) {\n    const guess = parseInt(arg);\n    if (isNaN(guess)) return sendTrackedMessage(sock, chat, \"Provide a valid number!\");\n    \n    if (guess === state.chats[chat].ans) {\n        state.scores[user] = (state.scores[user] || 0) + 1;\n        delete state.chats[chat];\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        return sock.sendMessage(chat, { text: `✅ *Brilliant, @${user.split('@')[0]}!*\\nCorrect answer was ${guess}.\\nPoints: ${state.scores[user]}`, mentions: [user] });\n    } else {\n        return sendTrackedMessage(sock, chat, `❌ Incorrect! Keep trying.`);\n    }\n} else {\n    return sendTrackedMessage(sock, chat, `Type !math start to play!`);\n}"
     }
   },
   "root": {
