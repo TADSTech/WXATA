@@ -127,6 +127,24 @@ for (const [cat, cmds] of Object.entries(categories)) {
     menuText += '\\n';
 }
 
+try {
+    const { commandHandler } = require('./commands/CommandHandler');
+    const modularCommands = commandHandler.list();
+    if (modularCommands.length > 0) {
+        menuText += \`╭━─━─━─≪❥≫\\n│ *GAMES & MODULES ❞*\\n╰━─━─━─≪❥≫\\n\`;
+        modularCommands.forEach(cmd => {
+            if (isDetailed) {
+                menuText += \`│ ✗ \${botInfo.prefix}\${cmd.trigger} (\${cmd.name})\\n│    \${cmd.description || cmd.desc}\\n\`;
+            } else {
+                menuText += \`│ ✗ \${botInfo.prefix}\${cmd.trigger}\\n\`;
+            }
+        });
+        menuText += '\\n';
+    }
+} catch (e) {
+    console.error('Could not load commandHandler for menu:', e);
+}
+
 if (!isDetailed) menuText += \`_Tip: Use \${botInfo.prefix}mn detailed for descriptions._\`;
 
 await sock.sendMessage(remoteJid, {
@@ -153,7 +171,17 @@ await sock.sendMessage(remoteJid, {
       code: `if (!argumentName) return sendTrackedMessage(sock, remoteJid, \`📖 *WXATA HELP*\\n\\nUsage: \${botInfo.prefix}hp <command>\\nExample: \${botInfo.prefix}hp st\\n\\nType \${botInfo.prefix}mn to see all aliases.\`);
 
 const cmdKey = argumentName.toLowerCase().trim();
-const script = Object.values(botInfo.scripts).find(s => s.trigger === cmdKey || s.name?.toLowerCase() === cmdKey || (s.aliases && s.aliases.includes(cmdKey)));
+let script = Object.values(botInfo.scripts).find(s => s.trigger === cmdKey || s.name?.toLowerCase() === cmdKey || (s.aliases && s.aliases.includes(cmdKey)));
+
+if (!script) {
+  try {
+      const { commandHandler } = require('./commands/CommandHandler');
+      const mod = commandHandler.get(cmdKey);
+      if (mod) {
+          script = { name: mod.name, desc: mod.description, trigger: mod.trigger, target: mod.target };
+      }
+  } catch(e) {}
+}
 
 if (!script) return sendTrackedMessage(sock, remoteJid, \`❌ Command "\${cmdKey}" not found.\`);
 
