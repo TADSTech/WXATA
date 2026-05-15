@@ -6,6 +6,7 @@ export class RandomCommand implements Command {
   description = 'Play random casino-style games!';
   trigger = 'random';
   target: 'chat' | 'self' = 'chat';
+  aliases = ['rd', 'casino', 'slots', 'flip'];
 
   async execute(ctx: CommandContext): Promise<void> {
     const args = (ctx.argumentName || '').trim().toLowerCase().split(' ');

@@ -17,6 +17,11 @@ export class CommandHandler {
 
   register(command: Command): void {
     this.commands.set(command.trigger.toLowerCase(), command);
+    if (command.aliases) {
+      for (const alias of command.aliases) {
+        this.commands.set(alias.toLowerCase(), command);
+      }
+    }
   }
 
   registerMany(commands: Command[]): void {
@@ -34,7 +39,7 @@ export class CommandHandler {
   }
 
   list(): Command[] {
-    return Array.from(this.commands.values());
+    return Array.from(new Set(this.commands.values()));
   }
 
   async dispatch(trigger: string, ctx: CommandContext): Promise<boolean> {

@@ -12,6 +12,17 @@ import { BrainTeaserCommand } from "./commands/games/BrainTeaserCommand";
 commandHandler.register(new FunCommand());
 commandHandler.register(new RandomCommand());
 commandHandler.register(new BrainTeaserCommand());
+import { WordChainCommand, WordRandomCommand } from "./commands/games/WordGameCommand";
+import { AlexaCommand } from "./commands/misc/AlexaCommand";
+import { ShipCommand } from "./commands/misc/ShipCommand";
+import { SysInfoCommand } from "./commands/misc/SysInfoCommand";
+import { WyrCommand } from "./commands/games/WyrCommand";
+commandHandler.register(new WordChainCommand());
+commandHandler.register(new WordRandomCommand());
+commandHandler.register(new AlexaCommand());
+commandHandler.register(new ShipCommand());
+commandHandler.register(new SysInfoCommand());
+commandHandler.register(new WyrCommand());
 
 import fs from "fs/promises";
 import fsSync from "fs";
@@ -131,7 +142,7 @@ try {
     const { commandHandler } = require('./commands/CommandHandler');
     const modularCommands = commandHandler.list();
     if (modularCommands.length > 0) {
-        menuText += \`╭━─━─━─≪❥≫\\n│ *GAMES & MODULES ❞*\\n╰━─━─━─≪❥≫\\n\`;
+        menuText += \`╭━─━─━─≪❥≫\\n│ *PREMIUM MODULES ❞*\\n╰━─━─━─≪❥≫\\n\`;
         modularCommands.forEach(cmd => {
             if (isDetailed) {
                 menuText += \`│ ✗ \${botInfo.prefix}\${cmd.trigger} (\${cmd.name})\\n│    \${cmd.description || cmd.desc}\\n\`;

@@ -16,6 +16,7 @@ export class BrainTeaserCommand implements Command {
   description = 'Test your brain with math or word puzzles!';
   trigger = 'brainteaser';
   target: 'chat' | 'self' = 'chat';
+  aliases = ['bt', 'brain', 'quiz'];
 
   async execute(ctx: CommandContext): Promise<void> {
     const args = (ctx.argumentName || '').trim().toLowerCase().split(' ');

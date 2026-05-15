@@ -9,6 +9,12 @@ interface GroupScore {
 
 const minigameScores = new Map<string, GroupScore>();
 
+export function setScore(groupId: string, playerId: string, playerName: string, points: number) {
+  const group = minigameScores.get(groupId) || {};
+  group[playerId] = { name: playerName, score: points };
+  minigameScores.set(groupId, group);
+}
+
 export function addWin(groupId: string, playerId: string, playerName: string, points: number = 1) {
   const group = minigameScores.get(groupId) || {};
   if (!group[playerId]) {

@@ -35,6 +35,8 @@ export interface Command {
   trigger: string;
   /** Where to send the response by default */
   target: 'chat' | 'self';
+  /** Alternative shorthand triggers for the command */
+  aliases?: string[];
   /** Whether this command requires root/sudo */
   requiresRoot?: boolean;
   /** Execute the command */

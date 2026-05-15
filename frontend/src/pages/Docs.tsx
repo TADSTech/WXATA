@@ -98,6 +98,15 @@ Commands are prefix-based (default: \`!\`). Each command has a primary trigger a
 | \`wn\` | warn | admin | Warn user (3x = kick) |
 | \`ad\` | antidel | tools | Anti-delete toggle |
 | \`vs\` | vars | admin | View/set system vars |
+| \`alexa\` | play, music | music | Play music from YouTube |
+| \`ship\` | match, couple | fun | Find your group partner |
+| \`sysinfo\` | sys, info | tools | Full server system info |
+| \`fun\` | games, bomb | games | Hot Potato bomb game |
+| \`random\` | rd, slots | games | Casino & random games |
+| \`bt\` | brain, quiz | games | Brain teaser puzzles |
+| \`wcg\` | wc, chain | games | Word chain game |
+| \`wrg\` | wr, unscramble | games | Word scramble game |
+| \`wyr\` | choice | games | Would you rather? |
 
 ### Using Commands
 

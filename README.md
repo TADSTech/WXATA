@@ -1,4 +1,4 @@
-﻿# WXATA 🟢
+# WXATA 🟢
 
 A high-performance WhatsApp automation platform built with **Baileys** and **Bun**. Run interactive scripts, manage permissions, and configure everything from a live web dashboard.
 
@@ -62,11 +62,19 @@ See **[deployment.md](./deployment.md)** for full instructions covering:
 | `+save` | Save quoted media to your chat |
 | `+tagall` | Mention all group members |
 | `+warn` | Warn a user (3 strikes = kick) |
-| `+antidel [on\|off\|target +number]` | Anti-delete toggle |
-| `+antibc [on\|off\|message]` | Anti-broadcast toggle |
+| `+antidel` | Anti-delete toggle |
+| `+antibc` | Anti-broadcast toggle |
 | `+ss <url>` | Screenshot a webpage |
+| `+alexa <song>` | Play music from YouTube |
+| `+ship` | Find your group partner |
+| `+sysinfo` | Full server system info |
+| `+fun` | Hot Potato bomb game |
+| `+random` | Casino & random games |
+| `+bt` | Brain teaser puzzles |
+| `+wcg` | Word chain game |
+| `+wrg` | Word scramble game |
+| `+wyr` | Would you rather? |
 | `+owner` | Send owner vCard |
-| `+joke` | Random programming joke |
 
 All commands are editable from the dashboard. Add custom JS scripts without restarting.
 
