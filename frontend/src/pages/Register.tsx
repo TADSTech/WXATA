@@ -309,22 +309,23 @@ export default function Register() {
                   className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
                 />
               </div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label
-                      htmlFor="reg-code"
-                      className="block text-sm font-medium text-text-muted"
-                    >
-                      Registration Code
-                    </label>
-                    <a 
-                      href="https://selar.co/wxata" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs text-accent-light hover:text-accent-primary font-semibold transition-colors"
-                    >
-                      Buy Code Instantly →
-                    </a>
-                  </div>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label
+                    htmlFor="reg-code"
+                    className="block text-sm font-medium text-text-muted"
+                  >
+                    Registration Code
+                  </label>
+                  <a 
+                    href="https://selar.co/wxata" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-accent-light hover:text-accent-primary font-semibold transition-colors"
+                  >
+                    Buy Code Instantly →
+                  </a>
+                </div>
                 <input
                   id="reg-code"
                   type="text"
