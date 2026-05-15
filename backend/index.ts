@@ -769,6 +769,131 @@ for (const [k, v] of Object.entries(configVars)) {
 text += '\\n_Usage: !vs set WARN\\_MESSAGE new text_';
 return sendTrackedMessage(sock, remoteJid, text);`,
     },
+    alexa: {
+      name: "Alexa Music",
+      desc: "Play Music Using Sayan Official API 🚀",
+      trigger: "alexa",
+      aliases: ["play", "al", "music"],
+      type: "tools",
+      response: "",
+      target: "chat",
+      code: `if (!argumentName) return sendTrackedMessage(sock, remoteJid, '_*Please Enter A Song Name, Ex: Alexa Teri Ishq Main*_');
+const query = argumentName.trim();
+const api = \`https://api.sayan-nexuswork.workers.dev/music?query=\${encodeURIComponent(query)}\`;
+try {
+  const res = await fetch(api);
+  const data = await res.json();
+  if (data.status !== 'success') return sendTrackedMessage(sock, remoteJid, '_*No Results Found.*_');
+  const caption = \`☘️ *Title:* \${data.title}\\n⏱️ *Duration:* \${data.duration}\\n🎭 *Views:* \${data.views}\\n📺 *Channel:* \${data.channel}\\n\\n*Downloading audio...*\`;
+  if (data.thumbnail) await sock.sendMessage(remoteJid, { image: { url: data.thumbnail }, caption }, { quoted: msg });
+  else await sendTrackedMessage(sock, remoteJid, caption);
+  const audioRes = await fetch(data.url);
+  const buffer = Buffer.from(await audioRes.arrayBuffer());
+  await sock.sendMessage(remoteJid, { audio: buffer, mimetype: 'audio/mpeg', fileName: \`\${data.title}.mp3\` }, { quoted: msg });
+} catch (e) { await sendTrackedMessage(sock, remoteJid, '_*Server Error.*_'); }`,
+    },
+    ship: {
+      name: "Ship",
+      desc: "Find your partner in a group 💕",
+      trigger: "ship",
+      aliases: ["sh", "match", "couple"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, '_*Groups only.*_');
+const sender = msg.key.participant || msg.key.remoteJid;
+let target = msg.message?.extendedTextMessage?.contextInfo?.participant || msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+const metadata = await sock.groupMetadata(remoteJid);
+const participants = metadata.participants || [];
+if (!target || target === sender) {
+  let randomUser = participants[Math.floor(Math.random() * participants.length)];
+  while (randomUser.id === sender && participants.length > 1) randomUser = participants[Math.floor(Math.random() * participants.length)];
+  target = randomUser.id;
+}
+const caption = \`💞 *Match Found:*\\n@\${sender.split('@')[0]} ❤ @\${target.split('@')[0]}\`;
+await sock.sendMessage(remoteJid, { text: caption, mentions: [sender, target] }, { quoted: msg });`,
+    },
+    sysinfo: {
+      name: "SysInfo",
+      desc: "All System Server Info",
+      trigger: "sysinfo",
+      aliases: ["sys", "info", "speedtest", "server"],
+      type: "tools",
+      response: "",
+      target: "chat",
+      code: `const os = require('os');
+const text = \`🖥️ *SERVER INFO*\\n\\n🔹 *Platform:* \${os.platform()} (\${os.release()})\\n🔹 *Arch:* \${os.arch()}\\n🔹 *CPUs:* \${os.cpus().length}\\n🔹 *RAM:* \${((os.totalmem()-os.freemem())/1024/1024/1024).toFixed(2)}GB / \${(os.totalmem()/1024/1024/1024).toFixed(0)}GB\\n🔹 *Uptime:* \${(os.uptime()/3600).toFixed(1)}h\\n🔹 *Load:* \${os.loadavg().map(l=>l.toFixed(2)).join(', ')}\`;
+await sendTrackedMessage(sock, remoteJid, text);`,
+    },
+    wyr: {
+      name: "Would You Rather",
+      desc: "Play a game of Would You Rather",
+      trigger: "wyr",
+      aliases: ["wouldyourather", "would", "choice"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `try {
+  const response = await fetch('https://api.popcat.xyz/wyr');
+  const data = await response.json();
+  await sock.sendMessage(remoteJid, { poll: { name: 'Would you rather...', values: [\`\${data.ops1}, or\`, data.ops2], selectableCount: 1 } }, { quoted: msg });
+} catch (e) { await sendTrackedMessage(sock, remoteJid, \"Error fetching poll.\"); }`,
+    },
+    fun: {
+      name: "Hot Potato Bomb",
+      desc: "Play the classic Hot Potato bomb game!",
+      trigger: "fun",
+      aliases: ["games", "bomb", "potato"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `const { commandHandler } = require('./commands/CommandHandler');
+await commandHandler.dispatch('fun', { sock, msg, remoteJid, argumentName, botInfo, sendTrackedMessage });`,
+    },
+    random: {
+      name: "Random Games",
+      desc: "Casino and random games (slots, flip)",
+      trigger: "random",
+      aliases: ["rd", "casino", "slots", "flip"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `const { commandHandler } = require('./commands/CommandHandler');
+await commandHandler.dispatch('random', { sock, msg, remoteJid, argumentName, botInfo, sendTrackedMessage });`,
+    },
+    bt: {
+      name: "Brain Teaser",
+      desc: "Math and word puzzles",
+      trigger: "bt",
+      aliases: ["brain", "quiz", "brainteaser"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `const { commandHandler } = require('./commands/CommandHandler');
+await commandHandler.dispatch('brainteaser', { sock, msg, remoteJid, argumentName, botInfo, sendTrackedMessage });`,
+    },
+    wcg: {
+      name: "Word Chain Game",
+      desc: "Competitive word chain",
+      trigger: "wcg",
+      aliases: ["wc", "chain"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `const { commandHandler } = require('./commands/CommandHandler');
+await commandHandler.dispatch('wcg', { sock, msg, remoteJid, argumentName, botInfo, sendTrackedMessage });`,
+    },
+    wrg: {
+      name: "Word Scramble",
+      desc: "Unscramble words",
+      trigger: "wrg",
+      aliases: ["wr", "unscramble"],
+      type: "fun",
+      response: "",
+      target: "chat",
+      code: `const { commandHandler } = require('./commands/CommandHandler');
+await commandHandler.dispatch('wrg', { sock, msg, remoteJid, argumentName, botInfo, sendTrackedMessage });`,
+    },
   },
   root: {
     target: "self",
@@ -1839,31 +1964,8 @@ function attachMessageHandler(
             continue; // Skip normal command processing for this message
           }
 
-          // Modular CommandHandler Hook
-          if (normalizedText.startsWith(botInfo.prefix.toLowerCase().trim())) {
-            const rawAfterPrefix = (text ?? "").slice(botInfo.prefix.length).trim();
-            const spaceIdx = rawAfterPrefix.indexOf(' ');
-            const trigger = (spaceIdx === -1 ? rawAfterPrefix : rawAfterPrefix.slice(0, spaceIdx)).toLowerCase();
-            const argumentName = spaceIdx === -1 ? undefined : rawAfterPrefix.slice(spaceIdx + 1).trim();
 
-            if (commandHandler.has(trigger)) {
-              if (!hasPermission) {
-                dashboard.log("WARN", `Blocked unpermitted modular command "${trigger}" from ${remoteJid}`);
-                continue;
-              }
-              const ctx = {
-                sock,
-                msg,
-                remoteJid: remoteJid!,
-                argumentName,
-                sendTrackedMessage,
-                botInfo
-              };
-              await commandHandler.dispatch(trigger, ctx);
-              continue; // Skip legacy JSON engine
-            }
-          }
-
+          let scriptExecuted = false;
           for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
             const prefixPattern = escapeRegex(botInfo.prefix.trim());
 
@@ -2030,11 +2132,36 @@ function attachMessageHandler(
                   `${scriptName} triggered but target could not be resolved`,
                 );
               }
-              if (triggerMatch) break;
+            } // end of if (triggerMatch)
+          } // end of for scripts
+
+          if (scriptExecuted) continue;
+
+          // Modular CommandHandler Hook (checked AFTER scripts, allowing users to override)
+          if (normalizedText.startsWith(botInfo.prefix.toLowerCase().trim())) {
+            const rawAfterPrefix = (text ?? "").slice(botInfo.prefix.length).trim();
+            const spaceIdx = rawAfterPrefix.indexOf(' ');
+            const trigger = (spaceIdx === -1 ? rawAfterPrefix : rawAfterPrefix.slice(0, spaceIdx)).toLowerCase();
+            const argumentName = spaceIdx === -1 ? undefined : rawAfterPrefix.slice(spaceIdx + 1).trim();
+
+            if (commandHandler.has(trigger)) {
+              if (!hasPermission) {
+                dashboard.log("WARN", `Blocked unpermitted modular command "${trigger}" from ${remoteJid}`);
+                continue;
+              }
+              const ctx = {
+                sock,
+                msg,
+                remoteJid: remoteJid!,
+                argumentName,
+                sendTrackedMessage,
+                botInfo
+              };
+              await commandHandler.dispatch(trigger, ctx);
+              continue;
             }
-            if (triggerMatch) break;
           }
-        }
+        } // end of if (remoteJid)
 
         if (text?.toLowerCase() === "ping" && remoteJid) {
           await sendTrackedMessage(sock, remoteJid, "pong 🟢");

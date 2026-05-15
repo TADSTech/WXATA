@@ -46,19 +46,19 @@ export default function Register() {
 
         if (codeError || !codeData) {
           throw new Error(
-            `Invalid User Code. DM us to purchase access: ${WHATSAPP_LINK}`,
+            `Invalid User Code. Purchase access instantly here: https://selar.co/wxata`,
           );
         }
 
         if (codeData.suspended) {
           throw new Error(
-            `This code has been suspended. Contact us: ${WHATSAPP_LINK}`,
+            `This code has been suspended. Contact support: ${WHATSAPP_LINK}`,
           );
         }
 
         if (codeData.used) {
           throw new Error(
-            `This code has already been used. DM us if you need help: ${WHATSAPP_LINK}`,
+            `This code has already been used. Buy a new one: https://selar.co/wxata`,
           );
         }
 
@@ -309,20 +309,29 @@ export default function Register() {
                   className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
                 />
               </div>
-              <div>
-                <label
-                  htmlFor="reg-code"
-                  className="block text-sm font-medium mb-1 text-text-muted"
-                >
-                  Registration Code
-                </label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label
+                      htmlFor="reg-code"
+                      className="block text-sm font-medium text-text-muted"
+                    >
+                      Registration Code
+                    </label>
+                    <a 
+                      href="https://selar.co/wxata" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-accent-light hover:text-accent-primary font-semibold transition-colors"
+                    >
+                      Buy Code Instantly →
+                    </a>
+                  </div>
                 <input
                   id="reg-code"
                   type="text"
                   required
                   value={userCode}
                   onChange={(e) => setUserCode(e.target.value)}
-                  placeholder="Provided by administrator"
+                  placeholder="XXXX-XXXX-XXXX"
                   className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary"
                 />
               </div>

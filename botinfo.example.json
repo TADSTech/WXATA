@@ -244,6 +244,63 @@
       "response": "",
       "target": "chat",
       "code": "const fs = require('fs');\nconst path = require('path');\nconst file = path.resolve(__rootdir, 'math_game.json');\nlet state = { chats: {}, scores: {} };\ntry { if(fs.existsSync(file)) state = JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e) {}\n\nconst arg = argumentName ? argumentName.trim().toLowerCase() : '';\nconst chat = remoteJid;\nconst user = msg.key?.participant || remoteJid;\n\nif (arg === 'lb' || arg === 'leaderboard') {\n    let scores = Object.entries(state.scores).sort((a,b)=>b[1]-a[1]).slice(0, 10);\n    if (!scores.length) return sendTrackedMessage(sock, chat, \"No scores yet!\");\n    let text = \"🏆 *MATH LEADERBOARD* 🏆\\n\\n\";\n    scores.forEach((s, i) => text += `${i+1}. @${s[0].split('@')[0]} - ${s[1]} pts\\n`);\n    return sock.sendMessage(chat, { text, mentions: scores.map(s => s[0]) });\n}\n\nif (!arg || arg === 'start') {\n    if (state.chats[chat]) return sendTrackedMessage(sock, chat, \"Finish the current math problem first! (Reply with !math <number>)\");\n    const ops = ['+', '-', '*'];\n    const op = ops[Math.floor(Math.random() * ops.length)];\n    let a = Math.floor(Math.random() * 50) + 1;\n    let b = Math.floor(Math.random() * 50) + 1;\n    let ans = 0;\n    if (op === '*') {\n        a = Math.floor(Math.random() * 12) + 2;\n        b = Math.floor(Math.random() * 12) + 2;\n        ans = a * b;\n    } else if (op === '+') {\n        ans = a + b;\n    } else {\n        if (a < b) { let temp = a; a = b; b = temp; }\n        ans = a - b;\n    }\n    \n    state.chats[chat] = { q: `${a} ${op} ${b}`, ans: ans };\n    fs.writeFileSync(file, JSON.stringify(state, null, 2));\n    return sendTrackedMessage(sock, chat, `🧠 *MATH CHALLENGE* 🧠\\n\\nSolve this:\\n*${a} ${op} ${b} = ?*\\n\\n_Reply with !math <answer>_`);\n}\n\nif (state.chats[chat]) {\n    const guess = parseInt(arg);\n    if (isNaN(guess)) return sendTrackedMessage(sock, chat, \"Provide a valid number!\");\n    \n    if (guess === state.chats[chat].ans) {\n        state.scores[user] = (state.scores[user] || 0) + 1;\n        delete state.chats[chat];\n        fs.writeFileSync(file, JSON.stringify(state, null, 2));\n        return sock.sendMessage(chat, { text: `✅ *Brilliant, @${user.split('@')[0]}!*\\nCorrect answer was ${guess}.\\nPoints: ${state.scores[user]}`, mentions: [user] });\n    } else {\n        return sendTrackedMessage(sock, chat, `❌ Incorrect! Keep trying.`);\n    }\n} else {\n    return sendTrackedMessage(sock, chat, `Type !math start to play!`);\n}"
+    },
+    "alexa": {
+      "name": "Alexa Music",
+      "desc": "Play Music Using Sayan Official API 🚀",
+      "trigger": "alexa",
+      "aliases": [
+        "play",
+        "al",
+        "music"
+      ],
+      "type": "tools",
+      "response": "",
+      "target": "chat",
+      "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, '_*Please Enter A Song Name, Ex: Alexa Teri Ishq Main*_');\nconst query = argumentName.trim();\nconst api = `https://api.sayan-nexuswork.workers.dev/music?query=${encodeURIComponent(query)}`;\ntry {\n  const res = await fetch(api);\n  const data = await res.json();\n  if (data.status !== 'success') return sendTrackedMessage(sock, remoteJid, '_*No Results Found.*_');\n  const caption = `☘️ *Title:* ${data.title}\\n⏱️ *Duration:* ${data.duration}\\n🎭 *Views:* ${data.views}\\n📺 *Channel:* ${data.channel}\\n\\n*Downloading audio...*`;\n  if (data.thumbnail) await sock.sendMessage(remoteJid, { image: { url: data.thumbnail }, caption }, { quoted: msg });\n  else await sendTrackedMessage(sock, remoteJid, caption);\n  const audioRes = await fetch(data.url);\n  const buffer = Buffer.from(await audioRes.arrayBuffer());\n  await sock.sendMessage(remoteJid, { audio: buffer, mimetype: 'audio/mpeg', fileName: `${data.title}.mp3` }, { quoted: msg });\n} catch (e) { await sendTrackedMessage(sock, remoteJid, '_*Server Error.*_'); }"
+    },
+    "ship": {
+      "name": "Ship",
+      "desc": "Find your partner in a group 💕",
+      "trigger": "ship",
+      "aliases": [
+        "sh",
+        "match",
+        "couple"
+      ],
+      "type": "fun",
+      "response": "",
+      "target": "chat",
+      "code": "if (!remoteJid.endsWith('@g.us')) return sendTrackedMessage(sock, remoteJid, '_*Groups only.*_');\nconst sender = msg.key.participant || msg.key.remoteJid;\nlet target = msg.message?.extendedTextMessage?.contextInfo?.participant || msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];\nconst metadata = await sock.groupMetadata(remoteJid);\nconst participants = metadata.participants || [];\nif (!target || target === sender) {\n  let randomUser = participants[Math.floor(Math.random() * participants.length)];\n  while (randomUser.id === sender && participants.length > 1) randomUser = participants[Math.floor(Math.random() * participants.length)];\n  target = randomUser.id;\n}\nconst caption = `💞 *Match Found:*\\n@${sender.split('@')[0]} ❤ @${target.split('@')[0]}`;\nawait sock.sendMessage(remoteJid, { text: caption, mentions: [sender, target] }, { quoted: msg });"
+    },
+    "sysinfo": {
+      "name": "SysInfo",
+      "desc": "All System Server Info",
+      "trigger": "sysinfo",
+      "aliases": [
+        "sys",
+        "info",
+        "speedtest",
+        "server"
+      ],
+      "type": "tools",
+      "response": "",
+      "target": "chat",
+      "code": "const os = require('os');\nconst text = `🖥️ *SERVER INFO*\\n\\n🔹 *Platform:* ${os.platform()} (${os.release()})\\n🔹 *Arch:* ${os.arch()}\\n🔹 *CPUs:* ${os.cpus().length}\\n🔹 *RAM:* ${((os.totalmem()-os.freemem())/1024/1024/1024).toFixed(2)}GB / ${(os.totalmem()/1024/1024/1024).toFixed(0)}GB\\n🔹 *Uptime:* ${(os.uptime()/3600).toFixed(1)}h\\n🔹 *Load:* ${os.loadavg().map(l=>l.toFixed(2)).join(', ')}`;\nawait sendTrackedMessage(sock, remoteJid, text);"
+    },
+    "wyr": {
+      "name": "Would You Rather",
+      "desc": "Play a game of Would You Rather",
+      "trigger": "wyr",
+      "aliases": [
+        "wouldyourather",
+        "would",
+        "choice"
+      ],
+      "type": "fun",
+      "response": "",
+      "target": "chat",
+      "code": "try {\n  const response = await fetch('https://api.popcat.xyz/wyr');\n  const data = await response.json();\n  await sock.sendMessage(remoteJid, { poll: { name: 'Would you rather...', values: [`${data.ops1}, or`, data.ops2], selectableCount: 1 } }, { quoted: msg });\n} catch (e) { await sendTrackedMessage(sock, remoteJid, \"Error fetching poll.\"); }"
     }
   },
   "root": {

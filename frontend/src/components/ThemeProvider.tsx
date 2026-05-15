@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type Theme = 'midnight' | 'nord' | 'cyberpunk' | 'rose' | 'ocean' | 'forest' | 'minimal' | 'sepia' | 'hacker' | 'sunset';
+export type Theme = 'vibes' | 'midnight' | 'nord' | 'cyberpunk' | 'rose' | 'ocean' | 'forest' | 'minimal' | 'sepia' | 'hacker' | 'sunset';
 
 export const KNOWN_THEMES: Theme[] = [
-  'midnight', 'nord', 'cyberpunk', 'rose', 'ocean',
+  'vibes', 'midnight', 'nord', 'cyberpunk', 'rose', 'ocean',
   'forest', 'minimal', 'sepia', 'hacker', 'sunset'
 ];
 
@@ -13,7 +13,7 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'midnight',
+  theme: 'vibes',
   setTheme: () => {}
 });
 
@@ -26,10 +26,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
       // Unknown or missing value — clear it and fall back to default
       localStorage.removeItem('wxata-theme');
-      return 'midnight';
+      return 'vibes';
     } catch {
       // Private browsing or storage access denied
-      return 'midnight';
+      return 'vibes';
     }
   });
 
