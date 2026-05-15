@@ -15,7 +15,7 @@ interface BombState {
   ticksLeft: number;
 }
 
-const activeBombs = new Map<string, BombState>();
+export const activeBombs = new Map<string, BombState>();
 
 export class FunCommand implements Command {
   name = 'Fun Games';
@@ -65,7 +65,7 @@ export class FunCommand implements Command {
         
         const holder = state.players[state.currentHolderIndex]!;
         const names = state.players.map(p => p.name).join(', ');
-        await ctx.sendTrackedMessage(ctx.sock, groupId, `💣 *BOMB PLANTED!* 💣\nPlayers: ${names}\n\nThe bomb is handed to @${holder.id.split('@')[0]}!\nQuick, pass it with *${ctx.botInfo.prefix}fun pass* before it explodes! (30s)`);
+        await ctx.sendTrackedMessage(ctx.sock, groupId, `💣 *BOMB PLANTED!* 💣\nPlayers: ${names}\n\nThe bomb is handed to @${holder.id.split('@')[0]}!\nQuick, pass it with *${ctx.botInfo.prefix}fun pass* before it explodes! (30s)`, [holder.id]);
         
         this.resetBombTimer(groupId, ctx, 30000);
       }, 60000); // 60s lobby
@@ -99,7 +99,7 @@ export class FunCommand implements Command {
 
       const holder = state.players[state.currentHolderIndex]!;
       if (holder.id !== sender) {
-        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `You don't have the bomb! @${holder.id.split('@')[0]} has it!`);
+        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `You don't have the bomb! @${holder.id.split('@')[0]} has it!`, [holder.id]);
         return;
       }
 
@@ -119,7 +119,7 @@ export class FunCommand implements Command {
       state.currentHolderIndex = nextHolderIndex;
       const nextHolder = state.players[state.currentHolderIndex]!;
       
-      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `✅ Passed to @${nextHolder.id.split('@')[0]}! Quick, pass it again! (20s)`);
+      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `✅ Passed to @${nextHolder.id.split('@')[0]}! Quick, pass it again! (20s)`, [nextHolder.id]);
       this.resetBombTimer(groupId, ctx, 20000); // 20s pass timer
       return;
     }
@@ -133,7 +133,7 @@ export class FunCommand implements Command {
     
     state.timer = setTimeout(async () => {
       const holder = state.players[state.currentHolderIndex]!;
-      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `⏳ *10 SECONDS LEFT* before the bomb explodes! Pass it quickly, @${holder.id.split('@')[0]}!`);
+      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `⏳ *10 SECONDS LEFT* before the bomb explodes! Pass it quickly, @${holder.id.split('@')[0]}!`, [holder.id]);
       
       const subTimer = setTimeout(async () => {
         const boomState = activeBombs.get(groupId);
@@ -152,7 +152,7 @@ export class FunCommand implements Command {
     addWin(groupId, holder.id, holder.name, -5); // Penalty
     
     const reason = isTimeout ? `Time ran out!` : `The fuse triggered while passing!`;
-    await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `💥 *KABOOM!* 💥\n${reason}\nIt exploded on @${holder.id.split('@')[0]}!\n\n@${holder.id.split('@')[0]} loses 5 points.`);
+    await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `💥 *KABOOM!* 💥\n${reason}\nIt exploded on @${holder.id.split('@')[0]}!\n\n@${holder.id.split('@')[0]} loses *5 points*.`, [holder.id]);
     
     state.players = state.players.filter(p => p.id !== holder.id);
     
@@ -160,7 +160,7 @@ export class FunCommand implements Command {
       if (state.players.length === 1) {
         const winner = state.players[0]!;
         addWin(groupId, winner.id, winner.name, 10);
-        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🏆 @${winner.id.split('@')[0]} survived and won the Hot Potato! (+10 pts)`);
+        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🏆 @${winner.id.split('@')[0]} survived and won the Hot Potato! (+10 pts)`, [winner.id]);
       } else {
         await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `💀 Everyone exploded! Nobody wins.`);
       }
@@ -168,7 +168,7 @@ export class FunCommand implements Command {
     } else {
       state.currentHolderIndex = Math.floor(Math.random() * state.players.length);
       const nextHolder = state.players[state.currentHolderIndex]!;
-      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `💣 A new bomb has been given to @${nextHolder.id.split('@')[0]}!\nPass it quickly! (30s)`);
+      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `💣 A new bomb has been given to @${nextHolder.id.split('@')[0]}!\nPass it quickly! (30s)`, [nextHolder.id]);
       this.resetBombTimer(groupId, ctx, 30000);
     }
   }

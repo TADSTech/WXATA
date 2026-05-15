@@ -12,7 +12,9 @@ import { BrainTeaserCommand } from "./commands/games/BrainTeaserCommand";
 commandHandler.register(new FunCommand());
 commandHandler.register(new RandomCommand());
 commandHandler.register(new BrainTeaserCommand());
-import { WordChainCommand, WordRandomCommand } from "./commands/games/WordGameCommand";
+import { WordChainCommand, WordRandomCommand, activeWCG } from "./commands/games/WordGameCommand";
+import { activeTeasers } from "./commands/games/BrainTeaserCommand";
+import { activeBombs } from "./commands/games/FunCommand";
 import { AlexaCommand } from "./commands/misc/AlexaCommand";
 import { ShipCommand } from "./commands/misc/ShipCommand";
 import { SysInfoCommand } from "./commands/misc/SysInfoCommand";
@@ -1578,9 +1580,10 @@ async function sendTrackedMessage(
   sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>,
   jid: string,
   text: string,
+  mentions?: string[],
 ) {
   rememberOutboundMessage(jid, text);
-  await sock.sendMessage(jid, { text });
+  await sock.sendMessage(jid, { text, mentions });
 }
 
 function extractMessageText(message: unknown): string | undefined {
@@ -1992,6 +1995,7 @@ function attachMessageHandler(
             }
 
             if (triggerMatch) {
+              scriptExecuted = true;
               dashboard.log(
                 "DEBUG",
                 `Match found: script="${scriptName}" trigger="${matchedTrigger}" args="${argumentName || "none"}"`,
@@ -2136,6 +2140,56 @@ function attachMessageHandler(
           } // end of for scripts
 
           if (scriptExecuted) continue;
+
+          // Game Word Tracker (Track words directly without prefix)
+          if (remoteJid && !normalizedText.startsWith(botInfo.prefix.toLowerCase().trim())) {
+            const state = activeWCG.get(remoteJid);
+            if (state && state.phase === 'playing') {
+              const currentPlayer = state.players[state.currentPlayerIndex];
+              const sender = (msg.key?.participant || msg.participant || msg.key?.remoteJid || 'unknown');
+              if (currentPlayer && currentPlayer.id === sender) {
+                const trigger = state.type === 'wcg' ? 'wcg' : 'wrg';
+                const ctx = {
+                  sock,
+                  msg,
+                  remoteJid: remoteJid!,
+                  argumentName: `play ${text.trim()}`,
+                  sendTrackedMessage,
+                  botInfo
+                };
+                await commandHandler.dispatch(trigger, ctx);
+                continue;
+              }
+            }
+            
+            const teaser = activeTeasers.get(remoteJid);
+            if (teaser && teaser.active) {
+              const ctx = {
+                sock,
+                msg,
+                remoteJid: remoteJid!,
+                argumentName: `ans ${text.trim()}`,
+                sendTrackedMessage,
+                botInfo
+              };
+              await commandHandler.dispatch('brainteaser', ctx);
+              continue;
+            }
+
+            const bomb = activeBombs.get(remoteJid);
+            if (bomb && bomb.active && bomb.phase === 'playing' && normalizedText === 'pass') {
+              const ctx = {
+                sock,
+                msg,
+                remoteJid: remoteJid!,
+                argumentName: 'pass',
+                sendTrackedMessage,
+                botInfo
+              };
+              await commandHandler.dispatch('fun', ctx);
+              continue;
+            }
+          }
 
           // Modular CommandHandler Hook (checked AFTER scripts, allowing users to override)
           if (normalizedText.startsWith(botInfo.prefix.toLowerCase().trim())) {

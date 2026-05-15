@@ -9,7 +9,7 @@ export interface CommandContext {
   msg: any;
   remoteJid: string;
   argumentName: string | undefined;
-  sendTrackedMessage: (sock: WASocket, jid: string, text: string) => Promise<void>;
+  sendTrackedMessage: (sock: WASocket, jid: string, text: string, mentions?: string[]) => Promise<void>;
   botInfo: BotInfoSnapshot;
 }
 

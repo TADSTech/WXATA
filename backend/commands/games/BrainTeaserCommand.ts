@@ -7,7 +7,7 @@ interface TeaserState {
   answer: string;
 }
 
-const activeTeasers = new Map<string, TeaserState>();
+export const activeTeasers = new Map<string, TeaserState>();
 
 const WORDS = ['developer', 'javascript', 'typescript', 'computer', 'keyboard', 'internet', 'whatsapp', 'programming', 'software', 'hardware'];
 
@@ -55,7 +55,7 @@ export class BrainTeaserCommand implements Command {
         answer: ans.toString()
       });
 
-      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🧠 *MATH BLITZ!* 🧠\nWhat is: *${question}* ?\nFirst to answer with *${ctx.botInfo.prefix}brainteaser ans <number>* wins 2 pts!`);
+      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🧠 *MATH BLITZ!* 🧠\nWhat is: *${question}* ?\nFirst to answer with *${ctx.botInfo.prefix}bt ans <number>* wins *2 pts*!`);
       return;
     }
 
@@ -74,7 +74,7 @@ export class BrainTeaserCommand implements Command {
         answer: word
       });
 
-      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🔡 *WORD SCRAMBLE!* 🔡\nUnscramble this word: *${scrambled.toUpperCase()}*\nFirst to answer with *${ctx.botInfo.prefix}brainteaser ans <word>* wins 2 pts!`);
+      await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `🔡 *WORD SCRAMBLE!* 🔡\nUnscramble: *${scrambled.toUpperCase()}*\nFirst to answer with *${ctx.botInfo.prefix}bt ans <word>* wins *2 pts*!`);
       return;
     }
 
@@ -89,7 +89,7 @@ export class BrainTeaserCommand implements Command {
       if (guess === teaser.answer) {
         teaser.active = false;
         addWin(groupId, sender, senderName, 2);
-        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `✅ *CORRECT!* ✅\n${senderName} got it! The answer was ${teaser.answer}. (+2 pts)`);
+        await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `✅ *CORRECT!*\n*${senderName}* got it! The answer was *${teaser.answer}*. (+2 pts)`, [sender]);
       } else {
         await ctx.sendTrackedMessage(ctx.sock, ctx.remoteJid, `❌ Incorrect! Try again.`);
       }
