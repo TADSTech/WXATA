@@ -15,6 +15,7 @@ import {
   MessageSquare,
   TrendingUp,
   Palette,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { SocialBanner } from "../components/SocialBanner";
@@ -291,6 +292,12 @@ const Landing = () => {
             title="Extension Marketplace"
             desc="Install community-built scripts directly from the dashboard. One click, no code."
             delay={0.4}
+          />
+          <FeatureCard
+            icon={Users}
+            title="Dual Accounts"
+            desc="Manage two separate WhatsApp accounts (Primary & Secondary) simultaneously from one dashboard."
+            delay={0.45}
           />
           <FeatureCard
             icon={Terminal}

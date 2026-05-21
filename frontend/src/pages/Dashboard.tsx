@@ -1010,6 +1010,7 @@ const Dashboard = () => {
   const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
 
   // ── Bot state ───────────────────────────────────────────────────────────────
+  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>('primary');
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -1061,12 +1062,16 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [username, navigate]);
 
-  // ── Send GET_BOT_INFO on connect ────────────────────────────────────────────
+  // ── Send GET_BOT_INFO on connect & account switch ─────────────────────────────
   useEffect(() => {
     if (isAuthenticated && wsStatus === 'connected') {
-      send({ command: 'GET_BOT_INFO' });
+      setLogs([]);
+      setQrData(null);
+      setPairingCode(null);
+      setBotInfo(DEFAULT_BOT_INFO);
+      send({ command: 'GET_BOT_INFO', accountId: selectedAccountId });
     }
-  }, [isAuthenticated, wsStatus, send]);
+  }, [isAuthenticated, wsStatus, send, selectedAccountId]);
 
   // ── Route lastMessage by event field ────────────────────────────────────────
   useEffect(() => {
@@ -1074,40 +1079,48 @@ const Dashboard = () => {
     const msg = lastMessage as Record<string, unknown>;
     const event = msg.event as string;
     const data = msg.data;
+    const msgAccountId = msg.accountId as string | undefined;
 
     if (event === 'status' && data && typeof data === 'object') {
       const s = data as Record<string, unknown>;
+      const connections = s.connection as Record<string, string>;
+      const conn = connections?.[selectedAccountId] ?? 'DISCONNECTED';
       setBotStatus({
-        connection: (s.connection as string) ?? 'DISCONNECTED',
+        connection: conn,
         uptime: (s.uptime as string) ?? '00h 00m 00s',
         memory: (s.memory as string) ?? '0MB / 512MB',
       });
-      if (s.connection === 'CONNECTED') {
+      if (conn === 'CONNECTED') {
         setAuthMethod('NONE');
         setQrData(null);
         setPairingCode(null);
         setIsConnecting(false);
       }
-    } else if (event === 'log' && data && typeof data === 'object') {
-      const l = data as Record<string, unknown>;
-      const entry: LogEntry = {
-        timestamp: (l.timestamp as string) ?? '',
-        type: (l.type as string) ?? 'INFO',
-        message: (l.message as string) ?? '',
-      };
-      setLogs(prev => [...prev, entry].slice(-50));
-    } else if (event === 'qr') {
-      setQrData(data as string);
-      setIsConnecting(false);
-    } else if (event === 'pairing-code') {
-      setPairingCode(data as string);
-      setIsConnecting(false);
-    } else if (event === 'bot-info' && data) {
-      setBotInfo(data as BotInfo);
-      setConfigStatus('Config synced');
-      addToast('Config synced', 'success');
+    } else {
+      // For all other events, filter by selectedAccountId
+      if (msgAccountId && msgAccountId !== selectedAccountId) return;
+
+      if (event === 'log' && data && typeof data === 'object') {
+        const l = data as Record<string, unknown>;
+        const entry: LogEntry = {
+          timestamp: (l.timestamp as string) ?? '',
+          type: (l.type as string) ?? 'INFO',
+          message: (l.message as string) ?? '',
+        };
+        setLogs(prev => [...prev, entry].slice(-50));
+      } else if (event === 'qr') {
+        setQrData(data as string);
+        setIsConnecting(false);
+      } else if (event === 'pairing-code') {
+        setPairingCode(data as string);
+        setIsConnecting(false);
+      } else if (event === 'bot-info' && data) {
+        setBotInfo(data as BotInfo);
+        setConfigStatus('Config synced');
+        addToast('Config synced', 'success');
+      }
     }
-  }, [lastMessage, addToast]);
+  }, [lastMessage, addToast, selectedAccountId]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1116,7 +1129,7 @@ const Dashboard = () => {
       addToast('Not connected', 'error');
       return;
     }
-    send({ command, data });
+    send({ command, data, accountId: selectedAccountId });
   };
 
   const startConnection = (method: 'QR' | 'PHONE') => {
@@ -1124,6 +1137,7 @@ const Dashboard = () => {
     setAuthMethod(method);
     send({
       command: 'START_CONNECTION',
+      accountId: selectedAccountId,
       data: { method, phoneNumber: method === 'PHONE' ? phoneNumber : undefined },
     });
   };

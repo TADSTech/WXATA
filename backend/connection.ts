@@ -21,14 +21,10 @@ const logger = pino({ level: 'warn' });
 
 import fsSync from 'fs';
 
-// Configuration constants
-// Use Render's persistent disk at /data if available so auth survives restarts
-const AUTH_DIR = fsSync.existsSync('/data')
-  ? '/data/auth_info'
-  : path.resolve(__dirname, 'auth_info');
 const RECONNECT_INTERVALS = [5000, 15000, 30000, 60000]; // Exponential backoff
 
 interface ConnectionOptions {
+  accountId: "primary" | "secondary";
   phoneNumber?: string;
   usePairingCode?: boolean;
   onQR?: (qr: string) => void;
@@ -46,14 +42,25 @@ export class WXATAConnection {
 
   constructor(private options: ConnectionOptions) {}
 
+  public get accountId() {
+    return this.options.accountId;
+  }
+
+  private getAuthDir() {
+    return fsSync.existsSync('/data')
+      ? `/data/auth_info_${this.options.accountId}`
+      : path.resolve(__dirname, `auth_info_${this.options.accountId}`);
+  }
+
   /**
    * Initialize the connection with robust state handling
    */
   public async createConnection(): Promise<WASocket> {
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const authDir = this.getAuthDir();
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version } = await fetchLatestBaileysVersion();
 
-    dashboard.setConnectionStatus('CONNECTING');
+    dashboard.setConnectionStatus(this.options.accountId, 'CONNECTING');
 
     this.sock = makeWASocket({
       version,
@@ -104,10 +111,10 @@ export class WXATAConnection {
           try {
             const code = await this.sock.requestPairingCode(phoneNumber.replace(/\D/g, ''));
             if (this.options.onPairingCode) this.options.onPairingCode(code);
-            dashboard.log('SUCCESS', `Pairing code generated for ${phoneNumber}`);
+            dashboard.log(this.options.accountId, 'SUCCESS', `Pairing code generated for ${phoneNumber}`);
           } catch (err) {
             logger.error({ err }, 'Failed to request pairing code');
-            dashboard.log('ERROR', 'Failed to generate pairing code');
+            dashboard.log(this.options.accountId, 'ERROR', 'Failed to generate pairing code');
           }
         }
       });
@@ -123,23 +130,23 @@ export class WXATAConnection {
 
       if (connection === 'close') {
         this.isConnected = false;
-        dashboard.setConnectionStatus('DISCONNECTED');
+        dashboard.setConnectionStatus(this.options.accountId, 'DISCONNECTED');
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         const reason = lastDisconnect?.error;
 
-        console.log(`Connection closed. Reason: ${statusCode} (${reason})`);
-        dashboard.log('ERROR', `Connection closed: ${statusCode}`);
+        console.log(`[${this.options.accountId.toUpperCase()}] Connection closed. Reason: ${statusCode} (${reason})`);
+        dashboard.log(this.options.accountId, 'ERROR', `Connection closed: ${statusCode}`);
 
         if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
           logger.warn(`Auth failure (${statusCode}). Clearing session and stopping — manual re-pair required.`);
-          dashboard.log('WARN', 'Auth failure (401/logged out). Session cleared. Please re-pair from the dashboard.');
+          dashboard.log(this.options.accountId, 'WARN', 'Auth failure (401/logged out). Session cleared. Please re-pair from the dashboard.');
           await this.clearSession();
           this.reconnectAttempts = 0;
           if (this.options.onLogout) this.options.onLogout();
           // Do NOT reconnect — credentials are gone. The dashboard must issue a new START_CONNECTION.
         } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
           logger.error('Connection replaced by another session. Stopping reconnects to prevent conflict loops.');
-          dashboard.log('ERROR', 'Session taken over by another instance. Please restart the container if this is unexpected.');
+          dashboard.log(this.options.accountId, 'ERROR', 'Session taken over by another instance. Please restart the container if this is unexpected.');
           // Do not automatically reconnect on 440. This allows PaaS rolling-deployments to cleanly transition
           // by letting the old container die instead of fighting the new container for the session.
         } else {
@@ -154,11 +161,11 @@ export class WXATAConnection {
       } else if (connection === 'open') {
         this.isConnected = true;
         this.reconnectAttempts = 0;
-        dashboard.setConnectionStatus('CONNECTED');
+        dashboard.setConnectionStatus(this.options.accountId, 'CONNECTED');
         console.log('\n----------------------------------------');
-        console.log('🟢 WXATA: Protocol connection established');
+        console.log(`🟢 WXATA: Protocol connection established (${this.options.accountId.toUpperCase()})`);
         console.log('----------------------------------------\n');
-        dashboard.log('SUCCESS', 'WhatsApp Protocol connection established');
+        dashboard.log(this.options.accountId, 'SUCCESS', 'WhatsApp Protocol connection established');
         if (this.options.onOpen) this.options.onOpen();
       }
     });
@@ -166,10 +173,10 @@ export class WXATAConnection {
     // Handle History Sync
     this.sock.ev.on('messaging-history.set', ({ isLatest }) => {
       const msg = `Syncing chat history (isLatest: ${isLatest}). Please wait...`;
-      console.log(`📡 WXATA: ${msg}`);
-      dashboard.log('INFO', msg);
+      console.log(`📡 WXATA (${this.options.accountId.toUpperCase()}): ${msg}`);
+      dashboard.log(this.options.accountId, 'INFO', msg);
       if (isLatest) {
-        dashboard.log('SUCCESS', 'Initial history sync completed! Bot is ready to receive commands.');
+        dashboard.log(this.options.accountId, 'SUCCESS', 'Initial history sync completed! Bot is ready to receive commands.');
       }
     });
 
@@ -201,10 +208,11 @@ export class WXATAConnection {
    */
   public async clearSession() {
     try {
-      await fs.rm(AUTH_DIR, { recursive: true, force: true });
-      logger.info('Session data wiped successfully');
+      const authDir = this.getAuthDir();
+      await fs.rm(authDir, { recursive: true, force: true });
+      logger.info(`Session data wiped successfully for ${this.options.accountId}`);
     } catch (err) {
-      logger.error({ err }, 'Failed to wipe session data');
+      logger.error({ err }, `Failed to wipe session data for ${this.options.accountId}`);
     }
   }
 

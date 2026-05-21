@@ -80,10 +80,9 @@ interface BotPermissions {
 }
 
 // Use Render's persistent disk at /data if available, otherwise workspace root
-const DATA_DIR = require("fs").existsSync("/data")
-  ? "/data"
-  : path.resolve(__dirname, "..");
-const BOT_INFO_PATH = path.resolve(DATA_DIR, "botinfo.json");
+const DATA_DIR = require("fs").existsSync("/data") ? "/data" : path.resolve(__dirname, "..");
+function getAccountDir(accountId: string) { const dir = path.resolve(DATA_DIR, accountId); if (!require("fs").existsSync(dir)) require("fs").mkdirSync(dir, { recursive: true }); return dir; }
+
 const OUTBOUND_MESSAGE_TTL_MS = 15_000;
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: "!",
@@ -257,7 +256,7 @@ try {
     }
   });
 } catch (err) {
-  dashboard.log('ERROR', \`!owner vCard send failed: \${err?.message ?? err}\`);
+  dashboard.log(accountId, 'ERROR', \`!owner vCard send failed: \${err?.message ?? err}\`);
   await sendTrackedMessage(sock, remoteJid, '❌ Failed to send owner contact.');
 }`,
     },
@@ -1215,7 +1214,8 @@ function buildMenuResponse(botInfo: BotInfo): string {
   return lines.join("\n");
 }
 
-async function readBotInfo(): Promise<BotInfo> {
+async function readBotInfo(accountId: string): Promise<BotInfo> {
+  const BOT_INFO_PATH = path.resolve(getAccountDir(accountId), "botinfo.json");
   try {
     const raw = await fs.readFile(BOT_INFO_PATH, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -1230,8 +1230,9 @@ async function readBotInfo(): Promise<BotInfo> {
   }
 }
 
-async function updateBotInfo(patch: Partial<BotInfo>): Promise<BotInfo> {
-  const current = await readBotInfo();
+async function updateBotInfo(accountId: string, patch: Partial<BotInfo>): Promise<BotInfo> {
+  const BOT_INFO_PATH = path.resolve(getAccountDir(accountId), "botinfo.json");
+  const current = await readBotInfo(accountId);
   const merged = sanitizeBotInfo({ ...current, ...patch });
   await fs.writeFile(BOT_INFO_PATH, JSON.stringify(merged, null, 2), "utf-8");
   return merged;
@@ -1749,10 +1750,7 @@ function resolveScriptResponse(
   return argumentConfig?.response?.trim() || script.response;
 }
 
-function attachMessageHandler(
-  sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>,
-  onMessage?: () => void,
-) {
+function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>, accountId: string, onMessage?: () => void) {
   sock.ev.on("messaging-history.set", async ({ messages }) => {
     if (messages && messages.length > 0) {
       const now = Math.floor(Date.now() / 1000);
@@ -1772,7 +1770,7 @@ function attachMessageHandler(
           count++;
         }
       }
-      dashboard.log(
+      dashboard.log(accountId, 
         "INFO",
         `Cached ${count} recent messages for anti-delete (skipped ${messages.length - count} old/status)`,
       );
@@ -1807,13 +1805,13 @@ function attachMessageHandler(
         const isBotEcho =
           msg.key?.fromMe &&
           wasRecentlySentByBot(remoteJid ?? undefined, text ?? undefined);
-        const botInfo = await readBotInfo();
+        const botInfo = await readBotInfo(accountId);
         const isRootSender = senderMatchesRoot(sock, msg, botInfo.root.target);
         const isCommandPermittedByList = isCommandPermitted(botInfo, msg, sock);
         const hasPermission = isRootSender || isCommandPermittedByList;
 
         if (text && text.startsWith(botInfo.prefix)) {
-          dashboard.log(
+          dashboard.log(accountId, 
             "DEBUG",
             `COMMAND_CHECK text="${text.trim()}" isRoot=${isRootSender} isPermitted=${isCommandPermittedByList} fromMe=${msg.key?.fromMe}`,
           );
@@ -1824,7 +1822,7 @@ function attachMessageHandler(
           .replace(/\s+/g, " ")
           .trim()
           .slice(0, 80);
-        dashboard.log(
+        dashboard.log(accountId, 
           "DEBUG",
           `INBOUND type=${m.type} fromMe=${String(msg.key?.fromMe)} jid=${remoteJid ?? "-"} participant=${participant} text=${textPreview || "<none>"}`,
         );
@@ -1860,7 +1858,7 @@ function attachMessageHandler(
             }
             if (cfgEnabled && msg.key?.participant) {
               await sendTrackedMessage(sock, msg.key.participant, cfgMsg);
-              dashboard.log(
+              dashboard.log(accountId, 
                 "SUCCESS",
                 `Anti-broadcast replied to ${msg.key.participant}`,
               );
@@ -1878,12 +1876,12 @@ function attachMessageHandler(
             normalizedText === chaiTrigger ||
             normalizedText.startsWith(chaiTrigger + " ")
           ) {
-            dashboard.log("DEBUG", `[Chai] Triggered by ${remoteJid}. hasPermission=${hasPermission}`);
+            dashboard.log(accountId, "DEBUG", `[Chai] Triggered by ${remoteJid}. hasPermission=${hasPermission}`);
             if (hasPermission && remoteJid) {
               const rootJid =
                 resolveTargetJid(sock, botInfo.root.target) ??
                 resolveSelfJid(sock);
-              dashboard.log("DEBUG", `[Chai] rootJid resolved to: ${rootJid}`);
+              dashboard.log(accountId, "DEBUG", `[Chai] rootJid resolved to: ${rootJid}`);
               
               if (rootJid) {
                 const bail = require("@whiskeysockets/baileys");
@@ -1891,7 +1889,7 @@ function attachMessageHandler(
                   msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
                 if (!extractFrom) {
-                  dashboard.log("WARN", `[Chai] No quoted message found.`);
+                  dashboard.log(accountId, "WARN", `[Chai] No quoted message found.`);
                   await sendTrackedMessage(
                     sock,
                     rootJid,
@@ -1913,7 +1911,7 @@ function attachMessageHandler(
                       ? "video"
                       : "audio";
 
-                  dashboard.log("DEBUG", `[Chai] Extracted mediaType: ${mediaType}`);
+                  dashboard.log(accountId, "DEBUG", `[Chai] Extracted mediaType: ${mediaType}`);
 
                   if (mediaMsg) {
                     try {
@@ -1937,12 +1935,12 @@ function attachMessageHandler(
                         rootJid,
                         `✅ [Chai] Media extracted from ${remoteJid} and sent here.`,
                       );
-                      dashboard.log(
+                      dashboard.log(accountId, 
                         "SUCCESS",
                         `Chai command executed by ${remoteJid}`,
                       );
                     } catch (err: any) {
-                      dashboard.log("ERROR", `[Chai] Extraction failed: ${err.message}`);
+                      dashboard.log(accountId, "ERROR", `[Chai] Extraction failed: ${err.message}`);
                       await sendTrackedMessage(
                         sock,
                         rootJid,
@@ -1950,7 +1948,7 @@ function attachMessageHandler(
                       );
                     }
                   } else {
-                    dashboard.log("WARN", `[Chai] No valid media found in quoted message.`);
+                    dashboard.log(accountId, "WARN", `[Chai] No valid media found in quoted message.`);
                     await sendTrackedMessage(
                       sock,
                       rootJid,
@@ -1959,10 +1957,10 @@ function attachMessageHandler(
                   }
                 }
               } else {
-                 dashboard.log("ERROR", `[Chai] rootJid could not be resolved!`);
+                 dashboard.log(accountId, "ERROR", `[Chai] rootJid could not be resolved!`);
               }
             } else {
-               dashboard.log("WARN", `[Chai] Denied permission for ${remoteJid}`);
+               dashboard.log(accountId, "WARN", `[Chai] Denied permission for ${remoteJid}`);
             }
             continue; // Skip normal command processing for this message
           }
@@ -1996,13 +1994,13 @@ function attachMessageHandler(
 
             if (triggerMatch) {
               scriptExecuted = true;
-              dashboard.log(
+              dashboard.log(accountId, 
                 "DEBUG",
                 `Match found: script="${scriptName}" trigger="${matchedTrigger}" args="${argumentName || "none"}"`,
               );
 
               if (!hasPermission) {
-                dashboard.log(
+                dashboard.log(accountId, 
                   "WARN",
                   `Blocked unpermitted command "${scriptName}" from ${remoteJid}`,
                 );
@@ -2048,12 +2046,12 @@ function attachMessageHandler(
                   break;
                 }
 
-                const updated = await updateBotInfo({
+                const updated = await updateBotInfo(accountId, {
                   permissions: nextPermissions,
                 });
                 const summary = `✅ Permissions ${parsedPermArgs.mode} complete.\nallowAll=${updated.permissions.allowAll}\nchats=${updated.permissions.chats.length}\nnumbers=${updated.permissions.numbers.length}`;
                 if (replyJid) await sendTrackedMessage(sock, replyJid, summary);
-                dashboard.log(
+                dashboard.log(accountId, 
                   "SUCCESS",
                   `Permission ${parsedPermArgs.mode} applied by ${remoteJid}`,
                 );
@@ -2080,7 +2078,7 @@ function attachMessageHandler(
                   // Pass resolved JID so scripts can reply even when remoteJid is a @lid
                   const execJid = resolveReplyJid(remoteJid) ?? remoteJid;
                   // __rootdir = data directory (persistent disk on Render, workspace root locally)
-                  const __rootdir = DATA_DIR;
+                  const __rootdir = getAccountDir(accountId);
                   await executor(
                     sock,
                     msg,
@@ -2092,12 +2090,12 @@ function attachMessageHandler(
                     require,
                     __rootdir,
                   );
-                  dashboard.log(
+                  dashboard.log(accountId, 
                     "SUCCESS",
                     `${scriptName} JS executed by ${remoteJid}`,
                   );
                 } catch (err: any) {
-                  dashboard.log(
+                  dashboard.log(accountId, 
                     "ERROR",
                     `JS Extension Error (${scriptName}): ${err.message}`,
                   );
@@ -2126,12 +2124,12 @@ function attachMessageHandler(
                     ? buildMenuResponse(botInfo)
                     : resolveScriptResponse(script, argumentName);
                 await sendTrackedMessage(sock, targetJid, responseText);
-                dashboard.log(
+                dashboard.log(accountId, 
                   "SUCCESS",
                   `${scriptName} triggered by ${remoteJid}; response sent to ${targetJid}`,
                 );
               } else {
-                dashboard.log(
+                dashboard.log(accountId, 
                   "ERROR",
                   `${scriptName} triggered but target could not be resolved`,
                 );
@@ -2200,7 +2198,7 @@ function attachMessageHandler(
 
             if (commandHandler.has(trigger)) {
               if (!hasPermission) {
-                dashboard.log("WARN", `Blocked unpermitted modular command "${trigger}" from ${remoteJid}`);
+                dashboard.log(accountId, "WARN", `Blocked unpermitted modular command "${trigger}" from ${remoteJid}`);
                 continue;
               }
               const ctx = {
@@ -2219,17 +2217,17 @@ function attachMessageHandler(
 
         if (text?.toLowerCase() === "ping" && remoteJid) {
           await sendTrackedMessage(sock, remoteJid, "pong 🟢");
-          dashboard.log("SUCCESS", `Auto-reply [pong] sent to ${remoteJid}`);
+          dashboard.log(accountId, "SUCCESS", `Auto-reply [pong] sent to ${remoteJid}`);
         }
 
         const logMsg = `From: ${remoteJid} | Text: ${text ?? "<media>"}`;
         console.log(`[MSG] ${logMsg}`);
         // Only log MSG events that have actual text — media-only messages are too noisy
-        if (text) dashboard.log("MSG", logMsg);
+        if (text) dashboard.log(accountId, "MSG", logMsg);
       } catch (err: any) {
         // Error boundary: log and continue — one bad message must not crash the batch
         const msgId = (msg as any)?.key?.id ?? "unknown";
-        dashboard.log(
+        dashboard.log(accountId, 
           "ERROR",
           `messages.upsert: unhandled error on msg ${msgId}: ${err?.message ?? err}`,
         );
@@ -2255,14 +2253,14 @@ function attachMessageHandler(
 
         const originalMsg = getMessage(targetId);
         if (!originalMsg) {
-          dashboard.log(
+          dashboard.log(accountId, 
             "DEBUG",
             `Anti-delete: message ${targetId} not in DB (too old or never cached)`,
           );
           continue;
         }
 
-        const botInfo = await readBotInfo();
+        const botInfo = await readBotInfo(accountId);
         if (!botInfo.scripts.antidel) continue;
 
         const cfgPath = rPath.resolve(DATA_DIR, "antidel.json");
@@ -2295,7 +2293,7 @@ function attachMessageHandler(
           originalMsg.key?.remoteJid ||
           "unknown";
         const chatJid = originalMsg.key?.remoteJid || "unknown";
-        dashboard.log(
+        dashboard.log(accountId, 
           "INFO",
           `Anti-delete triggered: msg from ${sender} in ${chatJid}`,
         );
@@ -2306,13 +2304,13 @@ function attachMessageHandler(
             forward: originalMsg,
             force: true,
           } as any);
-          dashboard.log(
+          dashboard.log(accountId, 
             "SUCCESS",
             `Anti-delete: forwarded message from ${sender}`,
           );
         } catch (forwardErr: any) {
           // Forward failed — extract whatever content we can and send as media/text
-          dashboard.log(
+          dashboard.log(accountId, 
             "WARN",
             `Anti-delete forward failed (${forwardErr.message}), falling back to extraction`,
           );
@@ -2366,11 +2364,11 @@ function attachMessageHandler(
                    await sock.sendMessage(cfg.target, { text: fallbackText });
                 }
                 
-                dashboard.log("SUCCESS", `Anti-delete: sent extracted media for ${sender}`);
+                dashboard.log(accountId, "SUCCESS", `Anti-delete: sent extracted media for ${sender}`);
               } catch (mediaErr: any) {
                 fallbackText += `\n\n📎 Type: ${mediaType} (media extraction failed: ${mediaErr.message})`;
                 await sock.sendMessage(cfg.target, { text: fallbackText });
-                dashboard.log("SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
+                dashboard.log(accountId, "SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
               }
             } else {
                // No media, just text
@@ -2378,10 +2376,10 @@ function attachMessageHandler(
                   fallbackText += `\n\n❓ Unknown message type or media not recoverable`;
                }
                await sock.sendMessage(cfg.target, { text: fallbackText });
-               dashboard.log("SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
+               dashboard.log(accountId, "SUCCESS", `Anti-delete: sent fallback text for ${sender}`);
             }
           } catch (textErr: any) {
-            dashboard.log(
+            dashboard.log(accountId, 
               "ERROR",
               `Anti-delete: complete failure — ${textErr.message}`,
             );
@@ -2389,7 +2387,7 @@ function attachMessageHandler(
         }
       } catch (err: any) {
         // Error boundary: log and continue processing remaining updates
-        dashboard.log(
+        dashboard.log(accountId, 
           "ERROR",
           `messages.update: unhandled error on update ${update?.key?.id ?? "unknown"}: ${err?.message ?? err}`,
         );
@@ -2399,17 +2397,15 @@ function attachMessageHandler(
   });
 }
 
-async function sendWelcomeMessage(
-  sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>,
-) {
-  const botInfo = await readBotInfo();
+async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>, accountId: string) {
+  const botInfo = await readBotInfo(accountId);
   if (!botInfo.welcome.enabled) {
     return;
   }
 
   const targetJid = resolveTargetJid(sock, botInfo.root.target);
   if (!targetJid) {
-    dashboard.log(
+    dashboard.log(accountId, 
       "ERROR",
       "Welcome message enabled but target could not be resolved",
     );
@@ -2424,29 +2420,30 @@ async function sendWelcomeMessage(
     .replace(/{menu}/g, botInfo.scripts.menu?.trigger || "menu");
 
   await sendTrackedMessage(sock, targetJid, interpolatedText);
-  dashboard.log("SUCCESS", `Welcome message sent to ${targetJid}`);
+  dashboard.log(accountId, "SUCCESS", `Welcome message sent to ${targetJid}`);
 }
 
-async function ensureConfigFiles(): Promise<void> {
+async function ensureConfigFiles(accountId: string): Promise<void> {
   // DATA_DIR is defined at module level — /data on Render, workspace root locally
-  const dir = DATA_DIR;
+  const dir = getAccountDir(accountId);
+  const botInfoPath = path.resolve(dir, "botinfo.json");
 
   // Also seed botinfo.json from example if missing
   try {
-    await fs.access(BOT_INFO_PATH);
+    await fs.access(botInfoPath);
   } catch {
     const examplePath = path.resolve(__dirname, "..", "botinfo.example.json");
     try {
       const example = await fs.readFile(examplePath, "utf-8");
-      await fs.writeFile(BOT_INFO_PATH, example, "utf-8");
-      dashboard.log("INFO", "Created botinfo.json from botinfo.example.json");
+      await fs.writeFile(botInfoPath, example, "utf-8");
+      dashboard.log(accountId, "INFO", "Created botinfo.json from botinfo.example.json");
     } catch {
       await fs.writeFile(
-        BOT_INFO_PATH,
+        botInfoPath,
         JSON.stringify(DEFAULT_BOT_INFO, null, 2),
         "utf-8",
       );
-      dashboard.log("INFO", "Created default botinfo.json");
+      dashboard.log(accountId, "INFO", "Created default botinfo.json");
     }
   }
 
@@ -2459,7 +2456,7 @@ async function ensureConfigFiles(): Promise<void> {
       JSON.stringify({ enabled: true, target: null }, null, 2),
       "utf-8",
     );
-    dashboard.log("INFO", "Created default antidel.json");
+    dashboard.log(accountId, "INFO", "Created default antidel.json");
   }
 
   const antibcPath = path.resolve(dir, "antibc.json");
@@ -2475,7 +2472,7 @@ async function ensureConfigFiles(): Promise<void> {
       ),
       "utf-8",
     );
-    dashboard.log("INFO", "Created default antibc.json");
+    dashboard.log(accountId, "INFO", "Created default antibc.json");
   }
 
   const warnsPath = path.resolve(dir, "warns.json");
@@ -2483,7 +2480,7 @@ async function ensureConfigFiles(): Promise<void> {
     await fs.access(warnsPath);
   } catch {
     await fs.writeFile(warnsPath, JSON.stringify({}, null, 2), "utf-8");
-    dashboard.log("INFO", "Created default warns.json");
+    dashboard.log(accountId, "INFO", "Created default warns.json");
   }
 
   const varsPath = path.resolve(dir, "vars.json");
@@ -2491,243 +2488,151 @@ async function ensureConfigFiles(): Promise<void> {
     await fs.access(varsPath);
   } catch {
     await fs.writeFile(varsPath, JSON.stringify({}, null, 2), "utf-8");
-    dashboard.log("INFO", "Created default vars.json");
+    dashboard.log(accountId, "INFO", "Created default vars.json");
   }
 }
 
+
+const connectionManagers = new Map<string, WXATAConnection>();
+const lastConnectionParamsMap = new Map<string, { method: string; phoneNumber?: string }>();
+const lastMessageAtMap = new Map<string, number>();
+
 async function startBot() {
   await validateLicense();
-  dashboard.log("INFO", "Initializing WXATA Backend System...");
-  console.log("🚀 Initializing WXATA Backend...");
-  await ensureConfigFiles();
+  console.log("🚀 Initializing WXATA Backend for Dual Accounts...");
+  
+  await ensureConfigFiles("primary");
+  await ensureConfigFiles("secondary");
 
-  // Load persisted vars (e.g. DB_RETENTION_DAYS set via +vars)
-  try {
-    const varsPath = path.resolve(DATA_DIR, "vars.json");
-    const savedVars = JSON.parse(await fs.readFile(varsPath, "utf-8"));
-    if (savedVars.DB_RETENTION_DAYS) {
-      setRetentionDays(+savedVars.DB_RETENTION_DAYS);
-      dashboard.log(
-        "INFO",
-        `DB retention loaded: ${savedVars.DB_RETENTION_DAYS} days`,
-      );
-    }
-  } catch {
-    /* vars.json missing or empty — use default */
-  }
-
-  let connectionManager: WXATAConnection | null = null;
-  let hasSentWelcome = false;
-  let lastConnectionParams: { method: string; phoneNumber?: string } | null =
-    null;
-
-  // ── Watchdog — detect and recover from Baileys buffer stalls ─────────────
-  // When Baileys gets stuck processing undecryptable group messages, the
-  // message handler queue freezes. The bot appears connected but doesn't
-  // respond to commands. We detect this by tracking the last time a message
-  // was received and force-reconnecting if it's been too long.
-  let lastMessageAt = Date.now();
-  const WATCHDOG_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes of silence = stalled
-
-  // Export a function so attachMessageHandler can reset the watchdog
-  function resetWatchdog() {
-    lastMessageAt = Date.now();
-  }
-
+  // Start the watchdog
+  const WATCHDOG_TIMEOUT_MS = 4 * 60 * 1000;
   setInterval(async () => {
-    // Only check if we're supposed to be connected
-    if (!connectionManager || !lastConnectionParams) return;
-    const sock = connectionManager.getSocket();
-    if (!sock) return;
+    for (const accountId of ["primary", "secondary"]) {
+      const connectionManager = connectionManagers.get(accountId);
+      const lastConnectionParams = lastConnectionParamsMap.get(accountId);
+      
+      if (!connectionManager || !lastConnectionParams) continue;
+      const sock = connectionManager.getSocket();
+      if (!sock) continue;
 
-    const silentMs = Date.now() - lastMessageAt;
-    if (silentMs > WATCHDOG_TIMEOUT_MS) {
-      dashboard.log(
-        "WARN",
-        `Watchdog: No messages for ${Math.round(silentMs / 1000)}s — force reconnecting...`,
-      );
-      console.log(
-        `🔁 Watchdog triggered after ${Math.round(silentMs / 1000)}s silence — reconnecting`,
-      );
-      lastMessageAt = Date.now(); // Reset before reconnect to avoid loop
+      const lastMessageAt = lastMessageAtMap.get(accountId) || Date.now();
+      const silentMs = Date.now() - lastMessageAt;
+      
+      if (silentMs > WATCHDOG_TIMEOUT_MS) {
+        dashboard.log(accountId, "WARN", `Watchdog: No messages for ${Math.round(silentMs / 1000)}s — force reconnecting...`);
+        console.log(`🔁 Watchdog triggered after ${Math.round(silentMs / 1000)}s silence for ${accountId} — reconnecting`);
+        lastMessageAtMap.set(accountId, Date.now());
 
-      try {
-        await connectionManager.destroy();
-        connectionManager = new WXATAConnection({
-          phoneNumber: lastConnectionParams.phoneNumber,
-          usePairingCode: lastConnectionParams.method === "PHONE",
-          onQR: (qr) => {
-            dashboard.sendQR(qr);
-            qrcode.generate(qr, { small: true });
-          },
-          onPairingCode: (code) => {
-            dashboard.sendPairingCode(code);
-          },
-          onSocketCreated: (sock) => {
-            dashboard.setSock(sock);
-            attachMessageHandler(sock, resetWatchdog);
-          },
-          onOpen: () => {
-            dashboard.log("SUCCESS", "Watchdog reconnect successful");
-          },
-          onLogout: () => {
-            dashboard.log("WARN", "Session expired during watchdog reconnect");
-          },
-        });
-        await connectionManager.createConnection();
-      } catch (err) {
-        dashboard.log("ERROR", `Watchdog reconnect failed: ${err}`);
+        try {
+          await connectionManager.destroy();
+          const newManager = new WXATAConnection({
+            accountId: accountId as "primary"|"secondary",
+            phoneNumber: lastConnectionParams.phoneNumber,
+            usePairingCode: lastConnectionParams.method === "PHONE",
+            onQR: (qr) => { dashboard.sendQR(accountId, qr); require('qrcode-terminal').generate(qr, { small: true }); },
+            onPairingCode: (code) => { dashboard.sendPairingCode(accountId, code); },
+            onSocketCreated: (sock) => { dashboard.setSock(accountId, sock); attachMessageHandler(sock, accountId, () => lastMessageAtMap.set(accountId, Date.now())); },
+            onOpen: () => { dashboard.log(accountId, "SUCCESS", "Watchdog reconnect successful"); },
+            onLogout: () => { dashboard.log(accountId, "WARN", "Session expired during watchdog reconnect"); }
+          });
+          connectionManagers.set(accountId, newManager);
+          await newManager.createConnection();
+        } catch (err) {
+          dashboard.log(accountId, "ERROR", `Watchdog reconnect failed: ${err}`);
+        }
       }
     }
-  }, 60_000); // Check every minute
+  }, 60_000);
 
   dashboard.onCommand(async (payload) => {
     try {
+      const accountId = payload.accountId || "primary";
+      
       if (payload.command === "START_CONNECTION") {
         const { method, phoneNumber } = payload.data;
-        lastConnectionParams = { method, phoneNumber };
+        lastConnectionParamsMap.set(accountId, { method, phoneNumber });
 
-        dashboard.log("INFO", `Starting connection via ${method}...`);
-
+        dashboard.log(accountId, "INFO", `Starting connection via ${method}...`);
+        let connectionManager = connectionManagers.get(accountId);
         if (connectionManager) {
           await connectionManager.destroy();
         }
 
         connectionManager = new WXATAConnection({
+          accountId: accountId as "primary"|"secondary",
           phoneNumber,
           usePairingCode: method === "PHONE",
-          onQR: (qr) => {
-            dashboard.sendQR(qr);
-            qrcode.generate(qr, { small: true });
-          },
-          onPairingCode: (code) => {
-            dashboard.sendPairingCode(code);
-          },
-          onSocketCreated: (sock) => {
-            dashboard.setSock(sock);
-            attachMessageHandler(sock, resetWatchdog);
-          },
-          onOpen: () => {
-            dashboard.log("SUCCESS", "Bot is now fully operational");
-
-            if (!hasSentWelcome) {
-              setTimeout(() => {
+          onQR: (qr) => { dashboard.sendQR(accountId, qr); require('qrcode-terminal').generate(qr, { small: true }); },
+          onPairingCode: (code) => { dashboard.sendPairingCode(accountId, code); },
+          onSocketCreated: (sock) => { dashboard.setSock(accountId, sock); attachMessageHandler(sock, accountId, () => lastMessageAtMap.set(accountId, Date.now())); },
+          onOpen: () => { 
+            dashboard.log(accountId, "SUCCESS", "Bot is now fully operational"); 
+            setTimeout(() => {
                 const socketForWelcome = connectionManager?.getSocket();
                 if (socketForWelcome) {
-                  sendWelcomeMessage(socketForWelcome)
-                    .then(() => {
-                      hasSentWelcome = true;
-                    })
-                    .catch((err) => {
-                      console.error("Failed to send welcome message", err);
-                      dashboard.log("ERROR", "Failed to send welcome message");
+                    sendWelcomeMessage(socketForWelcome, accountId).catch(err => {
+                        console.error("Failed to send welcome message", err);
+                        dashboard.log(accountId, "ERROR", "Failed to send welcome message");
                     });
                 }
-              }, 15000); // Increased timeout to ensure session keys fully propagate to WhatsApp servers before sending
-            }
-          },
+            }, 15000);
+          }
         });
-
+        
+        connectionManagers.set(accountId, connectionManager);
         await connectionManager.createConnection();
       }
 
       if (payload.command === "GET_BOT_INFO") {
-        const botInfo = await readBotInfo();
-        dashboard.broadcast({ event: "bot-info", data: botInfo });
+        const botInfo = await readBotInfo(accountId);
+        dashboard.broadcast({ event: "bot-info", accountId, data: botInfo });
       }
 
       if (payload.command === "UPDATE_BOT_INFO") {
-        const updated = await updateBotInfo(payload.data ?? {});
-        dashboard.broadcast({ event: "bot-info", data: updated });
-        dashboard.log("SUCCESS", "Bot script configuration updated");
+        const updated = await updateBotInfo(accountId, payload.data ?? {});
+        dashboard.broadcast({ event: "bot-info", accountId, data: updated });
+        dashboard.log(accountId, "SUCCESS", "Bot script configuration updated");
       }
 
       if (payload.command === "QUICK_ACTION") {
         const { action } = payload.data;
-        dashboard.log("WARN", `Executing Quick Action: ${action}`);
+        dashboard.log(accountId, "WARN", `Executing Quick Action: ${action}`);
 
+        let connectionManager = connectionManagers.get(accountId);
         switch (action) {
           case "RESTART_BOT":
-            dashboard.log("INFO", "Restarting bot process via PM2...");
-            if (connectionManager) {
-              await connectionManager.destroy();
-              connectionManager = null;
-            }
-            dashboard.setConnectionStatus("DISCONNECTED");
-            dashboard.log(
-              "SUCCESS",
-              "Graceful shutdown complete. PM2 will restart the process.",
-            );
-            // Exit code 0 → PM2 treats this as a normal exit and restarts automatically.
-            // If PM2 is not in use the process simply stops (no infinite loop).
+            dashboard.log(accountId, "INFO", "Restarting bot process via PM2...");
+            if (connectionManager) { await connectionManager.destroy(); connectionManagers.delete(accountId); }
+            dashboard.setConnectionStatus(accountId, "DISCONNECTED");
+            dashboard.log(accountId, "SUCCESS", "Graceful shutdown complete. PM2 will restart the process.");
             setTimeout(() => process.exit(0), 500);
             break;
           case "TERMINATE":
-            dashboard.log(
-              "WARN",
-              "Terminating bot process and clearing session...",
-            );
-            if (connectionManager) {
-              await connectionManager.logout(); // This clears auth_info
-              await connectionManager.destroy();
-              connectionManager = null;
-            } else {
-              // Fallback if not fully initialized
-              const fs = require("fs/promises");
-              const AUTH_DIR = fsSync.existsSync("/data")
-                ? "/data/auth_info"
-                : path.resolve(__dirname, "auth_info");
-              await fs
-                .rm(AUTH_DIR, { recursive: true, force: true })
-                .catch(() => {});
-            }
-            dashboard.setConnectionStatus("DISCONNECTED");
-            dashboard.log(
-              "SUCCESS",
-              "Session cleared. PM2 will NOT restart (stop_exit_codes: [2]).",
-            );
-            // Exit code 2 → listed in PM2 stop_exit_codes, so PM2 stops without restarting.
-            setTimeout(() => process.exit(2), 500);
-            break;
-          case "LOGOUT":
-            dashboard.log("WARN", "Logging out and clearing session data...");
+            dashboard.log(accountId, "WARN", "Terminating bot process and clearing session...");
             if (connectionManager) {
               await connectionManager.logout();
               await connectionManager.destroy();
-              connectionManager = null;
-            } else {
-              // Fallback if not fully initialized
-              const fs = require("fs/promises");
-              const AUTH_DIR = fsSync.existsSync("/data")
-                ? "/data/auth_info"
-                : path.resolve(__dirname, "auth_info");
-              await fs
-                .rm(AUTH_DIR, { recursive: true, force: true })
-                .catch(() => {});
+              connectionManagers.delete(accountId);
             }
-            dashboard.setConnectionStatus("DISCONNECTED");
-            dashboard.log(
-              "SUCCESS",
-              "Session cleared. System ready for new pairing.",
-            );
+            dashboard.setConnectionStatus(accountId, "DISCONNECTED");
+            setTimeout(() => process.exit(2), 500);
             break;
-          case "EXPORT_DATA":
-            dashboard.log("INFO", "Exporting session logs...");
+          case "LOGOUT":
+            dashboard.log(accountId, "WARN", "Logging out and clearing session data...");
+            if (connectionManager) {
+              await connectionManager.logout();
+              await connectionManager.destroy();
+              connectionManagers.delete(accountId);
+            }
+            dashboard.setConnectionStatus(accountId, "DISCONNECTED");
+            dashboard.log(accountId, "SUCCESS", "Session cleared. System ready for new pairing.");
             break;
         }
       }
     } catch (err) {
       console.error("Dashboard command failed", err);
-      dashboard.log("ERROR", "Failed to execute dashboard command");
-      dashboard.setConnectionStatus("DISCONNECTED");
     }
   });
-
-  dashboard.setConnectionStatus("DISCONNECTED");
-  dashboard.log(
-    "INFO",
-    "Backend ready. Waiting for START_CONNECTION command from dashboard.",
-  );
 }
 
 startBot().catch((err) => {

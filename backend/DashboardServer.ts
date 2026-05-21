@@ -250,7 +250,7 @@ export interface DashboardLog {
 }
 
 export interface SystemStatus {
-  connection: "CONNECTED" | "DISCONNECTED" | "CONNECTING";
+  connection: Record<string, "CONNECTED" | "DISCONNECTED" | "CONNECTING">;
   uptime: string;
   memory: string;
   pm2: boolean;
@@ -279,11 +279,10 @@ class DashboardServer {
   private wss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
   private startTime: number = Date.now();
-  private currentConnection: "CONNECTED" | "DISCONNECTED" | "CONNECTING" =
-    "DISCONNECTED";
+  private currentConnection: Record<string, "CONNECTED" | "DISCONNECTED" | "CONNECTING"> = { primary: "DISCONNECTED", secondary: "DISCONNECTED" };
 
   // ── WhatsApp API fields ───────────────────────────────────────────────────
-  private sock: WASocket | null = null;
+  private socks: Record<string, WASocket> = {};
   private pendingTopups = new Map<string, string>();
 
   constructor() {
@@ -1010,7 +1009,8 @@ class DashboardServer {
               return;
             }
 
-            if (!this.sock) {
+            const sock = this.socks["primary"];
+            if (!sock) {
               res.writeHead(503, { "Content-Type": "application/json" });
               res.end(
                 JSON.stringify({ error: "WhatsApp bot is not connected" }),
@@ -1018,7 +1018,7 @@ class DashboardServer {
               return;
             }
 
-            await this.sock.sendMessage(this.normalizeJid(body.to), {
+            await sock.sendMessage(this.normalizeJid(body.to), {
               text: body.message,
             });
 
@@ -1440,18 +1440,19 @@ class DashboardServer {
     }
   }
 
-  public sendQR(qr: string) {
-    this.broadcast({ event: "qr", data: qr });
+  public sendQR(accountId: string, qr: string) {
+    this.broadcast({ event: "qr", accountId, data: qr });
   }
 
-  public sendPairingCode(code: string) {
-    this.broadcast({ event: "pairing-code", data: code });
+  public sendPairingCode(accountId: string, code: string) {
+    this.broadcast({ event: "pairing-code", accountId, data: code });
   }
 
   public setConnectionStatus(
+    accountId: string,
     status: "CONNECTED" | "DISCONNECTED" | "CONNECTING",
   ) {
-    this.currentConnection = status;
+    this.currentConnection[accountId] = status;
     this.sendStatus();
   }
 
@@ -1464,13 +1465,13 @@ class DashboardServer {
     });
   }
 
-  public log(type: LogType, message: string) {
+  public log(accountId: string, type: LogType, message: string) {
     const logEntry: DashboardLog = {
       timestamp: new Date().toLocaleTimeString(),
       type,
       message,
     };
-    this.broadcast({ event: "log", data: logEntry });
+    this.broadcast({ event: "log", accountId, data: logEntry });
   }
 
   public sendStatus() {
@@ -1497,8 +1498,8 @@ class DashboardServer {
   }
 
   // ── WhatsApp API: register the socket once it's ready ─────────────────────
-  public setSock(sock: WASocket): void {
-    this.sock = sock;
+  public setSock(accountId: string, sock: WASocket): void {
+    this.socks[accountId] = sock;
   }
 
   // ── WhatsApp API: normalise a phone number to a Baileys JID ───────────────
