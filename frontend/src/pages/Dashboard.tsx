@@ -1010,7 +1010,7 @@ const Dashboard = () => {
   const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
 
   // ── Bot state ───────────────────────────────────────────────────────────────
-  const [selectedAccountId] = useState<'primary' | 'secondary'>('primary');
+  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>('primary');
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -1329,6 +1329,18 @@ const Dashboard = () => {
           )}
         </div>
         <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 border border-border-strong rounded px-2 py-1 bg-bg-panel">
+            <span className="text-xs uppercase tracking-widest text-text-muted">Account:</span>
+            <select
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value as 'primary' | 'secondary')}
+              className="bg-transparent text-accent-light outline-none text-xs font-bold uppercase cursor-pointer"
+            >
+              <option value="primary" className="bg-bg-panel text-accent-light">Primary</option>
+              <option value="secondary" className="bg-bg-panel text-accent-light">Secondary</option>
+            </select>
+          </div>
+
           <button
             onClick={() => navigate('/docs')}
             className="flex items-center gap-2 text-text-muted hover:text-accent-light transition-colors uppercase text-xs tracking-widest border border-border-strong px-2 py-1 rounded"
