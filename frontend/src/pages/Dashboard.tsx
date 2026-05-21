@@ -1010,7 +1010,7 @@ const Dashboard = () => {
   const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
 
   // ── Bot state ───────────────────────────────────────────────────────────────
-  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>('primary');
+  const [selectedAccountId] = useState<'primary' | 'secondary'>('primary');
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [qrData, setQrData] = useState<string | null>(null);
