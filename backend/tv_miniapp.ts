@@ -127,7 +127,7 @@ export function initTVMiniapp(sock: any, accountId: string) {
         // Randomly decide between a quote or a meme
         const isMeme = Math.random() > 0.5;
         if (isMeme) {
-          const meme = await fetchMeme(theme);
+          const meme = await fetchMeme(theme || 'General');
           if (meme.imageBuffer) {
             const brandedImage = await overlayStickers(meme.imageBuffer);
             await sock.sendMessage('status@broadcast', { 
@@ -169,11 +169,13 @@ cron.schedule('* * * * *', async () => {
   
   for (let i = scheduledPosts.length - 1; i >= 0; i--) {
     const post = scheduledPosts[i];
+    if (!post) continue;
+    
     if (now >= post.postAt) {
       // time to post
       try {
         let imageBuffer: Buffer | undefined;
-        if (post.imageUrls && post.imageUrls.length > 0) {
+        if (post.imageUrls && post.imageUrls.length > 0 && post.imageUrls[0]) {
           const imgRes = await axios.get(post.imageUrls[0], { responseType: 'arraybuffer' });
           imageBuffer = Buffer.from(imgRes.data);
           if (post.applyStickers) {
