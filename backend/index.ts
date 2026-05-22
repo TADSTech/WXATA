@@ -56,6 +56,11 @@ interface BotScriptArgument {
   response?: string;
 }
 
+interface BotTvConfig {
+  triggerText: string;
+  welcomeMessage: string;
+}
+
 interface BotInfo {
   prefix: string;
   scripts: Record<string, BotScript>;
@@ -63,6 +68,7 @@ interface BotInfo {
   welcome: BotWelcome;
   permissions: BotPermissions;
   tvMode?: boolean;
+  tvConfig?: BotTvConfig;
 }
 
 interface BotRoot {
@@ -909,6 +915,10 @@ await commandHandler.dispatch('wrg', { sock, msg, remoteJid, argumentName, botIn
     chats: [],
     numbers: [],
   },
+  tvConfig: {
+    triggerText: "hey, i want to join tadstech. my name is ",
+    welcomeMessage: "Welcome! I’ve saved your number as {{name}}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.",
+  },
 };
 
 function sanitizeBotScript(
@@ -1040,10 +1050,22 @@ function sanitizePermissions(
         .filter((entry) => !!entry)
     : [];
 
+  const allowAll = typeof input?.allowAll === "boolean" ? input.allowAll : false;
+  return { allowAll, chats: Array.from(new Set(chats)), numbers: Array.from(new Set(numbers)) };
+}
+
+function sanitizeBotTvConfig(
+  input: Partial<BotTvConfig> | undefined,
+): BotTvConfig {
   return {
-    allowAll: typeof input?.allowAll === "boolean" ? input.allowAll : false,
-    chats: Array.from(new Set(chats)),
-    numbers: Array.from(new Set(numbers)),
+    triggerText:
+      typeof input?.triggerText === "string" && input.triggerText.trim()
+        ? input.triggerText.trim().toLowerCase()
+        : DEFAULT_BOT_INFO.tvConfig!.triggerText,
+    welcomeMessage:
+      typeof input?.welcomeMessage === "string" && input.welcomeMessage.trim()
+        ? input.welcomeMessage.trim()
+        : DEFAULT_BOT_INFO.tvConfig!.welcomeMessage,
   };
 }
 
@@ -1118,6 +1140,10 @@ function sanitizeBotInfo(
     input.permissions && typeof input.permissions === "object"
       ? input.permissions
       : undefined;
+  const tvConfigInput =
+    input.tvConfig && typeof input.tvConfig === "object"
+      ? input.tvConfig
+      : undefined;
 
   const scripts = Object.entries(
     scriptsInput as Record<string, Partial<BotScript>>,
@@ -1171,6 +1197,7 @@ function sanitizeBotInfo(
       permissionsInput as Partial<BotPermissions> | undefined,
     ),
     tvMode: !!input.tvMode,
+    tvConfig: sanitizeBotTvConfig(tvConfigInput as Partial<BotTvConfig> | undefined),
   };
 }
 
@@ -1969,7 +1996,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
           // TV Mode Interception
           if (botInfo.tvMode && !isRootSender && remoteJid) {
-              const tvTrigger = "hey, i want to join tadstech. my name is ";
+              const tvTrigger = botInfo.tvConfig?.triggerText || "hey, i want to join tadstech. my name is ";
               if (normalizedText.startsWith(tvTrigger)) {
                   const namePart = text.trim().substring(tvTrigger.length).trim();
                   
@@ -1987,7 +2014,9 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
                       require("fs").writeFileSync(tvContactsFile, JSON.stringify(contacts, null, 2));
                   }
 
-                  await sendTrackedMessage(sock, remoteJid, `Welcome! I’ve saved your number as ${namePart}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.`);
+                  const rawWelcome = botInfo.tvConfig?.welcomeMessage || "Welcome! I’ve saved your number as {{name}}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.";
+                  const replyText = rawWelcome.replace(/\{\{name\}\}/gi, namePart);
+                  await sendTrackedMessage(sock, remoteJid, replyText);
                   continue; // Skip further processing
               }
           }
@@ -2014,8 +2043,10 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
                       await sendTrackedMessage(sock, remoteJid!, "❌ No contacts saved yet.");
                   } else {
                       let vcfData = '';
-                      contacts.forEach(c => {
-                          vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${c.name}\nTEL;type=CELL;type=VOICE;waid=${c.jid.split('@')[0]}:+${c.jid.split('@')[0]}\nEND:VCARD\n`;
+                      contacts.forEach((c, index) => {
+                          const sn = index + 1;
+                          const formattedName = `TTV${sn}-${c.name}`;
+                          vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${formattedName}\nTEL;type=CELL;type=VOICE;waid=${c.jid.split('@')[0]}:+${c.jid.split('@')[0]}\nEND:VCARD\n`;
                       });
                       
                       const vcfBuffer = Buffer.from(vcfData, 'utf8');

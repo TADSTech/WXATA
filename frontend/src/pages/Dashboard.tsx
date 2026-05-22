@@ -13,6 +13,11 @@ import { useWXATASocket } from '../hooks/useWXATASocket';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
+interface BotTvConfig {
+  triggerText: string;
+  welcomeMessage: string;
+}
+
 interface BotInfo {
   prefix: string;
   scripts: Record<string, BotScript>;
@@ -20,6 +25,7 @@ interface BotInfo {
   welcome: BotWelcome;
   permissions: BotPermissions;
   tvMode?: boolean;
+  tvConfig?: BotTvConfig;
 }
 
 interface BotScript {
@@ -733,6 +739,76 @@ function PermissionsEditor({ permissions, onChange, onSave }: PermissionsEditorP
   );
 }
 
+// ─── TVConfigEditor ──────────────────────────────────────────────────────────
+
+interface TVConfigEditorProps {
+  tvConfig?: BotTvConfig;
+  onChange: (c: BotTvConfig) => void;
+  onSave: () => void;
+}
+
+function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
+  const config = tvConfig || DEFAULT_BOT_INFO.tvConfig!;
+  return (
+    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4 text-xs">
+      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">TV Mode Configuration</h3>
+
+      <div className="bg-accent-subtle/20 border border-accent-subtle p-3 rounded text-accent-light space-y-1">
+        <span className="font-bold uppercase tracking-widest block mb-1">How it works</span>
+        When TV Mode is active, all normal commands are ignored for non-root users. Instead, if a user sends a message starting with the <strong>Trigger Text</strong>, the bot will extract their name and reply with the <strong>Welcome Message</strong>.
+      </div>
+
+      <label className="block space-y-1">
+        <span className="text-text-muted uppercase tracking-wider">Trigger Text (lowercase)</span>
+        <input
+          type="text"
+          value={config.triggerText}
+          onChange={e => onChange({ ...config, triggerText: e.target.value })}
+          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary transition-colors font-mono"
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-text-muted uppercase tracking-wider">Welcome Message</span>
+        <textarea
+          value={config.welcomeMessage}
+          onChange={e => onChange({ ...config, welcomeMessage: e.target.value })}
+          rows={4}
+          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary font-mono whitespace-pre-wrap transition-colors"
+        />
+        <span className="text-[10px] text-text-muted mt-1 block">Use <code>{`{{name}}`}</code> to inject the user's extracted name.</span>
+      </label>
+
+      <button
+        onClick={onSave}
+        className="w-full border border-border-strong bg-success-subtle text-accent-light hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors"
+      >
+        <Save className="w-3 h-3 inline mr-1" /> Save TV Config
+      </button>
+    </div>
+  );
+}
+
+// ─── TVCommandsReference ──────────────────────────────────────────────────────
+
+function TVCommandsReference({ prefix }: { prefix: string }) {
+  return (
+    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
+      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Root TV Commands</h3>
+      <div className="space-y-2">
+        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
+          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf</code></div>
+          <p className="text-[10px] text-text-muted">Generates and sends a .vcf file containing all intercepted TV contacts. Each contact is prefixed with TTV.</p>
+        </div>
+        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
+          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf clear</code></div>
+          <p className="text-[10px] text-text-muted">Wipes the internally saved list of TV contacts. (Make sure you've generated your VCF first!)</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── WelcomeEditor ────────────────────────────────────────────────────────────
 
 interface WelcomeEditorProps {
@@ -995,6 +1071,10 @@ const DEFAULT_BOT_INFO: BotInfo = {
   welcome: { enabled: false, text: '' },
   permissions: { allowAll: false, chats: [], numbers: [] },
   tvMode: false,
+  tvConfig: {
+    triggerText: "hey, i want to join tadstech. my name is ",
+    welcomeMessage: "Welcome! I’ve saved your number as {{name}}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.",
+  },
 };
 
 const Dashboard = () => {
@@ -1448,45 +1528,58 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Script Manager */}
-          <ScriptManager
-            botInfo={botInfo}
-            expandedScript={expandedScript}
-            setExpandedScript={setExpandedScript}
-            addingScript={addingScript}
-            setAddingScript={setAddingScript}
-            newScriptDraft={newScriptDraft}
-            setNewScriptDraft={setNewScriptDraft}
-            handleScriptFieldChange={handleScriptFieldChange}
-            handleScriptArgumentChange={handleScriptArgumentChange}
-            handleDeleteScript={handleDeleteScript}
-            handleAddScript={handleAddScript}
-            handlePublishScript={handlePublishScript}
-            onReorder={handleScriptReorder}
-          />
+          {botInfo.tvMode ? (
+            <>
+              <TVConfigEditor
+                tvConfig={botInfo.tvConfig}
+                onChange={c => { setBotInfo(prev => ({ ...prev, tvConfig: c })); setConfigStatus('Unsaved changes'); }}
+                onSave={saveBotInfo}
+              />
+              <TVCommandsReference prefix={botInfo.prefix} />
+            </>
+          ) : (
+            <>
+              {/* Script Manager */}
+              <ScriptManager
+                botInfo={botInfo}
+                expandedScript={expandedScript}
+                setExpandedScript={setExpandedScript}
+                addingScript={addingScript}
+                setAddingScript={setAddingScript}
+                newScriptDraft={newScriptDraft}
+                setNewScriptDraft={setNewScriptDraft}
+                handleScriptFieldChange={handleScriptFieldChange}
+                handleScriptArgumentChange={handleScriptArgumentChange}
+                handleDeleteScript={handleDeleteScript}
+                handleAddScript={handleAddScript}
+                handlePublishScript={handlePublishScript}
+                onReorder={handleScriptReorder}
+              />
 
-          {/* Permissions Editor */}
-          <PermissionsEditor
-            permissions={botInfo.permissions}
-            onChange={p => { setBotInfo(prev => ({ ...prev, permissions: p })); setConfigStatus('Unsaved changes'); }}
-            onSave={handlePermissionsSave}
-          />
+              {/* Permissions Editor */}
+              <PermissionsEditor
+                permissions={botInfo.permissions}
+                onChange={p => { setBotInfo(prev => ({ ...prev, permissions: p })); setConfigStatus('Unsaved changes'); }}
+                onSave={handlePermissionsSave}
+              />
 
-          {/* Welcome Editor */}
-          <WelcomeEditor
-            welcome={botInfo.welcome}
-            root={botInfo.root}
-            onChange={w => { setBotInfo(prev => ({ ...prev, welcome: w })); setConfigStatus('Unsaved changes'); }}
-            onRootChange={v => { setBotInfo(prev => ({ ...prev, root: { ...prev.root, target: v } })); setConfigStatus('Unsaved changes'); }}
-            onSave={handleWelcomeSave}
-          />
+              {/* Welcome Editor */}
+              <WelcomeEditor
+                welcome={botInfo.welcome}
+                root={botInfo.root}
+                onChange={w => { setBotInfo(prev => ({ ...prev, welcome: w })); setConfigStatus('Unsaved changes'); }}
+                onRootChange={v => { setBotInfo(prev => ({ ...prev, root: { ...prev.root, target: v } })); setConfigStatus('Unsaved changes'); }}
+                onSave={handleWelcomeSave}
+              />
 
-          {/* Mini Marketplace */}
-          <MiniMarketplace
-            installedKeys={Object.keys(botInfo.scripts)}
-            onInstall={handleMarketplaceInstall}
-            navigate={navigate}
-          />
+              {/* Mini Marketplace */}
+              <MiniMarketplace
+                installedKeys={Object.keys(botInfo.scripts)}
+                onInstall={handleMarketplaceInstall}
+                navigate={navigate}
+              />
+            </>
+          )}
 
           {/* Quick Actions */}
           <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
