@@ -2072,12 +2072,20 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
                   if (contacts.length === 0) {
                       await sendTrackedMessage(sock, remoteJid!, "❌ No contacts saved yet.");
+                  } else if (arg === 'list') {
+                      let listText = `📋 *Saved TV Contacts (${contacts.length})*\n\n`;
+                      contacts.forEach((c, index) => {
+                          const number = c.jid.split(':')[0].split('@')[0];
+                          listText += `${index + 1}. TTV${index + 1}-${c.name} (+${number})\n`;
+                      });
+                      await sendTrackedMessage(sock, remoteJid!, listText.trim());
                   } else {
                       let vcfData = '';
                       contacts.forEach((c, index) => {
                           const sn = index + 1;
                           const formattedName = `TTV${sn}-${c.name}`;
-                          vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${formattedName}\nTEL;type=CELL;type=VOICE;waid=${c.jid.split('@')[0]}:+${c.jid.split('@')[0]}\nEND:VCARD\n`;
+                          const number = c.jid.split(':')[0].split('@')[0];
+                          vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${formattedName}\nTEL;type=CELL;type=VOICE;waid=${number}:+${number}\nEND:VCARD\n`;
                       });
                       
                       const vcfBuffer = Buffer.from(vcfData, 'utf8');
