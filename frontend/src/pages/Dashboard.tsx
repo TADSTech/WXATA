@@ -809,6 +809,131 @@ function TVCommandsReference({ prefix }: { prefix: string }) {
   );
 }
 
+// ─── TwitterGrabber ──────────────────────────────────────────────────────────
+
+function TwitterGrabber() {
+  const [url, setUrl] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[] } | null>(null);
+  const [error, setError] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+  const [applyStickers, setApplyStickers] = useState(true);
+
+  const handleFetch = async () => {
+    if (!url) return;
+    setFetching(true);
+    setError('');
+    try {
+      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
+      const res = await fetch(`${backendUrlApi}/api/twitter/grab`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
+      setTweetData(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const handleSchedule = async () => {
+    if (!tweetData || !scheduledTime) return;
+    setScheduling(true);
+    try {
+      const postAt = new Date(scheduledTime).getTime();
+      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
+      const res = await fetch(`${backendUrlApi}/api/twitter/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postAt,
+          text: tweetData.text,
+          imageUrls: tweetData.imageUrls,
+          applyStickers
+        })
+      });
+      if (!res.ok) throw new Error('Failed to schedule');
+      alert("Tweet scheduled successfully!");
+      setTweetData(null);
+      setUrl('');
+      setScheduledTime('');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
+      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        X (Twitter) Grabber
+      </h3>
+      
+      <div className="flex gap-2">
+        <input 
+          type="text" 
+          placeholder="Paste Tweet URL..." 
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          className="flex-1 bg-bg-panel border border-border-strong p-2 text-text-main outline-none text-xs"
+        />
+        <button 
+          onClick={handleFetch} 
+          disabled={fetching}
+          className="border border-border-strong bg-accent-subtle hover:bg-accent-hover text-accent-light px-3 py-1 text-xs"
+        >
+          {fetching ? 'Fetching...' : 'Grab'}
+        </button>
+      </div>
+      
+      {error && <div className="text-danger-text text-[10px]">{error}</div>}
+
+      {tweetData && (
+        <div className="border border-border-strong/30 p-3 rounded space-y-3 mt-2">
+          <textarea 
+            value={tweetData.text} 
+            onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
+            className="w-full bg-bg-base border border-border-strong p-2 text-text-main text-xs h-24"
+          />
+          {tweetData.imageUrls.length > 0 && (
+            <div className="text-[10px] text-text-muted">
+              Found {tweetData.imageUrls.length} image(s).
+            </div>
+          )}
+          
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={applyStickers} onChange={e => setApplyStickers(e.target.checked)} />
+            Apply Stickers to images
+          </label>
+          
+          <div className="flex gap-2 mt-2">
+            <input 
+              type="datetime-local" 
+              value={scheduledTime}
+              onChange={e => setScheduledTime(e.target.value)}
+              className="bg-bg-panel border border-border-strong p-1 text-xs flex-1 text-text-main"
+            />
+            <button 
+              onClick={handleSchedule}
+              disabled={scheduling || !scheduledTime}
+              className="border border-border-strong bg-success-subtle text-accent-light px-3 py-1 text-xs"
+            >
+              {scheduling ? 'Scheduling...' : 'Schedule Status'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── WelcomeEditor ────────────────────────────────────────────────────────────
 
 interface WelcomeEditorProps {
@@ -1536,6 +1661,7 @@ const Dashboard = () => {
                 onSave={saveBotInfo}
               />
               <TVCommandsReference prefix={botInfo.prefix} />
+              <TwitterGrabber />
             </>
           ) : (
             <>

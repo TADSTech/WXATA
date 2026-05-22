@@ -6,6 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import { generateLicenseKey } from "./licenseValidator";
 import type { WASocket } from "@whiskeysockets/baileys";
+import { fetchTweetContent } from "./twitter_grabber.js";
+import { scheduleTweetPost } from "./tv_miniapp.js";
 
 // ---------------------------------------------------------------------------
 // Supabase service-role client (lazy — initialized on first use)
@@ -502,6 +504,8 @@ class DashboardServer {
           req.url === "/api/keys/github/upsert" ||
           req.url === "/api/keys/verify" ||
           req.url === "/api/keys/usage" ||
+          req.url === "/api/twitter/grab" ||
+          req.url === "/api/twitter/schedule" ||
           req.url === "/api/send" ||
           req.url === "/api/keys/topup/init" ||
           req.url === "/api/admin/config" ||
@@ -947,6 +951,60 @@ class DashboardServer {
             res.end(JSON.stringify({ error: "Internal server error" }));
           }
         })();
+        return;
+      }
+
+      // ── POST /api/twitter/grab ───────────────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/twitter/grab") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+            if (!body.url) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Missing Twitter URL" }));
+              return;
+            }
+            const tweetData = await fetchTweetContent(body.url);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(tweetData));
+          } catch (err: any) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message || "Failed to fetch tweet" }));
+          }
+        });
+        return;
+      }
+
+      // ── POST /api/twitter/schedule ───────────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/twitter/schedule") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+            if (!body.postAt || !body.text) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Missing postAt or text" }));
+              return;
+            }
+            scheduleTweetPost({
+              id: crypto.randomUUID(),
+              postAt: body.postAt,
+              text: body.text,
+              imageUrls: body.imageUrls || [],
+              applyStickers: !!body.applyStickers
+            });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+          } catch (err: any) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message || "Failed to schedule" }));
+          }
+        });
         return;
       }
 

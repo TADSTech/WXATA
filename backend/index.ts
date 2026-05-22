@@ -28,6 +28,7 @@ commandHandler.register(new WyrCommand());
 
 import fs from "fs/promises";
 import fsSync from "fs";
+import { initTVMiniapp, setTvSock } from "./tv_miniapp.js";
 import path from "path";
 import {
   storeMessage,
@@ -1628,11 +1629,16 @@ async function sendTrackedMessage(
   text: string,
   mentions?: string[],
 ) {
-  // Simulate human typing delay (1 to 3 seconds)
+  // Simulate a more rigid and slower human typing delay to avoid getting flagged
   try {
     await sock.sendPresenceUpdate('composing', jid);
-    const delay = Math.floor(Math.random() * 2000) + 1000;
-    await sleep(delay);
+    
+    // Base delay of 4-7 seconds, plus ~50ms per character in the message
+    const baseDelay = Math.floor(Math.random() * 3000) + 4000;
+    const textDelay = text ? Math.min(text.length * 50, 8000) : 0;
+    const totalDelay = baseDelay + textDelay;
+    
+    await sleep(totalDelay);
     await sock.sendPresenceUpdate('paused', jid);
   } catch (e) {
     // ignore presence errors
@@ -2801,6 +2807,8 @@ async function startBot() {
             setTimeout(() => {
                 const socketForWelcome = connectionManager?.getSocket();
                 if (socketForWelcome) {
+                    initTVMiniapp(socketForWelcome, accountId);
+                    setTvSock(socketForWelcome);
                     sendWelcomeMessage(socketForWelcome, accountId).catch(err => {
                         console.error("Failed to send welcome message", err);
                         dashboard.log(accountId, "ERROR", "Failed to send welcome message");
