@@ -1995,6 +1995,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
           }
 
           // TV Mode Interception
+          dashboard.log(accountId, "DEBUG", `TV Mode Check: tvMode=${botInfo.tvMode}, isRootSender=${isRootSender}, remoteJid=${remoteJid}`);
           if (botInfo.tvMode && !isRootSender && remoteJid) {
               const tvTrigger = botInfo.tvConfig?.triggerText || "hey, i want to join tadstech. my name is ";
               const triggerTrimmed = tvTrigger.trim().toLowerCase();
