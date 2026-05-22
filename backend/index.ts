@@ -1997,8 +1997,38 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
           // TV Mode Interception
           if (botInfo.tvMode && !isRootSender && remoteJid) {
               const tvTrigger = botInfo.tvConfig?.triggerText || "hey, i want to join tadstech. my name is ";
-              if (normalizedText.startsWith(tvTrigger)) {
-                  const namePart = text.trim().substring(tvTrigger.length).trim();
+              const triggerTrimmed = tvTrigger.trim().toLowerCase();
+              
+              // Check if they are pending a name response
+              const isPending = (global as any).pendingTvNames instanceof Set && (global as any).pendingTvNames.has(remoteJid);
+              
+              if (normalizedText.startsWith(triggerTrimmed) || isPending) {
+                  let namePart = "";
+                  
+                  if (normalizedText.startsWith(triggerTrimmed)) {
+                      // They sent the trigger phrase
+                      if (normalizedText.startsWith(tvTrigger.toLowerCase())) {
+                          namePart = text.substring(tvTrigger.length).trim();
+                      } else {
+                          namePart = text.substring(triggerTrimmed.length).trim();
+                      }
+                  } else {
+                      // They were pending and just sent their name
+                      namePart = text.trim();
+                  }
+                  
+                  if (!namePart) {
+                      // No name provided
+                      if (!(global as any).pendingTvNames) (global as any).pendingTvNames = new Set<string>();
+                      (global as any).pendingTvNames.add(remoteJid);
+                      await sendTrackedMessage(sock, remoteJid, "Your name is?");
+                      continue;
+                  }
+                  
+                  // Name is provided, clean up pending state if any
+                  if ((global as any).pendingTvNames instanceof Set) {
+                      (global as any).pendingTvNames.delete(remoteJid);
+                  }
                   
                   // Save contact internally
                   const tvContactsFile = path.resolve(getAccountDir(accountId), 'tv_contacts.json');
