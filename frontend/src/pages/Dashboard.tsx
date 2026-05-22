@@ -19,6 +19,7 @@ interface BotInfo {
   root: BotRoot;
   welcome: BotWelcome;
   permissions: BotPermissions;
+  tvMode?: boolean;
 }
 
 interface BotScript {
@@ -993,6 +994,7 @@ const DEFAULT_BOT_INFO: BotInfo = {
   root: { target: 'self' },
   welcome: { enabled: false, text: '' },
   permissions: { allowAll: false, chats: [], numbers: [] },
+  tvMode: false,
 };
 
 const Dashboard = () => {
@@ -1421,6 +1423,20 @@ const Dashboard = () => {
                 className="w-full bg-bg-panel border border-border-strong p-2 text-accent-light outline-none focus:border-border-strong"
               />
             </label>
+            {(String(userData?.email || userData?.name || userData?.username || '').includes('motrenewed')) && (
+              <label className="flex items-center justify-between gap-3 border border-border-subtle p-2 rounded cursor-pointer mt-2 bg-accent-subtle/10">
+                <span className="text-accent-primary uppercase tracking-wider">Beta: TV Mode Automation</span>
+                <input
+                  type="checkbox"
+                  checked={!!botInfo.tvMode}
+                  onChange={e => {
+                    setBotInfo(prev => ({ ...prev, tvMode: e.target.checked }));
+                    setConfigStatus('Unsaved changes');
+                  }}
+                  className="w-4 h-4 accent-accent-primary"
+                />
+              </label>
+            )}
             <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-strong/10">
               <span className="text-[10px] text-accent-primary uppercase tracking-wider">{configStatus || 'Ready'}</span>
               <button

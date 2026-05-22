@@ -62,6 +62,7 @@ interface BotInfo {
   root: BotRoot;
   welcome: BotWelcome;
   permissions: BotPermissions;
+  tvMode?: boolean;
 }
 
 interface BotRoot {
@@ -1169,6 +1170,7 @@ function sanitizeBotInfo(
     permissions: sanitizePermissions(
       permissionsInput as Partial<BotPermissions> | undefined,
     ),
+    tvMode: !!input.tvMode,
   };
 }
 
@@ -1577,12 +1579,38 @@ function wasRecentlySentByBot(
   );
 }
 
+// Anti-Ban & Spam Tracking State
+interface SpamTracker {
+  count: number;
+  lastMessageAt: number;
+  warned: boolean;
+  blockedUntil: number;
+}
+const userSpamState = new Map<string, SpamTracker>();
+const SPAM_LIMIT = 5;
+const SPAM_WINDOW_MS = 10_000;
+const SPAM_BLOCK_DURATION_MS = 60_000;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function sendTrackedMessage(
   sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>,
   jid: string,
   text: string,
   mentions?: string[],
 ) {
+  // Simulate human typing delay (1 to 3 seconds)
+  try {
+    await sock.sendPresenceUpdate('composing', jid);
+    const delay = Math.floor(Math.random() * 2000) + 1000;
+    await sleep(delay);
+    await sock.sendPresenceUpdate('paused', jid);
+  } catch (e) {
+    // ignore presence errors
+  }
+
   rememberOutboundMessage(jid, text);
   await sock.sendMessage(jid, { text, mentions });
 }
@@ -1807,13 +1835,23 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
           wasRecentlySentByBot(remoteJid ?? undefined, text ?? undefined);
         const botInfo = await readBotInfo(accountId);
         const isRootSender = senderMatchesRoot(sock, msg, botInfo.root.target);
-        const isCommandPermittedByList = isCommandPermitted(botInfo, msg, sock);
-        const hasPermission = isRootSender || isCommandPermittedByList;
+        
+        // TV Mode Logic: Only root can use commands. Non-root gets completely ignored for generic commands.
+        // We evaluate permissions differently if TV mode is enabled.
+        let isCommandPermittedByList = false;
+        let hasPermission = false;
+
+        if (botInfo.tvMode) {
+            hasPermission = isRootSender; // Only root has permission in TV mode
+        } else {
+            isCommandPermittedByList = isCommandPermitted(botInfo, msg, sock);
+            hasPermission = isRootSender || isCommandPermittedByList;
+        }
 
         if (text && text.startsWith(botInfo.prefix)) {
           dashboard.log(accountId, 
             "DEBUG",
-            `COMMAND_CHECK text="${text.trim()}" isRoot=${isRootSender} isPermitted=${isCommandPermittedByList} fromMe=${msg.key?.fromMe}`,
+            `COMMAND_CHECK text="${text.trim()}" isRoot=${isRootSender} isPermitted=${isCommandPermittedByList} fromMe=${msg.key?.fromMe} tvMode=${!!botInfo.tvMode}`,
           );
         }
 
@@ -1868,6 +1906,129 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
         if (text) {
           const normalizedText = text.trim().toLowerCase();
+          const senderIdentifier = remoteJid || msg.key?.participant || 'unknown';
+
+          // Anti-Ban Spam Control check for non-root users
+          if (!isRootSender && !msg.key?.fromMe) {
+             const now = Date.now();
+             let spamTracker = userSpamState.get(senderIdentifier);
+             
+             if (!spamTracker) {
+                 spamTracker = { count: 0, lastMessageAt: now, warned: false, blockedUntil: 0 };
+                 userSpamState.set(senderIdentifier, spamTracker);
+             }
+
+             if (now < spamTracker.blockedUntil) {
+                 // User is currently blocked, ignore message
+                 continue; 
+             }
+
+             if (now - spamTracker.lastMessageAt > SPAM_WINDOW_MS) {
+                 // Reset if window passed
+                 spamTracker.count = 1;
+                 spamTracker.warned = false;
+             } else {
+                 spamTracker.count++;
+             }
+             spamTracker.lastMessageAt = now;
+
+             // We only apply spam limits to commands (starts with prefix)
+             // However, we must exclude games. We'll do the actual blocking below if it's not a fun command.
+             // But if they hit the limit, we'll mark them, and block them.
+             if (spamTracker.count > SPAM_LIMIT && text.startsWith(botInfo.prefix)) {
+                 // We will verify the command type below before actually applying the block,
+                 // but we can fast-track the check if we parse the command.
+                 const rawAfterPrefix = text.slice(botInfo.prefix.length).trim();
+                 const spaceIdx = rawAfterPrefix.indexOf(' ');
+                 const trigger = (spaceIdx === -1 ? rawAfterPrefix : rawAfterPrefix.slice(0, spaceIdx)).toLowerCase();
+                 
+                 // Check if it's a script
+                 let isFun = false;
+                 for (const s of Object.values(botInfo.scripts)) {
+                     if ((s.trigger === trigger || s.aliases?.includes(trigger)) && s.type === 'fun') {
+                         isFun = true;
+                         break;
+                     }
+                 }
+                 // Check modular commands
+                 if (commandHandler.has(trigger)) {
+                     const mod = commandHandler.get(trigger);
+                     if (mod && mod.category === 'fun') isFun = true;
+                 }
+
+                 if (!isFun) {
+                     spamTracker.blockedUntil = now + SPAM_BLOCK_DURATION_MS;
+                     if (!spamTracker.warned && remoteJid) {
+                         spamTracker.warned = true;
+                         await sendTrackedMessage(sock, remoteJid, "⚠️ *Spam Detected*\\nYou are sending commands too quickly. Please wait 1 minute.");
+                     }
+                     continue;
+                 }
+             }
+          }
+
+          // TV Mode Interception
+          if (botInfo.tvMode && !isRootSender && remoteJid) {
+              const tvTrigger = "hey, i want to join tadstech. my name is ";
+              if (normalizedText.startsWith(tvTrigger)) {
+                  const namePart = text.trim().substring(tvTrigger.length).trim();
+                  
+                  // Save contact internally
+                  const tvContactsFile = path.resolve(getAccountDir(accountId), 'tv_contacts.json');
+                  let contacts: any[] = [];
+                  try {
+                      if (require("fs").existsSync(tvContactsFile)) {
+                          contacts = JSON.parse(require("fs").readFileSync(tvContactsFile, 'utf8'));
+                      }
+                  } catch(e) {}
+                  
+                  if (!contacts.find(c => c.jid === remoteJid)) {
+                      contacts.push({ jid: remoteJid, name: namePart, date: new Date().toISOString() });
+                      require("fs").writeFileSync(tvContactsFile, JSON.stringify(contacts, null, 2));
+                  }
+
+                  await sendTrackedMessage(sock, remoteJid, `Welcome! I’ve saved your number as ${namePart}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.`);
+                  continue; // Skip further processing
+              }
+          }
+
+          // TV Mode VCF Generation for Root
+          if (botInfo.tvMode && isRootSender && normalizedText.startsWith(`${botInfo.prefix.trim().toLowerCase()}vcf`)) {
+              const tvContactsFile = path.resolve(getAccountDir(accountId), 'tv_contacts.json');
+              const arg = normalizedText.replace(`${botInfo.prefix.trim().toLowerCase()}vcf`, '').trim();
+              
+              if (arg === 'clear') {
+                  if (require("fs").existsSync(tvContactsFile)) {
+                      require("fs").unlinkSync(tvContactsFile);
+                  }
+                  await sendTrackedMessage(sock, remoteJid!, "✅ TV Contacts list has been cleared.");
+              } else {
+                  let contacts: any[] = [];
+                  try {
+                      if (require("fs").existsSync(tvContactsFile)) {
+                          contacts = JSON.parse(require("fs").readFileSync(tvContactsFile, 'utf8'));
+                      }
+                  } catch(e) {}
+
+                  if (contacts.length === 0) {
+                      await sendTrackedMessage(sock, remoteJid!, "❌ No contacts saved yet.");
+                  } else {
+                      let vcfData = '';
+                      contacts.forEach(c => {
+                          vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${c.name}\nTEL;type=CELL;type=VOICE;waid=${c.jid.split('@')[0]}:+${c.jid.split('@')[0]}\nEND:VCARD\n`;
+                      });
+                      
+                      const vcfBuffer = Buffer.from(vcfData, 'utf8');
+                      await sock.sendMessage(remoteJid!, { 
+                          document: vcfBuffer, 
+                          mimetype: 'text/vcard', 
+                          fileName: `TV_Contacts_${new Date().toISOString().split('T')[0]}.vcf`,
+                          caption: `Here are your ${contacts.length} TV Contacts.\n\nReply with \`!vcf clear\` to wipe the saved list after adding them.`
+                      });
+                  }
+              }
+              continue;
+          }
 
           // Standalone Special Command: chai! (prefix becomes suffix)
           // This command is hidden from the menu and botinfo.json

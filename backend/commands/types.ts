@@ -39,6 +39,8 @@ export interface Command {
   aliases?: string[];
   /** Whether this command requires root/sudo */
   requiresRoot?: boolean;
+  /** Category for spam bypass etc */
+  category?: string;
   /** Execute the command */
   execute(ctx: CommandContext): Promise<void>;
 }
