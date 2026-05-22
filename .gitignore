@@ -30,7 +30,6 @@ auth_info/
 backend/auth_info/
 
 # Runtime data files — generated on first run from *.example.json templates
-botinfo.json
 antidel.json
 antibc.json
 backend/antidel.json
