@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
+import TvDashboard from "./pages/TvDashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Admin from "./pages/Admin";
@@ -55,6 +56,15 @@ function App() {
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/tv/:username"
+            element={
+              <PrivateRoute>
+                <TvDashboard />
               </PrivateRoute>
             }
           />

@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { SocialBanner } from "../components/SocialBanner";
 import { useTheme, KNOWN_THEMES } from "../components/ThemeProvider";
+import { useState, useEffect } from "react";
+import { supabase } from "../supabase";
 
 // ── Feature card ──────────────────────────────────────────────────────────────
 function FeatureCard({
@@ -81,6 +83,15 @@ const Landing = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
+  const [sessionUser, setSessionUser] = useState<any>(null);
+  const tvModeMemory = localStorage.getItem('tvModeEnabled') === 'true';
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSessionUser(session?.user ?? null);
+    });
+  }, []);
+
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
@@ -140,6 +151,15 @@ const Landing = () => {
           >
             Sign In
           </motion.button>
+          {sessionUser && tvModeMemory && (
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate(`/tv/${sessionUser.user_metadata?.username || sessionUser.email}`)}
+              className="px-5 py-2 border border-accent-primary text-accent-light text-xs font-black rounded transition-all uppercase tracking-widest hover:bg-accent-subtle"
+            >
+              TV Dashboard
+            </motion.button>
+          )}
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate("/pricing")}

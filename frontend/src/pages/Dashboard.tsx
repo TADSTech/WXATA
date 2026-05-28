@@ -739,201 +739,6 @@ function PermissionsEditor({ permissions, onChange, onSave }: PermissionsEditorP
   );
 }
 
-// ─── TVConfigEditor ──────────────────────────────────────────────────────────
-
-interface TVConfigEditorProps {
-  tvConfig?: BotTvConfig;
-  onChange: (c: BotTvConfig) => void;
-  onSave: () => void;
-}
-
-function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
-  const config = tvConfig || DEFAULT_BOT_INFO.tvConfig!;
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4 text-xs">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">TV Mode Configuration</h3>
-
-      <div className="bg-accent-subtle/20 border border-accent-subtle p-3 rounded text-accent-light space-y-1">
-        <span className="font-bold uppercase tracking-widest block mb-1">How it works</span>
-        When TV Mode is active, all normal commands are ignored for non-root users. Instead, if a user sends a message starting with the <strong>Trigger Text</strong>, the bot will extract their name and reply with the <strong>Welcome Message</strong>.
-      </div>
-
-      <label className="block space-y-1">
-        <span className="text-text-muted uppercase tracking-wider">Trigger Text (lowercase)</span>
-        <input
-          type="text"
-          value={config.triggerText}
-          onChange={e => onChange({ ...config, triggerText: e.target.value })}
-          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary transition-colors font-mono"
-        />
-      </label>
-
-      <label className="block space-y-1">
-        <span className="text-text-muted uppercase tracking-wider">Welcome Message</span>
-        <textarea
-          value={config.welcomeMessage}
-          onChange={e => onChange({ ...config, welcomeMessage: e.target.value })}
-          rows={4}
-          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary font-mono whitespace-pre-wrap transition-colors"
-        />
-        <span className="text-[10px] text-text-muted mt-1 block">Use <code>{`{{name}}`}</code> to inject the user's extracted name.</span>
-      </label>
-
-      <button
-        onClick={onSave}
-        className="w-full border border-border-strong bg-success-subtle text-accent-light hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors"
-      >
-        <Save className="w-3 h-3 inline mr-1" /> Save TV Config
-      </button>
-    </div>
-  );
-}
-
-// ─── TVCommandsReference ──────────────────────────────────────────────────────
-
-function TVCommandsReference({ prefix }: { prefix: string }) {
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Root TV Commands</h3>
-      <div className="space-y-2">
-        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
-          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf</code></div>
-          <p className="text-[10px] text-text-muted">Generates and sends a .vcf file containing all intercepted TV contacts. Each contact is prefixed with TTV.</p>
-        </div>
-        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
-          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf clear</code></div>
-          <p className="text-[10px] text-text-muted">Wipes the internally saved list of TV contacts. (Make sure you've generated your VCF first!)</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── TwitterGrabber ──────────────────────────────────────────────────────────
-
-function TwitterGrabber() {
-  const [url, setUrl] = useState('');
-  const [fetching, setFetching] = useState(false);
-  const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[] } | null>(null);
-  const [error, setError] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [scheduling, setScheduling] = useState(false);
-  const [applyStickers, setApplyStickers] = useState(true);
-
-  const handleFetch = async () => {
-    if (!url) return;
-    setFetching(true);
-    setError('');
-    try {
-      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
-      const res = await fetch(`${backendUrlApi}/api/twitter/grab`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      setTweetData(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setFetching(false);
-    }
-  };
-
-  const handleSchedule = async () => {
-    if (!tweetData || !scheduledTime) return;
-    setScheduling(true);
-    try {
-      const postAt = new Date(scheduledTime).getTime();
-      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
-      const res = await fetch(`${backendUrlApi}/api/twitter/schedule`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postAt,
-          text: tweetData.text,
-          imageUrls: tweetData.imageUrls,
-          applyStickers
-        })
-      });
-      if (!res.ok) throw new Error('Failed to schedule');
-      alert("Tweet scheduled successfully!");
-      setTweetData(null);
-      setUrl('');
-      setScheduledTime('');
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setScheduling(false);
-    }
-  };
-
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        X (Twitter) Grabber
-      </h3>
-      
-      <div className="flex gap-2">
-        <input 
-          type="text" 
-          placeholder="Paste Tweet URL..." 
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-          className="flex-1 bg-bg-panel border border-border-strong p-2 text-text-main outline-none text-xs"
-        />
-        <button 
-          onClick={handleFetch} 
-          disabled={fetching}
-          className="border border-border-strong bg-accent-subtle hover:bg-accent-hover text-accent-light px-3 py-1 text-xs"
-        >
-          {fetching ? 'Fetching...' : 'Grab'}
-        </button>
-      </div>
-      
-      {error && <div className="text-danger-text text-[10px]">{error}</div>}
-
-      {tweetData && (
-        <div className="border border-border-strong/30 p-3 rounded space-y-3 mt-2">
-          <textarea 
-            value={tweetData.text} 
-            onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
-            className="w-full bg-bg-base border border-border-strong p-2 text-text-main text-xs h-24"
-          />
-          {tweetData.imageUrls.length > 0 && (
-            <div className="text-[10px] text-text-muted">
-              Found {tweetData.imageUrls.length} image(s).
-            </div>
-          )}
-          
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={applyStickers} onChange={e => setApplyStickers(e.target.checked)} />
-            Apply Stickers to images
-          </label>
-          
-          <div className="flex gap-2 mt-2">
-            <input 
-              type="datetime-local" 
-              value={scheduledTime}
-              onChange={e => setScheduledTime(e.target.value)}
-              className="bg-bg-panel border border-border-strong p-1 text-xs flex-1 text-text-main"
-            />
-            <button 
-              onClick={handleSchedule}
-              disabled={scheduling || !scheduledTime}
-              className="border border-border-strong bg-success-subtle text-accent-light px-3 py-1 text-xs"
-            >
-              {scheduling ? 'Scheduling...' : 'Schedule Status'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── WelcomeEditor ────────────────────────────────────────────────────────────
 
 interface WelcomeEditorProps {
@@ -1635,7 +1440,17 @@ const Dashboard = () => {
                   type="checkbox"
                   checked={!!botInfo.tvMode}
                   onChange={e => {
-                    setBotInfo(prev => ({ ...prev, tvMode: e.target.checked }));
+                    const isTv = e.target.checked;
+                    if (isTv && !confirm('Are you sure you want to enable TV mode? Normal commands will be disabled for non-root users.')) {
+                       return;
+                    }
+                    setBotInfo(prev => ({ ...prev, tvMode: isTv }));
+                    if (isTv) {
+                       localStorage.setItem('tvModeEnabled', 'true');
+                       navigate(`/tv/${username}`);
+                    } else {
+                       localStorage.setItem('tvModeEnabled', 'false');
+                    }
                     setConfigStatus('Unsaved changes');
                   }}
                   className="w-4 h-4 accent-accent-primary"
@@ -1653,18 +1468,21 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {botInfo.tvMode ? (
-            <>
-              <TVConfigEditor
-                tvConfig={botInfo.tvConfig}
-                onChange={c => { setBotInfo(prev => ({ ...prev, tvConfig: c })); setConfigStatus('Unsaved changes'); }}
-                onSave={saveBotInfo}
-              />
-              <TVCommandsReference prefix={botInfo.prefix} />
-              <TwitterGrabber />
-            </>
-          ) : (
-            <>
+          
+          {botInfo.tvMode && (
+            <div className="bg-accent-subtle/20 border border-accent-subtle p-4 rounded text-accent-light space-y-3">
+              <div className="font-bold uppercase tracking-widest text-xs">TV Mode Active</div>
+              <p className="text-xs">Your TV Mode dashboard is active for this account. Standard bot commands are disabled for non-root users.</p>
+              <button
+                onClick={() => navigate(`/tv/${username}`)}
+                className="w-full border border-accent-primary bg-accent-primary hover:bg-accent-hover text-bg-base px-4 py-2 text-xs font-bold transition-colors uppercase tracking-widest"
+              >
+                Go to TV Dashboard
+              </button>
+            </div>
+          )}
+
+          <div className={botInfo.tvMode ? "opacity-50 pointer-events-none" : ""}>
               {/* Script Manager */}
               <ScriptManager
                 botInfo={botInfo}
@@ -1704,8 +1522,7 @@ const Dashboard = () => {
                 onInstall={handleMarketplaceInstall}
                 navigate={navigate}
               />
-            </>
-          )}
+            </div>
 
           {/* Quick Actions */}
           <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
