@@ -382,16 +382,20 @@ function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
 
 // ─── TwitterGrabber ──────────────────────────────────────────────────────────
 
+import { toPng } from 'html-to-image';
+
 function TwitterGrabber() {
   const [url, setUrl] = useState('');
   const [fetching, setFetching] = useState(false);
-  const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[] } | null>(null);
+  const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[], user?: {name: string, handle: string, profileImage: string} } | null>(null);
   const [error, setError] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [scheduling, setScheduling] = useState(false);
   const [posting, setPosting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [applyStickers, setApplyStickers] = useState(true);
+  
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const getBackendUrl = () => {
     return ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000')
@@ -419,7 +423,8 @@ function TwitterGrabber() {
       // Ensure imageUrls is always an array
       const normalizedData = {
         text: data.text || '',
-        imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : []
+        imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : [],
+        user: data.user
       };
       console.log(`[TwitterGrabber] Normalized data:`, normalizedData);
       setTweetData(normalizedData);
@@ -432,14 +437,26 @@ function TwitterGrabber() {
     }
   };
 
+  const generateImageData = async (): Promise<string | null> => {
+    if (!cardRef.current) return null;
+    try {
+      // Temporarily hide scrolling/overflow effects if needed, but the card is fixed width
+      return await toPng(cardRef.current, { cacheBust: true, pixelRatio: 2 });
+    } catch (err) {
+      console.error('Failed to generate image', err);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     if (!tweetData) return;
     setSaving(true);
     try {
-      // Save to drafts or local storage
+      const base64 = await generateImageData();
       const draft = {
         text: tweetData.text,
         imageUrls: tweetData.imageUrls,
+        imageDataBase64: base64,
         applyStickers,
         savedAt: new Date().toISOString()
       };
@@ -458,14 +475,16 @@ function TwitterGrabber() {
     if (!tweetData) return;
     setPosting(true);
     try {
+      const base64 = await generateImageData();
       const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           postAt: Date.now(),
-          text: tweetData.text,
+          text: tweetData.text, // Backend might still require text or we send it as caption
           imageUrls: tweetData.imageUrls,
-          applyStickers
+          imageDataBase64: base64,
+          applyStickers: false // stickers are baked in the image
         })
       });
       const responseData = await res.json();
@@ -486,7 +505,7 @@ function TwitterGrabber() {
     setScheduling(true);
     try {
       const postAt = new Date(scheduledTime).getTime();
-      console.log('Scheduling tweet with:', { postAt, text: tweetData.text, imageUrls: tweetData.imageUrls, applyStickers });
+      const base64 = await generateImageData();
       
       const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
         method: 'POST',
@@ -495,13 +514,13 @@ function TwitterGrabber() {
           postAt,
           text: tweetData.text,
           imageUrls: tweetData.imageUrls,
-          applyStickers
+          imageDataBase64: base64,
+          applyStickers: false // stickers are baked in
         })
       });
       
       const responseData = await res.json();
       if (!res.ok) {
-        console.error('Schedule error response:', responseData);
         throw new Error(responseData.error || 'Failed to schedule');
       }
       
@@ -547,51 +566,68 @@ function TwitterGrabber() {
       {tweetData && (
         <div className="border border-border-strong/50 rounded-lg overflow-hidden bg-bg-panel/50">
           {/* Preview Section */}
-          <div className="border-b border-border-strong/30 p-4 space-y-3">
-            <div className="text-xs uppercase tracking-widest text-text-muted font-bold">Preview</div>
+          <div className="border-b border-border-strong/30 p-4 space-y-3 flex flex-col items-center">
+            <div className="w-full text-xs uppercase tracking-widest text-text-muted font-bold text-left mb-2">Preview</div>
             
-            {/* Tweet Text Preview */}
-            <div className="bg-bg-panel border border-border-strong/30 rounded p-3 space-y-2">
-              <div className="text-xs text-text-muted">Tweet Text:</div>
-              <textarea 
-                value={tweetData?.text || ''} 
-                onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
-                className="w-full bg-bg-base border border-border-strong/50 p-2 text-text-main text-xs h-20 rounded outline-none focus:border-accent-primary/50"
-              />
-              <div className="text-[10px] text-text-muted">
-                {(tweetData?.text || '').length} / 280 characters
+            {/* The generated square card */}
+            <div 
+              ref={cardRef}
+              className="relative flex flex-col justify-center items-center overflow-hidden"
+              style={{
+                width: '400px',
+                height: '400px',
+                background: 'linear-gradient(135deg, #1e293b, #0f172a)', // fallback background
+                borderRadius: '16px',
+                padding: '24px'
+              }}
+            >
+              {applyStickers && (
+                <>
+                  <div className="absolute top-4 left-4 w-12 h-12 bg-accent-primary/20 rounded-full blur-md" />
+                  <div className="absolute top-4 left-4 text-2xl animate-pulse">✨</div>
+                  <div className="absolute bottom-4 right-4 w-12 h-12 bg-accent-primary/20 rounded-full blur-md" />
+                  <div className="absolute bottom-4 right-4 text-2xl animate-pulse">🌟</div>
+                </>
+              )}
+
+              <div className="w-full flex-1 flex flex-col gap-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl">
+                <div 
+                  className="text-white text-lg font-bold whitespace-pre-wrap flex-shrink-0"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  {tweetData.text}
+                </div>
+                
+                {tweetData.imageUrls && tweetData.imageUrls.length > 0 && (
+                  <div className="flex-1 w-full relative rounded-lg overflow-hidden border border-white/10">
+                    <img 
+                      src={tweetData.imageUrls[0]} 
+                      alt="Tweet media"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Images Preview */}
-            {tweetData?.imageUrls && tweetData.imageUrls.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-text-muted">Images ({tweetData.imageUrls.length}):</div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {tweetData.imageUrls.map((imgUrl, idx) => (
-                    <div key={idx} className="border border-border-strong/30 rounded overflow-hidden bg-bg-base aspect-square">
-                      <img 
-                        src={imgUrl} 
-                        alt={`Tweet image ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="w-full mt-4 flex justify-between items-center bg-bg-panel border border-border-strong/30 rounded p-3">
+               <textarea 
+                  value={tweetData.text} 
+                  onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
+                  className="w-full bg-bg-base border border-border-strong/50 p-2 text-text-main text-xs h-16 rounded outline-none focus:border-accent-primary/50"
+                  placeholder="Edit text..."
+                />
+            </div>
 
-            {/* Options */}
-            <label className="flex items-center gap-2 text-xs cursor-pointer hover:text-accent-light transition-colors">
+            <label className="w-full flex items-center gap-2 text-xs cursor-pointer hover:text-accent-light transition-colors mt-2">
               <input 
                 type="checkbox" 
                 checked={applyStickers} 
                 onChange={e => setApplyStickers(e.target.checked)}
                 className="cursor-pointer"
               />
-              <span>✨ Apply Stickers to images</span>
+              <span>✨ Apply Stickers to card</span>
             </label>
           </div>
 

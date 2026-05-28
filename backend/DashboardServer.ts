@@ -999,7 +999,8 @@ class DashboardServer {
               postAt: body.postAt,
               text: body.text,
               imageUrls: body.imageUrls || [],
-              applyStickers: !!body.applyStickers
+              applyStickers: !!body.applyStickers,
+              imageDataBase64: body.imageDataBase64
             });
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ success: true }));

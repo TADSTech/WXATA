@@ -20,6 +20,7 @@ export interface ScheduledPost {
   text: string;
   imageUrls: string[];
   applyStickers: boolean;
+  imageDataBase64?: string;
 }
 
 const scheduledPosts: ScheduledPost[] = [];
@@ -175,7 +176,12 @@ cron.schedule('* * * * *', async () => {
       // time to post
       try {
         let imageBuffer: Buffer | undefined;
-        if (post.imageUrls && post.imageUrls.length > 0 && post.imageUrls[0]) {
+        if (post.imageDataBase64) {
+          // imageDataBase64 starts with "data:image/png;base64," 
+          const base64Data = post.imageDataBase64.replace(/^data:image\/\w+;base64,/, "");
+          imageBuffer = Buffer.from(base64Data, 'base64');
+          // If we receive the generated card, we don't apply stickers again here.
+        } else if (post.imageUrls && post.imageUrls.length > 0 && post.imageUrls[0]) {
           const imgRes = await axios.get(post.imageUrls[0], { responseType: 'arraybuffer' });
           imageBuffer = Buffer.from(imgRes.data);
           if (post.applyStickers) {

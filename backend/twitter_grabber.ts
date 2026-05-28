@@ -11,54 +11,20 @@ export async function fetchTweetContent(tweetUrl: string) {
   const tweetId = match[1];
   
   try {
-    // Use the public syndication API which doesn't require auth
-    const res = await axios.get(`https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en`);
+    const res = await axios.get(`https://api.vxtwitter.com/Twitter/status/${tweetId}`);
     const data = res.data;
     
     const text = data.text || '';
-    const imageUrls: string[] = [];
-    
-    // Extract images from various possible locations in the API response
-    if (data.mediaDetails && Array.isArray(data.mediaDetails)) {
-      for (const media of data.mediaDetails) {
-        if (media.type === 'photo' && media.media_url_https) {
-          // Use the largest available image (add :large suffix)
-          imageUrls.push(media.media_url_https + ':large');
-        }
-      }
-    }
-    
-    // Fallback: check for media in the entities field
-    if (imageUrls.length === 0 && data.entities?.media) {
-      for (const media of data.entities.media) {
-        if (media.type === 'photo' && media.media_url_https) {
-          imageUrls.push(media.media_url_https + ':large');
-        }
-      }
-    }
-    
-    // Additional fallback: look for images in extended_entities
-    if (imageUrls.length === 0 && data.extended_entities?.media) {
-      for (const media of data.extended_entities.media) {
-        if (media.type === 'photo' && media.media_url_https) {
-          imageUrls.push(media.media_url_https + ':large');
-        }
-      }
-    }
-    
-    // Debug logging
-    if (imageUrls.length === 0) {
-      console.warn(`No images found in tweet ${tweetId}. API response structure:`, {
-        hasMediaDetails: !!data.mediaDetails,
-        hasEntitiesMedia: !!data.entities?.media,
-        hasExtendedEntities: !!data.extended_entities?.media,
-        keys: Object.keys(data)
-      });
-    }
+    const imageUrls: string[] = data.mediaURLs || [];
     
     return {
       text,
-      imageUrls
+      imageUrls,
+      user: {
+        name: data.user_name,
+        handle: data.user_screen_name,
+        profileImage: data.user_profile_image_url
+      }
     };
   } catch (error: any) {
     console.error("Failed to fetch tweet:", error.message);
