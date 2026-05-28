@@ -392,16 +392,26 @@ input, textarea, select {
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--theme-border-strong);
-  border-radius: 20px;
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
   background: var(--theme-accent-primary);
+}
+
+/* Firefox scrollbar styling */
+.custom-scrollbar {
+  scrollbar-color: rgba(139, 92, 246, 0.2) transparent;
+  scrollbar-width: thin;
 }

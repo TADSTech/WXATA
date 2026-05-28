@@ -1420,7 +1420,7 @@ const Dashboard = () => {
         </div>
 
         {/* Right: Status + Config panels */}
-        <div className="flex flex-col gap-6 overflow-y-auto min-h-0">
+        <div className="flex flex-col gap-6 overflow-y-auto min-h-0 custom-scrollbar">
 
           {/* Status Bar */}
           <StatusBar
@@ -1558,7 +1558,7 @@ const Dashboard = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-2xl"
+              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-2xl custom-scrollbar"
             >
               <div className="p-4 border-b border-border-strong flex justify-between items-center sticky top-0 bg-bg-panel">
                 <h2 className="text-lg font-bold uppercase tracking-widest">Script Manager</h2>

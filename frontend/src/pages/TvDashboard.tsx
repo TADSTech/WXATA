@@ -881,7 +881,7 @@ const TvDashboard = () => {
         </div>
 
         {/* Right: Status + Config panels */}
-        <div className="flex flex-col gap-6 overflow-y-auto min-h-0">
+        <div className="flex flex-col gap-6 overflow-y-auto min-h-0 custom-scrollbar">
 
           {/* Status Bar */}
           <StatusBar
@@ -1014,7 +1014,7 @@ const TvDashboard = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-md"
+              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-md custom-scrollbar"
             >
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold uppercase tracking-widest">X Link Grabber</h2>
