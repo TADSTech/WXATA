@@ -380,26 +380,6 @@ function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
   );
 }
 
-// ─── TVCommandsReference ──────────────────────────────────────────────────────
-
-function TVCommandsReference({ prefix }: { prefix: string }) {
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Root TV Commands</h3>
-      <div className="space-y-2">
-        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
-          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf</code></div>
-          <p className="text-[10px] text-text-muted">Generates and sends a .vcf file containing all intercepted TV contacts. Each contact is prefixed with TTV.</p>
-        </div>
-        <div className="border border-border-strong/10 rounded p-2.5 bg-bg-panel-hover">
-          <div className="text-xs font-bold text-accent-light mb-1"><code>{prefix}vcf clear</code></div>
-          <p className="text-[10px] text-text-muted">Wipes the internally saved list of TV contacts. (Make sure you've generated your VCF first!)</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── TwitterGrabber ──────────────────────────────────────────────────────────
 
 function TwitterGrabber() {
