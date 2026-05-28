@@ -2660,6 +2660,24 @@ async function sendWelcomeMessage(sock: Awaited<ReturnType<WXATAConnection["crea
   dashboard.log(accountId, "SUCCESS", `Welcome message sent to ${targetJid}`);
 }
 
+async function sendTVModeWelcome(sock: Awaited<ReturnType<WXATAConnection["createConnection"]>>, accountId: string) {
+  const botInfo = await readBotInfo(accountId);
+
+  const targetJid = resolveTargetJid(sock, botInfo.root.target);
+  if (!targetJid) {
+    dashboard.log(accountId, 
+      "ERROR",
+      "TV mode enabled but root target could not be resolved",
+    );
+    return;
+  }
+
+  const tvModeMessage = `✅ *TV Mode Activated*\n\nYou've switched to TV Mode! 📺\n\nNow when users send "${botInfo.tvConfig?.triggerText || 'hey, i want to join'}" followed by their name, they'll automatically receive your welcome message and be added to your contact list.\n\nUse \`${botInfo.prefix}vcf\` to generate your contact list.`;
+
+  await sendTrackedMessage(sock, targetJid, tvModeMessage);
+  dashboard.log(accountId, "SUCCESS", `TV mode welcome message sent to ${targetJid}`);
+}
+
 async function ensureConfigFiles(accountId: string): Promise<void> {
   // DATA_DIR is defined at module level — /data on Render, workspace root locally
   const dir = getAccountDir(accountId);
@@ -2828,9 +2846,22 @@ async function startBot() {
       }
 
       if (payload.command === "UPDATE_BOT_INFO") {
+        const current = await readBotInfo(accountId);
         const updated = await updateBotInfo(accountId, payload.data ?? {});
         dashboard.broadcast({ event: "bot-info", accountId, data: updated });
         dashboard.log(accountId, "SUCCESS", "Bot script configuration updated");
+        
+        // Send TV mode welcome message if tvMode was just enabled
+        if (!current.tvMode && updated.tvMode) {
+          const connectionManager = connectionManagers.get(accountId);
+          const sock = connectionManager?.getSocket();
+          if (sock) {
+            sendTVModeWelcome(sock, accountId).catch(err => {
+              console.error("Failed to send TV mode welcome message", err);
+              dashboard.log(accountId, "ERROR", "Failed to send TV mode welcome message");
+            });
+          }
+        }
       }
 
       if (payload.command === "QUICK_ACTION") {
