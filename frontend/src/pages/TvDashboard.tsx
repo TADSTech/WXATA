@@ -389,15 +389,22 @@ function TwitterGrabber() {
   const [error, setError] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [scheduling, setScheduling] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [applyStickers, setApplyStickers] = useState(true);
+
+  const getBackendUrl = () => {
+    return ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000')
+      .replace('ws://', 'http://')
+      .replace('wss://', 'https://');
+  };
 
   const handleFetch = async () => {
     if (!url) return;
     setFetching(true);
     setError('');
     try {
-      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
-      const res = await fetch(`${backendUrlApi}/api/twitter/grab`, {
+      const res = await fetch(`${getBackendUrl()}/api/twitter/grab`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -412,13 +419,63 @@ function TwitterGrabber() {
     }
   };
 
+  const handleSave = async () => {
+    if (!tweetData) return;
+    setSaving(true);
+    try {
+      // Save to drafts or local storage
+      const draft = {
+        text: tweetData.text,
+        imageUrls: tweetData.imageUrls,
+        applyStickers,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem('twitterGrabberDraft', JSON.stringify(draft));
+      alert('✓ Draft saved successfully!');
+      setTweetData(null);
+      setUrl('');
+    } catch (err: any) {
+      alert('Failed to save draft');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePostNow = async () => {
+    if (!tweetData) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postAt: Date.now(),
+          text: tweetData.text,
+          imageUrls: tweetData.imageUrls,
+          applyStickers
+        })
+      });
+      const responseData = await res.json();
+      if (!res.ok) throw new Error(responseData.error || 'Failed to post');
+      alert('✓ Tweet posted successfully!');
+      setTweetData(null);
+      setUrl('');
+    } catch (err: any) {
+      console.error('Post error:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setPosting(false);
+    }
+  };
+
   const handleSchedule = async () => {
     if (!tweetData || !scheduledTime) return;
     setScheduling(true);
     try {
       const postAt = new Date(scheduledTime).getTime();
-      const backendUrlApi = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:5000').replace('ws://', 'http://').replace('wss://', 'https://');
-      const res = await fetch(`${backendUrlApi}/api/twitter/schedule`, {
+      console.log('Scheduling tweet with:', { postAt, text: tweetData.text, imageUrls: tweetData.imageUrls, applyStickers });
+      
+      const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -428,75 +485,144 @@ function TwitterGrabber() {
           applyStickers
         })
       });
-      if (!res.ok) throw new Error('Failed to schedule');
-      alert("Tweet scheduled successfully!");
+      
+      const responseData = await res.json();
+      if (!res.ok) {
+        console.error('Schedule error response:', responseData);
+        throw new Error(responseData.error || 'Failed to schedule');
+      }
+      
+      alert('✓ Tweet scheduled successfully!');
       setTweetData(null);
       setUrl('');
       setScheduledTime('');
     } catch (err: any) {
-      alert(err.message);
+      console.error('Schedule error:', err);
+      alert(`Error: ${err.message}`);
     } finally {
       setScheduling(false);
     }
   };
 
   return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        X (Twitter) Grabber
-      </h3>
-      
+    <div className="space-y-4">
+      {/* URL Input */}
       <div className="flex gap-2">
         <input 
           type="text" 
           placeholder="Paste Tweet URL..." 
           value={url}
           onChange={e => setUrl(e.target.value)}
-          className="flex-1 bg-bg-panel border border-border-strong p-2 text-text-main outline-none text-xs"
+          onKeyDown={e => e.key === 'Enter' && handleFetch()}
+          className="flex-1 bg-bg-panel border border-border-strong p-2.5 text-text-main outline-none text-xs rounded hover:border-accent-primary/50 focus:border-accent-primary"
         />
         <button 
           onClick={handleFetch} 
-          disabled={fetching}
-          className="border border-border-strong bg-accent-subtle hover:bg-accent-hover text-accent-light px-3 py-1 text-xs"
+          disabled={fetching || !url}
+          className="border border-border-strong bg-accent-subtle hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-accent-light px-4 py-2.5 text-xs font-bold rounded transition-colors"
         >
-          {fetching ? 'Fetching...' : 'Grab'}
+          {fetching ? '⟳ Fetching...' : '📥 Grab'}
         </button>
       </div>
       
-      {error && <div className="text-danger-text text-[10px]">{error}</div>}
+      {error && (
+        <div className="border border-danger-subtle bg-danger-subtle/30 text-danger-text p-2 rounded text-[10px]">
+          ⚠ {error}
+        </div>
+      )}
 
       {tweetData && (
-        <div className="border border-border-strong/30 p-3 rounded space-y-3 mt-2">
-          <textarea 
-            value={tweetData.text} 
-            onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
-            className="w-full bg-bg-base border border-border-strong p-2 text-text-main text-xs h-24"
-          />
-          {tweetData.imageUrls.length > 0 && (
-            <div className="text-[10px] text-text-muted">
-              Found {tweetData.imageUrls.length} image(s).
+        <div className="border border-border-strong/50 rounded-lg overflow-hidden bg-bg-panel/50">
+          {/* Preview Section */}
+          <div className="border-b border-border-strong/30 p-4 space-y-3">
+            <div className="text-xs uppercase tracking-widest text-text-muted font-bold">Preview</div>
+            
+            {/* Tweet Text Preview */}
+            <div className="bg-bg-panel border border-border-strong/30 rounded p-3 space-y-2">
+              <div className="text-xs text-text-muted">Tweet Text:</div>
+              <textarea 
+                value={tweetData.text} 
+                onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
+                className="w-full bg-bg-base border border-border-strong/50 p-2 text-text-main text-xs h-20 rounded outline-none focus:border-accent-primary/50"
+              />
+              <div className="text-[10px] text-text-muted">
+                {tweetData.text.length} / 280 characters
+              </div>
             </div>
-          )}
-          
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={applyStickers} onChange={e => setApplyStickers(e.target.checked)} />
-            Apply Stickers to images
-          </label>
-          
-          <div className="flex gap-2 mt-2">
+
+            {/* Images Preview */}
+            {tweetData.imageUrls.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-text-muted">Images ({tweetData.imageUrls.length}):</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {tweetData.imageUrls.map((imgUrl, idx) => (
+                    <div key={idx} className="border border-border-strong/30 rounded overflow-hidden bg-bg-base aspect-square">
+                      <img 
+                        src={imgUrl} 
+                        alt={`Tweet image ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Options */}
+            <label className="flex items-center gap-2 text-xs cursor-pointer hover:text-accent-light transition-colors">
+              <input 
+                type="checkbox" 
+                checked={applyStickers} 
+                onChange={e => setApplyStickers(e.target.checked)}
+                className="cursor-pointer"
+              />
+              <span>✨ Apply Stickers to images</span>
+            </label>
+          </div>
+
+          {/* Schedule Section */}
+          <div className="border-b border-border-strong/30 p-4 space-y-3">
+            <div className="text-xs uppercase tracking-widest text-text-muted font-bold">Schedule</div>
             <input 
               type="datetime-local" 
               value={scheduledTime}
               onChange={e => setScheduledTime(e.target.value)}
-              className="bg-bg-panel border border-border-strong p-1 text-xs flex-1 text-text-main"
+              className="w-full bg-bg-panel border border-border-strong/50 p-2.5 text-xs text-text-main rounded outline-none focus:border-accent-primary/50"
             />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="p-4 space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button 
+                onClick={handleSave}
+                disabled={saving}
+                className="border border-info-base bg-info-subtle hover:bg-info-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-info-text px-3 py-2 text-xs font-bold rounded transition-colors"
+              >
+                {saving ? '⟳' : '💾'} Save
+              </button>
+              <button 
+                onClick={handlePostNow}
+                disabled={posting}
+                className="border border-success-base bg-success-subtle hover:bg-success-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-success-text px-3 py-2 text-xs font-bold rounded transition-colors"
+              >
+                {posting ? '⟳' : '🚀'} Post
+              </button>
+              <button 
+                onClick={handleSchedule}
+                disabled={scheduling || !scheduledTime}
+                className="border border-warning-base bg-warning-subtle hover:bg-warning-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-warning-text px-3 py-2 text-xs font-bold rounded transition-colors"
+              >
+                {scheduling ? '⟳' : '⏰'} Schedule
+              </button>
+            </div>
             <button 
-              onClick={handleSchedule}
-              disabled={scheduling || !scheduledTime}
-              className="border border-border-strong bg-success-subtle text-accent-light px-3 py-1 text-xs"
+              onClick={() => setTweetData(null)}
+              className="w-full border border-border-strong text-text-muted hover:text-danger-text p-2 text-xs rounded transition-colors"
             >
-              {scheduling ? 'Scheduling...' : 'Schedule Status'}
+              Clear
             </button>
           </div>
         </div>
@@ -1014,15 +1140,17 @@ const TvDashboard = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-md custom-scrollbar"
+              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-lg custom-scrollbar"
             >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold uppercase tracking-widest">X Link Grabber</h2>
-                <button onClick={() => setShowTwitterModal(false)} className="text-text-muted hover:text-accent-light">
+              <div className="sticky top-0 bg-bg-panel border-b border-border-strong flex justify-between items-center p-4 z-10">
+                <h2 className="text-lg font-bold uppercase tracking-widest">𝕏 X Link Grabber</h2>
+                <button onClick={() => setShowTwitterModal(false)} className="text-text-muted hover:text-accent-light transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <TwitterGrabber />
+              <div className="p-4">
+                <TwitterGrabber />
+              </div>
             </motion.div>
           </motion.div>
         )}
