@@ -384,7 +384,7 @@ function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
 
 import { toPng } from 'html-to-image';
 
-function TwitterGrabber() {
+function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [url, setUrl] = useState('');
   const [fetching, setFetching] = useState(false);
   const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[], user?: {name: string, handle: string, profileImage: string} } | null>(null);
@@ -441,7 +441,7 @@ function TwitterGrabber() {
     if (!cardRef.current) return null;
     try {
       // Temporarily hide scrolling/overflow effects if needed, but the card is fixed width
-      return await toPng(cardRef.current, { cacheBust: true, pixelRatio: 2 });
+      return await toPng(cardRef.current, { cacheBust: false, pixelRatio: 2 });
     } catch (err) {
       console.error('Failed to generate image', err);
       return null;
@@ -453,6 +453,15 @@ function TwitterGrabber() {
     setSaving(true);
     try {
       const base64 = await generateImageData();
+      if (!base64) throw new Error("Could not generate image.");
+      
+      const link = document.createElement('a');
+      link.href = base64;
+      link.download = `tweet-card-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
       const draft = {
         text: tweetData.text,
         imageUrls: tweetData.imageUrls,
@@ -461,11 +470,11 @@ function TwitterGrabber() {
         savedAt: new Date().toISOString()
       };
       localStorage.setItem('twitterGrabberDraft', JSON.stringify(draft));
-      alert('✓ Draft saved successfully!');
+      addToast('Draft saved and image downloaded!', 'success');
       setTweetData(null);
       setUrl('');
     } catch (err: any) {
-      alert('Failed to save draft');
+      addToast(`Failed to save draft: ${err.message}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -476,6 +485,7 @@ function TwitterGrabber() {
     setPosting(true);
     try {
       const base64 = await generateImageData();
+      if (!base64) throw new Error("Could not generate image.");
       const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -489,12 +499,12 @@ function TwitterGrabber() {
       });
       const responseData = await res.json();
       if (!res.ok) throw new Error(responseData.error || 'Failed to post');
-      alert('✓ Tweet posted successfully!');
+      addToast('Tweet posted successfully!', 'success');
       setTweetData(null);
       setUrl('');
     } catch (err: any) {
       console.error('Post error:', err);
-      alert(`Error: ${err.message}`);
+      addToast(`Error: ${err.message}`, 'error');
     } finally {
       setPosting(false);
     }
@@ -506,6 +516,7 @@ function TwitterGrabber() {
     try {
       const postAt = new Date(scheduledTime).getTime();
       const base64 = await generateImageData();
+      if (!base64) throw new Error("Could not generate image.");
       
       const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
         method: 'POST',
@@ -524,13 +535,13 @@ function TwitterGrabber() {
         throw new Error(responseData.error || 'Failed to schedule');
       }
       
-      alert('✓ Tweet scheduled successfully!');
+      addToast('Tweet scheduled successfully!', 'success');
       setTweetData(null);
       setUrl('');
       setScheduledTime('');
     } catch (err: any) {
       console.error('Schedule error:', err);
-      alert(`Error: ${err.message}`);
+      addToast(`Error: ${err.message}`, 'error');
     } finally {
       setScheduling(false);
     }
@@ -592,18 +603,18 @@ function TwitterGrabber() {
 
               <div className="w-full flex-1 flex flex-col gap-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl">
                 <div 
-                  className="text-white text-lg font-bold whitespace-pre-wrap flex-shrink-0"
+                  className="text-white text-base font-bold whitespace-pre-wrap flex-shrink-0"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   {tweetData.text}
                 </div>
                 
                 {tweetData.imageUrls && tweetData.imageUrls.length > 0 && (
-                  <div className="flex-1 w-full relative rounded-lg overflow-hidden border border-white/10">
+                  <div className="flex-1 w-full relative rounded-lg overflow-hidden border border-white/10 bg-black/40">
                     <img 
                       src={tweetData.imageUrls[0]} 
                       alt="Tweet media"
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-contain"
                       crossOrigin="anonymous"
                     />
                   </div>
@@ -1198,7 +1209,7 @@ const TvDashboard = () => {
                 </button>
               </div>
               <div className="p-4">
-                <TwitterGrabber />
+                <TwitterGrabber addToast={addToast} />
               </div>
             </motion.div>
           </motion.div>
