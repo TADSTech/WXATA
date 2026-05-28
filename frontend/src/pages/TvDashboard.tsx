@@ -394,6 +394,7 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
   const [posting, setPosting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [applyStickers, setApplyStickers] = useState(true);
+  const [phoneNumber, setPhoneNumber] = useState('+234 800 000 0000');
   
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -593,12 +594,17 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
               }}
             >
               {applyStickers && (
-                <>
-                  <div className="absolute top-4 left-4 w-12 h-12 bg-accent-primary/20 rounded-full blur-md" />
-                  <div className="absolute top-4 left-4 text-2xl animate-pulse">✨</div>
-                  <div className="absolute bottom-4 right-4 w-12 h-12 bg-accent-primary/20 rounded-full blur-md" />
-                  <div className="absolute bottom-4 right-4 text-2xl animate-pulse">🌟</div>
-                </>
+                <div className="absolute top-3 left-3 flex flex-col items-start gap-1 z-10 pointer-events-none">
+                  {/* QR Code Placeholder */}
+                  <div className="w-14 h-14 bg-white rounded-md p-1 shadow-lg border border-white/20">
+                     <img src="/qr_code.png" alt="QR Code" className="w-full h-full object-cover" 
+                          onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjMzMzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjMiPlFSPC90ZXh0Pjwvc3ZnPg==' }} />
+                  </div>
+                  {/* Phone Number */}
+                  <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-white font-bold text-xs shadow border border-white/10">
+                     {phoneNumber}
+                  </div>
+                </div>
               )}
 
               <div className="w-full flex-1 flex flex-col gap-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl">
@@ -615,7 +621,6 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
                       src={tweetData.imageUrls[0]} 
                       alt="Tweet media"
                       className="absolute inset-0 w-full h-full object-contain"
-                      crossOrigin="anonymous"
                     />
                   </div>
                 )}
@@ -631,15 +636,27 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
                 />
             </div>
 
-            <label className="w-full flex items-center gap-2 text-xs cursor-pointer hover:text-accent-light transition-colors mt-2">
-              <input 
-                type="checkbox" 
-                checked={applyStickers} 
-                onChange={e => setApplyStickers(e.target.checked)}
-                className="cursor-pointer"
-              />
-              <span>✨ Apply Stickers to card</span>
-            </label>
+            <div className="w-full flex items-center gap-2 mt-2">
+              <label className="flex items-center gap-2 text-xs cursor-pointer hover:text-accent-light transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={applyStickers} 
+                  onChange={e => setApplyStickers(e.target.checked)}
+                  className="cursor-pointer"
+                />
+                <span>Apply Branding (QR & Number)</span>
+              </label>
+              
+              {applyStickers && (
+                <input 
+                  type="text" 
+                  value={phoneNumber} 
+                  onChange={e => setPhoneNumber(e.target.value)}
+                  className="flex-1 bg-bg-base border border-border-strong/50 p-1.5 text-text-main text-xs rounded outline-none focus:border-accent-primary/50"
+                  placeholder="Enter phone number"
+                />
+              )}
+            </div>
           </div>
 
           {/* Schedule Section */}

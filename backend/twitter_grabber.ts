@@ -15,7 +15,21 @@ export async function fetchTweetContent(tweetUrl: string) {
     const data = res.data;
     
     const text = data.text || '';
-    const imageUrls: string[] = data.mediaURLs || [];
+    const rawImageUrls: string[] = data.mediaURLs || [];
+    
+    // Convert images to base64 to avoid CORS issues on frontend canvas
+    const imageUrls: string[] = [];
+    for (const imgUrl of rawImageUrls) {
+      try {
+        const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+        const base64 = Buffer.from(imgRes.data).toString('base64');
+        const mimeType = imgRes.headers['content-type'] || 'image/jpeg';
+        imageUrls.push(`data:${mimeType};base64,${base64}`);
+      } catch (e) {
+        console.error("Failed to fetch image for base64:", e);
+        imageUrls.push(imgUrl); // fallback to original url
+      }
+    }
     
     return {
       text,
