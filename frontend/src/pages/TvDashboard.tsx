@@ -404,21 +404,29 @@ function TwitterGrabber() {
     setFetching(true);
     setError('');
     try {
+      console.log(`[TwitterGrabber] Fetching from: ${getBackendUrl()}/api/twitter/grab with URL:`, url);
       const res = await fetch(`${getBackendUrl()}/api/twitter/grab`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
+      console.log(`[TwitterGrabber] Response status: ${res.status}`, data);
+      if (!res.ok) {
+        const errorMsg = data.error || `Server error: ${res.status}`;
+        throw new Error(errorMsg);
+      }
       // Ensure imageUrls is always an array
       const normalizedData = {
         text: data.text || '',
         imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : []
       };
+      console.log(`[TwitterGrabber] Normalized data:`, normalizedData);
       setTweetData(normalizedData);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Unknown error';
+      console.error(`[TwitterGrabber] Fetch error:`, errorMsg);
+      setError(errorMsg);
     } finally {
       setFetching(false);
     }

@@ -967,10 +967,13 @@ class DashboardServer {
               res.end(JSON.stringify({ error: "Missing Twitter URL" }));
               return;
             }
+            console.log(`[Twitter Grab] Fetching URL: ${body.url}`);
             const tweetData = await fetchTweetContent(body.url);
+            console.log(`[Twitter Grab] Success:`, tweetData);
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify(tweetData));
           } catch (err: any) {
+            console.error(`[Twitter Grab] Error:`, err.message);
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: err.message || "Failed to fetch tweet" }));
           }
