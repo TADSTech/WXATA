@@ -82,9 +82,7 @@ function CommandPill({
 const Landing = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-
   const [sessionUser, setSessionUser] = useState<any>(null);
-  const tvModeMemory = localStorage.getItem('tvModeEnabled') === 'true';
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -137,6 +135,19 @@ const Landing = () => {
             Pricing
           </motion.button>
           <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              if (sessionUser) {
+                navigate(`/tv/${sessionUser.user_metadata?.username || sessionUser.email}`);
+              } else {
+                navigate("/login");
+              }
+            }}
+            className="text-sm font-bold text-accent-primary hover:text-accent-light transition-colors uppercase tracking-widest hidden md:block"
+          >
+            TV Beta
+          </motion.button>
+          <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={cycleTheme}
             className="p-2 rounded-lg border border-border-subtle text-text-muted hover:text-accent-light hover:border-accent-light transition-colors"
@@ -151,15 +162,7 @@ const Landing = () => {
           >
             Sign In
           </motion.button>
-          {sessionUser && tvModeMemory && (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(`/tv/${sessionUser.user_metadata?.username || sessionUser.email}`)}
-              className="px-5 py-2 border border-accent-primary text-accent-light text-xs font-black rounded transition-all uppercase tracking-widest hover:bg-accent-subtle"
-            >
-              TV Dashboard
-            </motion.button>
-          )}
+
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate("/pricing")}

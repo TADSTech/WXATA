@@ -21,7 +21,7 @@ async function signInDeveloperWithGithub() {
 }
 
 export default function Login() {
-  const [accountType, setAccountType] = useState<"bot" | "developer" | "beta">("bot");
+  const [accountType, setAccountType] = useState<"bot" | "developer">("bot");
   const [identifier, setIdentifier] = useState(""); // email or username
   const [password, setPassword] = useState("");
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -137,7 +137,7 @@ export default function Login() {
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    if (accountType === "bot" || accountType === "beta") {
+    if (accountType === "bot") {
       handleBotLogin(e);
     } else {
       handleDeveloperLogin(e);
@@ -176,17 +176,7 @@ export default function Login() {
           >
             Developer
           </button>
-          <button
-            onClick={() => setAccountType("beta")}
-            className={`px-4 py-3 font-bold uppercase tracking-widest text-sm transition-colors whitespace-nowrap flex items-center gap-1 ${
-              accountType === "beta"
-                ? "text-accent-primary border-b-2 border-accent-primary"
-                : "text-text-muted hover:text-text-main"
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse"></span>
-            TV Beta
-          </button>
+
         </div>
 
         {error && (
@@ -196,28 +186,22 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {accountType === "bot" || accountType === "beta" ? (
-            // Bot or Beta Account Login Form
+          {accountType === "bot" ? (
+            // Bot Account Login Form
             <>
-              {accountType === "beta" && (
-                <div className="bg-accent-subtle/20 border border-accent-subtle p-3 rounded mb-4 text-xs text-accent-light">
-                  <span className="font-bold uppercase tracking-widest block mb-1">Restricted Access</span>
-                  TV Dashboard is currently in closed beta. Only authorized admin accounts can login here.
-                </div>
-              )}
               <div>
                 <label
                   htmlFor="login-identifier"
                   className="block text-sm font-medium mb-1 text-text-muted"
                 >
-                  {accountType === "beta" ? "Admin Email" : "Email"}
+                  Email
                 </label>
                 <input
                   id="login-identifier"
                   type="text"
                   required
                   autoComplete="username"
-                  placeholder={accountType === "beta" ? "admin@tadstech.com" : "yourname or you@email.com"}
+                  placeholder="yourname or you@email.com"
                   className="w-full bg-bg-panel-hover border border-border-subtle rounded px-4 py-2 text-text-main focus:outline-none focus:border-accent-primary placeholder:text-text-muted/40"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
@@ -279,17 +263,17 @@ export default function Login() {
             className="w-full bg-accent-primary hover:bg-accent-hover text-bg-base font-bold py-3 px-4 rounded-xl text-sm uppercase tracking-widest transition-all disabled:opacity-50"
           >
             {loading
-              ? (accountType === "bot" || accountType === "beta")
+              ? (accountType === "bot")
                 ? "Signing in..."
                 : "Checking..."
-              : (accountType === "bot" || accountType === "beta")
+              : (accountType === "bot")
                 ? "Sign In"
                 : "Check Usage"}
           </button>
         </form>
 
         <p className="text-center text-xs text-text-muted mt-4">
-          {(accountType === "bot" || accountType === "beta") ? (
+          {(accountType === "bot") ? (
             <>
               Don't have an account?{" "}
               <Link
