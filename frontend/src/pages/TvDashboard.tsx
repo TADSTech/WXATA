@@ -594,15 +594,17 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
               }}
             >
               {applyStickers && (
-                <div className="absolute top-3 left-3 flex flex-col items-start gap-1 z-10 pointer-events-none">
-                  {/* QR Code Placeholder */}
-                  <div className="w-14 h-14 bg-white rounded-md p-1 shadow-lg border border-white/20">
+                <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between z-10 pointer-events-none">
+                  {/* Phone Number / Branding Badge */}
+                  <div className="bg-[#8b5cf6] px-3 py-1.5 rounded text-white font-bold text-xs shadow-md flex flex-col">
+                     <span className="text-[9px] uppercase tracking-wider opacity-90 mb-0.5">Tadstech Entertainment</span>
+                     <span>{phoneNumber}</span>
+                  </div>
+                  
+                  {/* Shrink QR Code */}
+                  <div className="w-10 h-10 bg-white rounded p-0.5 shadow-md">
                      <img src="/qr_code.png" alt="QR Code" className="w-full h-full object-cover" 
                           onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjMzMzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjMiPlFSPC90ZXh0Pjwvc3ZnPg==' }} />
-                  </div>
-                  {/* Phone Number */}
-                  <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-white font-bold text-xs shadow border border-white/10">
-                     {phoneNumber}
                   </div>
                 </div>
               )}
