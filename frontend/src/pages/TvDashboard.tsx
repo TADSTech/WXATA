@@ -411,7 +411,12 @@ function TwitterGrabber() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      setTweetData(data);
+      // Ensure imageUrls is always an array
+      const normalizedData = {
+        text: data.text || '',
+        imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls : []
+      };
+      setTweetData(normalizedData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -541,17 +546,17 @@ function TwitterGrabber() {
             <div className="bg-bg-panel border border-border-strong/30 rounded p-3 space-y-2">
               <div className="text-xs text-text-muted">Tweet Text:</div>
               <textarea 
-                value={tweetData.text} 
+                value={tweetData?.text || ''} 
                 onChange={e => setTweetData({ ...tweetData, text: e.target.value })}
                 className="w-full bg-bg-base border border-border-strong/50 p-2 text-text-main text-xs h-20 rounded outline-none focus:border-accent-primary/50"
               />
               <div className="text-[10px] text-text-muted">
-                {tweetData.text.length} / 280 characters
+                {(tweetData?.text || '').length} / 280 characters
               </div>
             </div>
 
             {/* Images Preview */}
-            {tweetData.imageUrls.length > 0 && (
+            {tweetData?.imageUrls && tweetData.imageUrls.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-text-muted">Images ({tweetData.imageUrls.length}):</div>
