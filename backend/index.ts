@@ -2801,7 +2801,13 @@ async function startBot() {
 
   dashboard.onCommand(async (payload) => {
     try {
-      const accountId = payload.accountId || "primary";
+      const accountId = payload.accountId as string | undefined;
+      
+      // Validate accountId is always provided and valid
+      if (!accountId || (accountId !== "primary" && accountId !== "secondary")) {
+        console.error(`[Dashboard] Invalid or missing accountId: "${accountId}" — ignoring command`);
+        return;
+      }
       
       if (payload.command === "START_CONNECTION") {
         const { method, phoneNumber } = payload.data;

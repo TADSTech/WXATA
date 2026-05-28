@@ -622,7 +622,9 @@ const TvDashboard = () => {
   const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
 
   // ── Bot state ───────────────────────────────────────────────────────────────
-  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>('primary');
+  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>(() => {
+    return (localStorage.getItem('selectedAccountId') as 'primary' | 'secondary') || 'primary';
+  });
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -669,12 +671,19 @@ const TvDashboard = () => {
     return () => subscription.unsubscribe();
   }, [username, navigate]);
 
-  // ── Send GET_BOT_INFO on connect & account switch ─────────────────────────────
+  // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('selectedAccountId', selectedAccountId);
+  }, [selectedAccountId]);
+
   useEffect(() => {
     if (isAuthenticated && wsStatus === 'connected') {
       setLogs([]);
       setQrData(null);
       setPairingCode(null);
+      setAuthMethod('NONE');
+      setIsConnecting(false);
+      setPhoneNumber('');
       setBotInfo(DEFAULT_BOT_INFO);
       send({ command: 'GET_BOT_INFO', accountId: selectedAccountId });
     }
@@ -727,7 +736,7 @@ const TvDashboard = () => {
         addToast('Config synced', 'success');
       }
     }
-  }, [lastMessage, addToast, selectedAccountId]);
+  }, [lastMessage, addToast, selectedAccountId, setAuthMethod, setIsConnecting]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -764,10 +773,8 @@ const TvDashboard = () => {
 
 
   const saveBotInfo = () => {
-    if (wsStatus !== 'connected') { addToast('Not connected', 'error'); return; }
-    send({ command: 'UPDATE_BOT_INFO', data: botInfo });
+    sendCommand('UPDATE_BOT_INFO', botInfo);
     setConfigStatus('Saving...');
-    addToast('Config saved', 'success');
   };
 
 
@@ -924,10 +931,10 @@ const TvDashboard = () => {
                     const isTv = e.target.checked;
                     setBotInfo(prev => ({ ...prev, tvMode: isTv }));
                     if (!isTv) {
-                       localStorage.setItem('tvModeEnabled', 'false');
+                       localStorage.setItem(`tvModeEnabled_${selectedAccountId}`, 'false');
                        navigate(`/dashboard/${username}`);
                     } else {
-                       localStorage.setItem('tvModeEnabled', 'true');
+                       localStorage.setItem(`tvModeEnabled_${selectedAccountId}`, 'true');
                     }
                     setConfigStatus('Unsaved changes');
                   }}

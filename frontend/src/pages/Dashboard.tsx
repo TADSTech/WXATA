@@ -1022,7 +1022,9 @@ const Dashboard = () => {
   const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
 
   // ── Bot state ───────────────────────────────────────────────────────────────
-  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>('primary');
+  const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>(() => {
+    return (localStorage.getItem('selectedAccountId') as 'primary' | 'secondary') || 'primary';
+  });
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [qrData, setQrData] = useState<string | null>(null);
@@ -1074,12 +1076,20 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [username, navigate]);
 
-  // ── Send GET_BOT_INFO on connect & account switch ─────────────────────────────
+  // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('selectedAccountId', selectedAccountId);
+  }, [selectedAccountId]);
+
   useEffect(() => {
     if (isAuthenticated && wsStatus === 'connected') {
       setLogs([]);
       setQrData(null);
       setPairingCode(null);
+      setBotStatus({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
+      setAuthMethod('NONE');
+      setIsConnecting(false);
+      setPhoneNumber('');
       setBotInfo(DEFAULT_BOT_INFO);
       send({ command: 'GET_BOT_INFO', accountId: selectedAccountId });
     }
@@ -1132,7 +1142,7 @@ const Dashboard = () => {
         addToast('Config synced', 'success');
       }
     }
-  }, [lastMessage, addToast, selectedAccountId]);
+  }, [lastMessage, addToast, selectedAccountId, setBotStatus, setAuthMethod, setIsConnecting]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1273,21 +1283,17 @@ const Dashboard = () => {
   };
 
   const saveBotInfo = () => {
-    if (wsStatus !== 'connected') { addToast('Not connected', 'error'); return; }
-    send({ command: 'UPDATE_BOT_INFO', data: botInfo });
+    sendCommand('UPDATE_BOT_INFO', botInfo);
     setConfigStatus('Saving...');
-    addToast('Config saved', 'success');
   };
 
   const handlePermissionsSave = () => {
-    if (wsStatus !== 'connected') { addToast('Not connected', 'error'); return; }
-    send({ command: 'UPDATE_BOT_INFO', data: botInfo });
+    sendCommand('UPDATE_BOT_INFO', botInfo);
     addToast('Saved', 'success');
   };
 
   const handleWelcomeSave = () => {
-    if (wsStatus !== 'connected') { addToast('Not connected', 'error'); return; }
-    send({ command: 'UPDATE_BOT_INFO', data: botInfo });
+    sendCommand('UPDATE_BOT_INFO', botInfo);
     addToast('Saved', 'success');
   };
 
@@ -1446,10 +1452,10 @@ const Dashboard = () => {
                     }
                     setBotInfo(prev => ({ ...prev, tvMode: isTv }));
                     if (isTv) {
-                       localStorage.setItem('tvModeEnabled', 'true');
+                       localStorage.setItem(`tvModeEnabled_${selectedAccountId}`, 'true');
                        navigate(`/tv/${username}`);
                     } else {
-                       localStorage.setItem('tvModeEnabled', 'false');
+                       localStorage.setItem(`tvModeEnabled_${selectedAccountId}`, 'false');
                     }
                     setConfigStatus('Unsaved changes');
                   }}
