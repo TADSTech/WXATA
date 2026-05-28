@@ -1044,6 +1044,10 @@ const Dashboard = () => {
     name: '', desc: '', trigger: '', aliases: [], type: 'misc', response: '', target: 'chat', code: '', defaultArgument: '',
   });
 
+  // ── Modal state ─────────────────────────────────────────────────────────────
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [showQuickActionsModal, setShowQuickActionsModal] = useState(false);
+
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkSession = async () => {
@@ -1332,7 +1336,7 @@ const Dashboard = () => {
 
   // ── Main render ─────────────────────────────────────────────────────────────
   return (
-    <div className="text-text-main font-mono p-6 flex flex-col gap-6">
+    <div className="text-text-main font-mono p-6 flex flex-col gap-6 h-screen overflow-hidden">
       <ToastContainer toasts={toasts} />
 
       {/* Header */}
@@ -1380,10 +1384,10 @@ const Dashboard = () => {
       </header>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
 
         {/* Left/Middle: Connection & Logs */}
-        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
+        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden min-h-0">
 
           {/* Connection Panel (visible until connected) */}
           <AnimatePresence>
@@ -1416,7 +1420,7 @@ const Dashboard = () => {
         </div>
 
         {/* Right: Status + Config panels */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 overflow-y-auto min-h-0">
 
           {/* Status Bar */}
           <StatusBar
@@ -1489,22 +1493,13 @@ const Dashboard = () => {
           )}
 
           <div className={botInfo.tvMode ? "opacity-50 pointer-events-none" : ""}>
-              {/* Script Manager */}
-              <ScriptManager
-                botInfo={botInfo}
-                expandedScript={expandedScript}
-                setExpandedScript={setExpandedScript}
-                addingScript={addingScript}
-                setAddingScript={setAddingScript}
-                newScriptDraft={newScriptDraft}
-                setNewScriptDraft={setNewScriptDraft}
-                handleScriptFieldChange={handleScriptFieldChange}
-                handleScriptArgumentChange={handleScriptArgumentChange}
-                handleDeleteScript={handleDeleteScript}
-                handleAddScript={handleAddScript}
-                handlePublishScript={handlePublishScript}
-                onReorder={handleScriptReorder}
-              />
+              {/* Script Manager Button */}
+              <button
+                onClick={() => setShowScriptModal(true)}
+                className="w-full border border-border-strong hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors rounded uppercase tracking-widest bg-accent-subtle text-accent-light"
+              >
+                📜 MANAGE SCRIPTS ({Object.keys(botInfo.scripts).length})
+              </button>
 
               {/* Permissions Editor */}
               <PermissionsEditor
@@ -1530,46 +1525,13 @@ const Dashboard = () => {
               />
             </div>
 
-          {/* Quick Actions */}
-          <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
-            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleQuickAction('RESTART_BOT')}
-                className="border border-border-strong hover:bg-accent-subtle p-2 text-xs transition-colors"
-              >
-                RESTART BOT
-              </button>
-              <button
-                onClick={() => handleQuickAction('TERMINATE')}
-                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-2 text-xs transition-colors"
-              >
-                TERMINATE
-              </button>
-              <button
-                onClick={() => handleQuickAction('CLEAR_LOGS')}
-                className="border border-border-strong hover:bg-accent-subtle p-2 text-xs transition-colors"
-              >
-                CLEAR LOGS
-              </button>
-              <button
-                onClick={() => handleQuickAction('EXPORT_DATA')}
-                className="border border-accent-subtle hover:bg-accent-subtle p-2 text-xs transition-colors"
-              >
-                EXPORT DATA
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm('Log out of WhatsApp? You will need to scan a new QR code.')) {
-                    handleQuickAction('LOGOUT');
-                  }
-                }}
-                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-2 text-xs transition-colors col-span-2 font-bold"
-              >
-                RESET SESSION (NEW QR)
-              </button>
-            </div>
-          </div>
+          {/* Quick Actions Button */}
+          <button
+            onClick={() => setShowQuickActionsModal(true)}
+            className="w-full border border-border-strong hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors rounded uppercase tracking-widest bg-accent-subtle text-accent-light"
+          >
+            ⚡ QUICK ACTIONS
+          </button>
 
           {/* Sign Out */}
           <button
@@ -1580,6 +1542,116 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Script Manager Modal */}
+      <AnimatePresence>
+        {showScriptModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowScriptModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-2xl"
+            >
+              <div className="p-4 border-b border-border-strong flex justify-between items-center sticky top-0 bg-bg-panel">
+                <h2 className="text-lg font-bold uppercase tracking-widest">Script Manager</h2>
+                <button onClick={() => setShowScriptModal(false)} className="text-text-muted hover:text-accent-light">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <ScriptManager
+                  botInfo={botInfo}
+                  expandedScript={expandedScript}
+                  setExpandedScript={setExpandedScript}
+                  addingScript={addingScript}
+                  setAddingScript={setAddingScript}
+                  newScriptDraft={newScriptDraft}
+                  setNewScriptDraft={setNewScriptDraft}
+                  handleScriptFieldChange={handleScriptFieldChange}
+                  handleScriptArgumentChange={handleScriptArgumentChange}
+                  handleDeleteScript={handleDeleteScript}
+                  handleAddScript={handleAddScript}
+                  handlePublishScript={handlePublishScript}
+                  onReorder={handleScriptReorder}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Actions Modal */}
+      <AnimatePresence>
+        {showQuickActionsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowQuickActionsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-bg-panel border border-border-strong rounded p-6 w-full max-w-sm"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold uppercase tracking-widest">Quick Actions</h2>
+                <button onClick={() => setShowQuickActionsModal(false)} className="text-text-muted hover:text-accent-light">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => { handleQuickAction('RESTART_BOT'); setShowQuickActionsModal(false); }}
+                  className="w-full border border-border-strong hover:bg-accent-subtle p-3 text-xs transition-colors uppercase font-bold"
+                >
+                  RESTART BOT
+                </button>
+                <button
+                  onClick={() => { handleQuickAction('TERMINATE'); setShowQuickActionsModal(false); }}
+                  className="w-full border border-danger-subtle text-danger-text hover:bg-danger-subtle p-3 text-xs transition-colors uppercase font-bold"
+                >
+                  TERMINATE
+                </button>
+                <button
+                  onClick={() => { handleQuickAction('CLEAR_LOGS'); setShowQuickActionsModal(false); }}
+                  className="w-full border border-border-strong hover:bg-accent-subtle p-3 text-xs transition-colors uppercase font-bold"
+                >
+                  CLEAR LOGS
+                </button>
+                <button
+                  onClick={() => { handleQuickAction('EXPORT_DATA'); setShowQuickActionsModal(false); }}
+                  className="w-full border border-accent-subtle hover:bg-accent-subtle p-3 text-xs transition-colors uppercase font-bold"
+                >
+                  EXPORT DATA
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm('Log out of WhatsApp? You will need to scan a new QR code.')) {
+                      handleQuickAction('LOGOUT');
+                      setShowQuickActionsModal(false);
+                    }
+                  }}
+                  className="w-full border border-danger-subtle text-danger-text hover:bg-danger-subtle p-3 text-xs transition-colors uppercase font-bold"
+                >
+                  RESET SESSION (NEW QR)
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

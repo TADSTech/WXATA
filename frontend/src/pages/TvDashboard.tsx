@@ -637,6 +637,9 @@ const TvDashboard = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
 
+  // ── Modal state ─────────────────────────────────────────────────────────────
+  const [showTwitterModal, setShowTwitterModal] = useState(false);
+
   // ── Script editor state ─────────────────────────────────────────────────────
 
   // ── Auth guard ──────────────────────────────────────────────────────────────
@@ -814,7 +817,7 @@ const TvDashboard = () => {
 
   // ── Main render ─────────────────────────────────────────────────────────────
   return (
-    <div className="text-text-main font-mono p-6 flex flex-col gap-6">
+    <div className="text-text-main font-mono p-6 flex flex-col gap-6 h-screen overflow-hidden">
       <ToastContainer toasts={toasts} />
 
       {/* Header */}
@@ -862,10 +865,10 @@ const TvDashboard = () => {
       </header>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden min-h-0">
 
         {/* Left/Middle: Connection & Logs */}
-        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
+        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden min-h-0">
 
           {/* Connection Panel (visible until connected) */}
           <AnimatePresence>
@@ -898,7 +901,7 @@ const TvDashboard = () => {
         </div>
 
         {/* Right: Status + Config panels */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 overflow-y-auto min-h-0">
 
           {/* Status Bar */}
           <StatusBar
@@ -959,8 +962,12 @@ const TvDashboard = () => {
             onChange={c => { setBotInfo(prev => ({ ...prev, tvConfig: c })); setConfigStatus('Unsaved changes'); }}
             onSave={saveBotInfo}
           />
-          <TVCommandsReference prefix={botInfo.prefix} />
-          <TwitterGrabber />
+          <button
+            onClick={() => setShowTwitterModal(true)}
+            className="w-full border border-border-strong hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors rounded uppercase tracking-widest bg-accent-subtle text-accent-light"
+          >
+            𝕏 X LINK GRABBER
+          </button>
           {/* Quick Actions */}
           <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
             <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Quick Actions</h3>
@@ -1011,6 +1018,35 @@ const TvDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* X (Twitter) Grabber Modal */}
+      <AnimatePresence>
+        {showTwitterModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowTwitterModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-md"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold uppercase tracking-widest">X Link Grabber</h2>
+                <button onClick={() => setShowTwitterModal(false)} className="text-text-muted hover:text-accent-light">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <TwitterGrabber />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
