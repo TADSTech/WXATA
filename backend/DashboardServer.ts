@@ -8,6 +8,12 @@ import { generateLicenseKey } from "./licenseValidator";
 import type { WASocket } from "@whiskeysockets/baileys";
 import { fetchTweetContent } from "./twitter_grabber.js";
 import { scheduleTweetPost } from "./tv_miniapp.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ---------------------------------------------------------------------------
 // Supabase service-role client (lazy — initialized on first use)
@@ -1012,7 +1018,7 @@ class DashboardServer {
         return;
       }
 
-      // ── POST /api/twitter/send-to-sudo ────────────────────────────────────
+      // ── POST /api/twitter/send-to-sudo ───────────────────────────────────
       if (req.method === "POST" && req.url === "/api/twitter/send-to-sudo") {
         setCorsHeaders(res);
         const chunks: Buffer[] = [];
@@ -1022,71 +1028,59 @@ class DashboardServer {
             const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
             if (!body.imageDataBase64) {
               res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Missing imageDataBase64" }));
+              res.end(JSON.stringify({ error: "Missing image data" }));
               return;
             }
 
             const accountId = body.accountId || "primary";
-            const sock = this.socks[accountId] || this.socks["primary"] || this.socks["secondary"];
+            const sock = this.socks[accountId] || this.socks["primary"];
             if (!sock) {
-              res.writeHead(503, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "WhatsApp bot is not connected" }));
-              return;
-            }
-
-            // Determine target sudo number
-            let targetJid: string | null = null;
-            if (body.sudoNumber) {
-              targetJid = this.normalizeJid(body.sudoNumber);
-            } else {
-              // Read from botinfo.json
-              try {
-                const fs = require("fs");
-                const path = require("path");
-                const DATA_DIR = path.resolve(process.cwd(), "backend", "data");
-                const accountDir = path.resolve(DATA_DIR, accountId);
-                const botInfoPath = path.resolve(accountDir, "botinfo.json");
-                if (fs.existsSync(botInfoPath)) {
-                  const botInfo = JSON.parse(fs.readFileSync(botInfoPath, "utf-8"));
-                  if (botInfo.root?.target && botInfo.root.target !== "self") {
-                    targetJid = this.normalizeJid(botInfo.root.target);
-                  } else if (botInfo.permissions?.numbers && botInfo.permissions.numbers.length > 0) {
-                    targetJid = this.normalizeJid(botInfo.permissions.numbers[0]);
-                  }
-                }
-              } catch (e) {
-                console.error("[send-to-sudo] Error reading local botinfo:", e);
-              }
-            }
-
-            // Fallback: If no target, send to the bot's own number (self)
-            if (!targetJid) {
-              const selfId = sock.user?.id;
-              if (selfId) {
-                targetJid = this.normalizeJid(selfId.split(":")[0] || "");
-              }
-            }
-
-            if (!targetJid) {
               res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Could not find a valid sudo number or self JID to send to" }));
+              res.end(JSON.stringify({ error: "WhatsApp socket is not connected." }));
               return;
             }
 
+            // Get the data dir
+            const DATA_DIR = fs.existsSync("/data") ? "/data" : path.resolve(__dirname, "..");
+            const botInfoPath = path.resolve(DATA_DIR, accountId, "botinfo.json");
+            
+            let ownerJid: string | null = null;
+            try {
+              const raw = await fs.promises.readFile(botInfoPath, "utf-8");
+              const botInfo = JSON.parse(raw);
+              const target = botInfo?.root?.target || "";
+              if (target) {
+                const cleanNumber = target.replace(/\D/g, "");
+                if (cleanNumber) {
+                  ownerJid = `${cleanNumber}@s.whatsapp.net`;
+                }
+              }
+            } catch (e) {
+              console.error("[send-to-sudo] Failed to read botinfo:", e);
+            }
+
+            if (!ownerJid) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Sudo/Owner number is not configured in botinfo." }));
+              return;
+            }
+
+            // Convert base64 to buffer
             const base64Data = body.imageDataBase64.replace(/^data:image\/\w+;base64,/, "");
             const imageBuffer = Buffer.from(base64Data, "base64");
 
-            await sock.sendMessage(targetJid, {
+            // Send image message with caption
+            await sock.sendMessage(ownerJid, {
               image: imageBuffer,
-              caption: body.text || "Saved X Card preview! 🚀"
+              caption: body.caption || "Saved X Card Preview"
             });
 
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: true, sentTo: targetJid }));
+            res.end(JSON.stringify({ success: true }));
           } catch (err: any) {
-            console.error("[send-to-sudo] Error sending to sudo:", err);
+            console.error("[send-to-sudo] Error:", err);
             res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: err.message || "Failed to send image to sudo number" }));
+            res.end(JSON.stringify({ error: err.message || "Failed to send to sudo" }));
           }
         });
         return;
