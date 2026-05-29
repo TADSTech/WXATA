@@ -384,7 +384,15 @@ function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
 
 import { toPng } from 'html-to-image';
 
-function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success' | 'error') => void }) {
+function TwitterGrabber({ 
+  addToast, 
+  selectedAccountId, 
+  botInfo 
+}: { 
+  addToast: (msg: string, type?: 'success' | 'error') => void;
+  selectedAccountId: 'primary' | 'secondary';
+  botInfo: BotInfo;
+}) {
   const [url, setUrl] = useState('');
   const [fetching, setFetching] = useState(false);
   const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[], user?: {name: string, handle: string, profileImage: string} } | null>(null);
@@ -472,6 +480,32 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
       };
       localStorage.setItem('twitterGrabberDraft', JSON.stringify(draft));
       addToast('Draft saved and image downloaded!', 'success');
+      
+      // Also send to sudo number on mobile
+      try {
+        console.log(`[TwitterGrabber] Sending generated card to sudo number...`);
+        const sendRes = await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: selectedAccountId || 'primary',
+            imageDataBase64: base64,
+            text: tweetData.text,
+            sudoNumber: botInfo.root?.target && botInfo.root.target !== "self" ? botInfo.root.target : undefined
+          })
+        });
+        const sendData = await sendRes.json();
+        if (sendRes.ok) {
+          addToast(`Sent preview to mobile (${sendData.sentTo.split('@')[0]})!`, 'success');
+        } else {
+          console.warn('[TwitterGrabber] Send to sudo failed:', sendData.error);
+          addToast('Saved but failed to send to mobile.', 'error');
+        }
+      } catch (sendErr) {
+        console.error('[TwitterGrabber] Error sending to sudo:', sendErr);
+        addToast('Saved but failed to send to mobile.', 'error');
+      }
+
       setTweetData(null);
       setUrl('');
     } catch (err: any) {
@@ -608,7 +642,7 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
                   </div>
                   
                   {/* Shrink QR Code */}
-                  <div className="absolute bottom-4 right-6 w-10 h-10 bg-white rounded p-0.5 shadow-md pointer-events-none">
+                  <div className="absolute bottom-2 right-4 w-10 h-10 bg-white rounded p-0.5 shadow-md pointer-events-none">
                      <img src="/qr_code.png" alt="QR Code" className="w-full h-full object-cover" 
                           onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjMzMzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjMiPlFSPC90ZXh0Pjwvc3ZnPg==' }} />
                   </div>
@@ -1234,7 +1268,11 @@ const TvDashboard = () => {
                 </button>
               </div>
               <div className="p-4">
-                <TwitterGrabber addToast={addToast} />
+                <TwitterGrabber 
+                  addToast={addToast} 
+                  selectedAccountId={selectedAccountId}
+                  botInfo={botInfo}
+                />
               </div>
             </motion.div>
           </motion.div>
