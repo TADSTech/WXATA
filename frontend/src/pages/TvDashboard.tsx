@@ -394,7 +394,7 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
   const [posting, setPosting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [applyStickers, setApplyStickers] = useState(true);
-  const [phoneNumber, setPhoneNumber] = useState('+234 800 000 0000');
+  const [phoneNumber, setPhoneNumber] = useState('+2348083696903');
   
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -584,41 +584,47 @@ function TwitterGrabber({ addToast }: { addToast: (msg: string, type?: 'success'
             {/* The generated square card */}
             <div 
               ref={cardRef}
-              className="relative flex flex-col justify-center items-center overflow-hidden"
+              className="relative flex flex-col justify-center items-stretch overflow-hidden"
               style={{
                 width: '400px',
                 height: '400px',
-                background: 'linear-gradient(135deg, #1e293b, #0f172a)', // fallback background
+                background: 'radial-gradient(circle at 0% 0%, rgba(0,0,0,0.3) 0%, transparent 60%), radial-gradient(circle at 100% 100%, rgba(0,0,0,0.3) 0%, transparent 60%), repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 12px), #7c3aed',
                 borderRadius: '16px',
-                padding: '24px'
+                paddingTop: '48px',
+                paddingBottom: '48px',
+                paddingLeft: '24px',
+                paddingRight: '24px'
               }}
             >
               {applyStickers && (
-                <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between z-10 pointer-events-none">
-                  {/* Phone Number / Branding Badge */}
-                  <div className="bg-[#8b5cf6] px-3 py-1.5 rounded text-white font-bold text-xs shadow-md flex flex-col">
-                     <span className="text-[9px] uppercase tracking-wider opacity-90 mb-0.5">Tadstech Entertainment</span>
-                     <span>{phoneNumber}</span>
+                <>
+                  {/* Phone Number / Branding Text - moved to top corner, shrunk, no background, custom font */}
+                  <div 
+                    className="absolute top-4 left-6 text-white text-[10px] tracking-wider opacity-95 flex flex-col text-left pointer-events-none"
+                    style={{ fontFamily: '"Space Grotesk", "Inter", "Noto Color Emoji", sans-serif' }}
+                  >
+                     <span className="text-[8px] uppercase tracking-widest opacity-80 font-bold mb-0.5">Tadstech Entertainment</span>
+                     <span className="font-semibold">{phoneNumber}</span>
                   </div>
                   
                   {/* Shrink QR Code */}
-                  <div className="w-10 h-10 bg-white rounded p-0.5 shadow-md">
+                  <div className="absolute bottom-4 right-6 w-10 h-10 bg-white rounded p-0.5 shadow-md pointer-events-none">
                      <img src="/qr_code.png" alt="QR Code" className="w-full h-full object-cover" 
                           onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjMzMzIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjMiPlFSPC90ZXh0Pjwvc3ZnPg==' }} />
                   </div>
-                </div>
+                </>
               )}
 
-              <div className="w-full flex-1 flex flex-col gap-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl">
+              <div className="w-full flex-1 flex flex-col gap-4 bg-white border border-slate-100 rounded-xl p-4 shadow-lg overflow-hidden">
                 <div 
-                  className="text-white text-base font-bold whitespace-pre-wrap flex-shrink-0"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
+                  className="text-slate-900 text-sm font-semibold whitespace-pre-wrap flex-shrink-0 leading-relaxed"
+                  style={{ fontFamily: '"Inter", "Noto Color Emoji", sans-serif' }}
                 >
                   {tweetData.text}
                 </div>
                 
                 {tweetData.imageUrls && tweetData.imageUrls.length > 0 && (
-                  <div className="flex-1 w-full relative rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                  <div className="flex-1 w-full relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                     <img 
                       src={tweetData.imageUrls[0]} 
                       alt="Tweet media"
