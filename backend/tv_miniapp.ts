@@ -25,6 +25,47 @@ export interface ScheduledPost {
 
 const scheduledPosts: ScheduledPost[] = [];
 
+async function getStatusJidList(accountId: string, sock?: any): Promise<string[]> {
+  try {
+    const DATA_DIR = fs.existsSync("/data") ? "/data" : path.resolve(__dirname, "..");
+    const botInfoPath = path.resolve(DATA_DIR, accountId, "botinfo.json");
+    const jids: string[] = [];
+    
+    if (fs.existsSync(botInfoPath)) {
+      const raw = await fs.promises.readFile(botInfoPath, "utf-8");
+      const botInfo = JSON.parse(raw);
+      
+      const owner = botInfo?.root?.target || "";
+      if (owner) {
+        const clean = owner.replace(/\D/g, "");
+        if (clean) jids.push(`${clean}@s.whatsapp.net`);
+      }
+      
+      const numbers = botInfo?.permissions?.numbers || [];
+      for (const num of numbers) {
+        if (num) {
+          const clean = num.replace(/\D/g, "");
+          if (clean) jids.push(`${clean}@s.whatsapp.net`);
+        }
+      }
+    }
+    
+    const senderJid = sock?.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
+    if (senderJid) {
+      jids.push(senderJid);
+    }
+    
+    // Add default fallback
+    jids.push("2348083696903@s.whatsapp.net");
+    
+    // Deduplicate
+    return Array.from(new Set(jids));
+  } catch (e) {
+    console.error("[tv-miniapp] getStatusJidList error:", e);
+  }
+  return ["2348083696903@s.whatsapp.net"];
+}
+
 const ASSETS_DIR = path.resolve(__dirname, 'assets', 'stickers');
 
 // Ensure assets directory exists
@@ -130,12 +171,7 @@ export function initTVMiniapp(sock: any, accountId: string) {
         if (isMeme) {
           const meme = await fetchMeme(theme || 'General');
           if (meme.imageBuffer) {
-            const jids = [
-              ...(sock.contacts ? Object.keys(sock.contacts) : []),
-              ...(sock.chats ? Object.keys(sock.chats) : [])
-            ].filter((jid: string) => jid.endsWith('@s.whatsapp.net'));
-            const senderJid = sock.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
-            const statusJidList = jids.length > 0 ? jids : (senderJid ? [senderJid] : []);
+            const statusJidList = await getStatusJidList(accountId, sock);
 
             const brandedImage = await overlayStickers(meme.imageBuffer);
             await sock.sendMessage('status@broadcast', { 
@@ -199,12 +235,7 @@ cron.schedule('* * * * *', async () => {
         }
         
         if (imageBuffer) {
-           const jids = [
-             ...(_tvSock.contacts ? Object.keys(_tvSock.contacts) : []),
-             ...(_tvSock.chats ? Object.keys(_tvSock.chats) : [])
-           ].filter((jid: string) => jid.endsWith('@s.whatsapp.net'));
-           const senderJid = _tvSock.user?.id ? (_tvSock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
-           const statusJidList = jids.length > 0 ? jids : (senderJid ? [senderJid] : []);
+           const statusJidList = await getStatusJidList("primary", _tvSock);
 
            await _tvSock.sendMessage('status@broadcast', { 
              image: imageBuffer, 
