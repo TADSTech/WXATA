@@ -229,36 +229,39 @@ const Landing = () => {
           </motion.p>
 
           <motion.div
-            className="flex gap-4 justify-center pt-4"
+            className="flex flex-col items-center pt-4 gap-4"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1 }}
           >
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate("/login")}
-              className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase shadow-[0_0_20px_rgba(139,92,246,0.4)]"
-            >
-              Launch App
-            </motion.button>
+            <div className="flex gap-4 justify-center">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/login")}
+                className="px-8 py-3 bg-accent-primary hover:bg-accent-hover text-bg-base font-bold rounded transition-all tracking-widest text-sm uppercase shadow-[0_0_20px_rgba(139,92,246,0.4)]"
+              >
+                Launch App
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => scrollToSection("features")}
+                className="px-8 py-3 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
+              >
+                Features <ChevronRight className="w-4 h-4" />
+              </motion.button>
+            </div>
+
             {sessionUser && isTvModeSecondary && (
               <motion.button
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => navigate(`/grabber/${sessionUser.user_metadata?.username || sessionUser.email}`)}
-                className="px-8 py-3 bg-info-subtle border border-info-base text-info-text font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                className="text-xs text-text-muted hover:text-accent-light transition-colors uppercase tracking-widest mt-2"
               >
                 𝕏 Quick Grab
               </motion.button>
             )}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => scrollToSection("features")}
-              className="px-8 py-3 border border-border-strong text-text-main hover:bg-bg-panel/10 font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2"
-            >
-              Features <ChevronRight className="w-4 h-4" />
-            </motion.button>
           </motion.div>
         </motion.div>
 
