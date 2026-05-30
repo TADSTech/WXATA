@@ -512,6 +512,7 @@ class DashboardServer {
           req.url === "/api/keys/usage" ||
           req.url === "/api/twitter/grab" ||
           req.url === "/api/twitter/schedule" ||
+          req.url === "/api/twitter/send-to-sudo" ||
           req.url === "/api/send" ||
           req.url === "/api/keys/topup/init" ||
           req.url === "/api/admin/config" ||
