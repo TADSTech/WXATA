@@ -1034,10 +1034,13 @@ class DashboardServer {
             }
 
             const accountId = body.accountId || "primary";
+            console.log(`[send-to-sudo] Received request for account: ${accountId}`);
+
             const sock = this.socks[accountId] || this.socks["primary"];
             if (!sock) {
+              console.error(`[send-to-sudo] Socket for ${accountId} is not connected.`);
               res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "WhatsApp socket is not connected." }));
+              res.end(JSON.stringify({ error: `WhatsApp [${accountId}] is not connected in the dashboard.` }));
               return;
             }
 
@@ -1047,13 +1050,15 @@ class DashboardServer {
             
             let ownerJid: string | null = null;
             try {
-              const raw = await fs.promises.readFile(botInfoPath, "utf-8");
-              const botInfo = JSON.parse(raw);
-              const target = botInfo?.root?.target || "";
-              if (target) {
-                const cleanNumber = target.replace(/\D/g, "");
-                if (cleanNumber) {
-                  ownerJid = `${cleanNumber}@s.whatsapp.net`;
+              if (fs.existsSync(botInfoPath)) {
+                const raw = await fs.promises.readFile(botInfoPath, "utf-8");
+                const botInfo = JSON.parse(raw);
+                const target = botInfo?.root?.target || "";
+                if (target) {
+                  const cleanNumber = target.replace(/\D/g, "");
+                  if (cleanNumber) {
+                    ownerJid = `${cleanNumber}@s.whatsapp.net`;
+                  }
                 }
               }
             } catch (e) {
@@ -1061,10 +1066,12 @@ class DashboardServer {
             }
 
             if (!ownerJid) {
-              res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Sudo/Owner number is not configured in botinfo." }));
-              return;
+              // Fallback to the default sudo number from the prompt if botinfo resolution fails
+              ownerJid = "2348083696903@s.whatsapp.net";
+              console.log("[send-to-sudo] Using default fallback JID: 2348083696903@s.whatsapp.net");
             }
+
+            console.log(`[send-to-sudo] Sending to JID: ${ownerJid}`);
 
             // Convert base64 to buffer
             const base64Data = body.imageDataBase64.replace(/^data:image\/\w+;base64,/, "");
@@ -1076,6 +1083,7 @@ class DashboardServer {
               caption: body.caption || "Saved X Card Preview"
             });
 
+            console.log(`[send-to-sudo] Successfully sent to ${ownerJid}`);
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ success: true }));
           } catch (err: any) {

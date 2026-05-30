@@ -464,8 +464,9 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
       document.body.removeChild(link);
       
       // Also send it to the sudo/owner number via backend API
+      addToast('Sending preview to mobile...', 'success');
       try {
-        await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
+        const response = await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -474,8 +475,16 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
             accountId: selectedAccountId
           })
         });
-      } catch (sendErr) {
+        
+        if (response.ok) {
+          addToast('Preview sent to mobile WhatsApp!', 'success');
+        } else {
+          const errData = await response.json();
+          addToast(`Mobile send failed: ${errData.error || response.statusText}`, 'error');
+        }
+      } catch (sendErr: any) {
         console.error('Failed to send to sudo number:', sendErr);
+        addToast(`Mobile send error: ${sendErr.message}`, 'error');
       }
 
       const draft = {
