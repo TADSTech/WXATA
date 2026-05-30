@@ -130,10 +130,19 @@ export function initTVMiniapp(sock: any, accountId: string) {
         if (isMeme) {
           const meme = await fetchMeme(theme || 'General');
           if (meme.imageBuffer) {
+            const jids = [
+              ...(sock.contacts ? Object.keys(sock.contacts) : []),
+              ...(sock.chats ? Object.keys(sock.chats) : [])
+            ].filter((jid: string) => jid.endsWith('@s.whatsapp.net'));
+            const senderJid = sock.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
+            const statusJidList = jids.length > 0 ? jids : (senderJid ? [senderJid] : []);
+
             const brandedImage = await overlayStickers(meme.imageBuffer);
             await sock.sendMessage('status@broadcast', { 
               image: brandedImage, 
               caption: meme.text 
+            }, {
+              statusJidList
             });
             console.log(`[TV-Miniapp] Posted branded meme status.`);
           } else {
@@ -190,9 +199,18 @@ cron.schedule('* * * * *', async () => {
         }
         
         if (imageBuffer) {
+           const jids = [
+             ...(_tvSock.contacts ? Object.keys(_tvSock.contacts) : []),
+             ...(_tvSock.chats ? Object.keys(_tvSock.chats) : [])
+           ].filter((jid: string) => jid.endsWith('@s.whatsapp.net'));
+           const senderJid = _tvSock.user?.id ? (_tvSock.user.id.split(':')[0] + '@s.whatsapp.net') : null;
+           const statusJidList = jids.length > 0 ? jids : (senderJid ? [senderJid] : []);
+
            await _tvSock.sendMessage('status@broadcast', { 
              image: imageBuffer, 
              caption: post.text 
+           }, {
+             statusJidList
            });
         } else {
            await _tvSock.sendMessage('status@broadcast', { text: post.text });
