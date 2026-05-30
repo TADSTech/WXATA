@@ -83,11 +83,14 @@ const Landing = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [sessionUser, setSessionUser] = useState<any>(null);
+  const [isTvModeSecondary, setIsTvModeSecondary] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessionUser(session?.user ?? null);
     });
+    
+    setIsTvModeSecondary(localStorage.getItem('tvModeEnabled_secondary') === 'true');
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -238,6 +241,17 @@ const Landing = () => {
             >
               Launch App
             </motion.button>
+            {sessionUser && isTvModeSecondary && (
+              <motion.button
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate(`/grabber/${sessionUser.user_metadata?.username || sessionUser.email}`)}
+                className="px-8 py-3 bg-info-subtle border border-info-base text-info-text font-bold rounded transition-all tracking-widest text-sm uppercase flex items-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+              >
+                𝕏 Quick Grab
+              </motion.button>
+            )}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => scrollToSection("features")}
