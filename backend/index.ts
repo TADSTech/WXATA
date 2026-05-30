@@ -14,7 +14,7 @@ commandHandler.register(new RandomCommand());
 commandHandler.register(new BrainTeaserCommand());
 import { WordChainCommand, WordRandomCommand, activeWCG } from "./commands/games/WordGameCommand";
 import { activeTeasers } from "./commands/games/BrainTeaserCommand";
-import { activeBombs } from "./commands/games/FunCommand";
+import { activeBombs } from "./commands/games/FunCommand"; 
 import { AlexaCommand } from "./commands/misc/AlexaCommand";
 import { ShipCommand } from "./commands/misc/ShipCommand";
 import { SysInfoCommand } from "./commands/misc/SysInfoCommand";

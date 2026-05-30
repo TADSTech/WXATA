@@ -86,16 +86,16 @@ function StatusBar({ connection, uptime, memory, wsStatus, wsAttempt }: StatusBa
   const isReconnecting = wsStatus === 'reconnecting';
 
   return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Bot Status</h3>
+    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 shadow-sm">
+      <h3 className="text-xs uppercase tracking-wide opacity-60 border-b border-border-subtle pb-2 font-medium">Bot Status</h3>
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-text-muted">Connection</span>
-          <span className={isConnected ? 'text-accent-light' : 'text-danger-text'}>{connection}</span>
+          <span className={`font-medium ${isConnected ? 'text-accent-light' : 'text-danger-text'}`}>{connection}</span>
         </div>
         {isReconnecting && (
-          <div className="flex items-center gap-2 text-xs text-warning-text border border-warning-subtle bg-warning-subtle/20 px-2 py-1 rounded">
-            <RefreshCw className="w-3 h-3 animate-spin" />
+          <div className="flex items-center gap-2 text-xs text-warning-text border border-warning-subtle bg-warning-subtle px-2.5 py-1.5 rounded-xl">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             <span>Reconnecting... (attempt {wsAttempt})</span>
           </div>
         )}
@@ -145,17 +145,17 @@ function ConnectionPanel({
   };
 
   return (
-    <div className="bg-bg-panel border border-border-strong rounded p-6 overflow-hidden">
+    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-6 overflow-hidden shadow-sm">
       <div className="flex flex-col md:flex-row gap-8 items-center justify-center">
         {/* QR Method */}
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="p-4 bg-bg-panel border border-border-subtle rounded-xl">
+          <div className="p-5 bg-bg-panel-hover border border-border-subtle rounded-2xl shadow-sm">
             {qrData ? (
-              <div className="p-2 bg-white rounded">
-                <QRCodeSVG value={qrData} size={150} />
+              <div className="p-3 bg-white rounded-xl">
+                <QRCodeSVG value={qrData} size={140} />
               </div>
             ) : (
-              <div className="w-[150px] h-[150px] flex items-center justify-center border border-dashed border-border-subtle">
+              <div className="w-[140px] h-[140px] flex items-center justify-center border-2 border-dashed border-border-subtle rounded-xl">
                 {isConnecting && authMethod === 'QR'
                   ? <RefreshCw className="w-8 h-8 animate-spin text-accent-light" />
                   : <QrCode className="w-12 h-12 text-accent-primary" />}
@@ -165,9 +165,9 @@ function ConnectionPanel({
           <button
             onClick={onConnectQR}
             disabled={isConnecting}
-            className="flex items-center gap-2 bg-accent-primary hover:bg-accent-hover disabled:opacity-50 text-bg-base px-6 py-2 rounded font-bold transition-all uppercase text-sm tracking-widest"
+            className="flex items-center gap-2 bg-accent-primary hover:bg-accent-hover disabled:opacity-50 text-white px-7 py-3 rounded-xl font-semibold transition-all uppercase text-sm tracking-wide shadow-sm hover:shadow-md"
           >
-            <Wifi className="w-4 h-4" /> Connect QR
+            <Wifi className="w-4.5 h-4.5" /> Connect QR
           </button>
         </div>
 
@@ -176,9 +176,9 @@ function ConnectionPanel({
         {/* Phone Method */}
         <div className="flex flex-col items-center gap-4 w-full max-w-xs">
           {pairingCode ? (
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-xs uppercase text-text-muted">Pairing Code</span>
-              <div className="text-4xl font-mono font-black tracking-widest text-accent-light bg-bg-panel px-6 py-3 border border-border-strong rounded">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-xs uppercase text-text-muted font-medium">Pairing Code</span>
+              <div className="text-4xl font-mono font-bold tracking-widest text-accent-light bg-accent-subtle px-7 py-4 border border-border-subtle rounded-2xl">
                 {pairingCode}
               </div>
             </div>
@@ -188,7 +188,7 @@ function ConnectionPanel({
                 <input
                   type="text"
                   placeholder="Phone (e.g. 551199999999)"
-                  className="w-full bg-bg-panel border border-border-strong p-2 text-accent-light text-center font-mono focus:border-border-strong outline-none placeholder:text-accent-primary/50"
+                  className="w-full bg-bg-panel-hover border border-border-subtle p-3 text-text-main text-center font-mono focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle outline-none placeholder:text-text-muted rounded-xl transition-all"
                   value={phoneNumber}
                   onChange={e => setPhoneNumber(e.target.value)}
                 />
@@ -196,9 +196,9 @@ function ConnectionPanel({
               <button
                 onClick={handleConnectPhone}
                 disabled={isConnecting || (showPhoneInput && !phoneNumber.trim())}
-                className="w-full flex items-center justify-center gap-2 bg-bg-panel border border-border-strong hover:bg-accent-subtle disabled:border-border-strong disabled:text-text-muted text-accent-light px-6 py-2 rounded font-bold transition-all uppercase text-sm tracking-widest"
+                className="w-full flex items-center justify-center gap-2 bg-bg-panel border border-border-subtle hover:bg-accent-subtle disabled:border-border-subtle disabled:text-text-muted text-accent-light px-6 py-3 rounded-xl font-semibold transition-all uppercase text-sm tracking-wide shadow-sm"
               >
-                <Phone className="w-4 h-4" /> {showPhoneInput ? 'Link via Phone' : 'Connect Phone'}
+                <Phone className="w-4.5 h-4.5" /> {showPhoneInput ? 'Link via Phone' : 'Connect Phone'}
               </button>
             </div>
           )}
@@ -206,28 +206,28 @@ function ConnectionPanel({
       </div>
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-2 justify-center mt-6 pt-4 border-t border-border-strong/10">
+      <div className="flex flex-wrap gap-2 justify-center mt-6 pt-4 border-t border-border-subtle">
         <button
           onClick={onRestart}
-          className="flex items-center gap-1.5 border border-border-strong hover:bg-accent-subtle px-3 py-1.5 text-xs rounded transition-colors"
+          className="flex items-center gap-1.5 border border-border-subtle hover:bg-bg-panel-hover px-4 py-2 text-xs rounded-xl transition-colors"
         >
-          <RefreshCw className="w-3 h-3" /> Restart
+          <RefreshCw className="w-3.5 h-3.5" /> Restart
         </button>
         <button
           onClick={() => {
             if (confirm('Log out of WhatsApp? You will need to scan a new QR code.')) onLogout();
           }}
-          className="flex items-center gap-1.5 border border-warning-subtle text-warning-text hover:bg-warning-subtle/20 px-3 py-1.5 text-xs rounded transition-colors"
+          className="flex items-center gap-1.5 border border-warning-subtle text-warning-text hover:bg-warning-subtle px-4 py-2 text-xs rounded-xl transition-colors"
         >
-          <LogOut className="w-3 h-3" /> Logout
+          <LogOut className="w-3.5 h-3.5" /> Logout
         </button>
         <button
           onClick={() => {
             if (confirm('Terminate the bot process? PM2 will stop it.')) onTerminate();
           }}
-          className="flex items-center gap-1.5 border border-danger-subtle text-danger-text hover:bg-danger-subtle/20 px-3 py-1.5 text-xs rounded transition-colors"
+          className="flex items-center gap-1.5 border border-danger-subtle text-danger-text hover:bg-danger-subtle px-4 py-2 text-xs rounded-xl transition-colors"
         >
-          <X className="w-3 h-3" /> Terminate
+          <X className="w-3.5 h-3.5" /> Terminate
         </button>
       </div>
     </div>
@@ -237,12 +237,12 @@ function ConnectionPanel({
 // ─── LogPanel ─────────────────────────────────────────────────────────────────
 
 const LOG_TYPE_COLORS: Record<string, string> = {
-  INFO: 'text-blue-400',
-  WARN: 'text-yellow-400',
-  ERROR: 'text-red-400',
-  SUCCESS: 'text-green-400',
-  DEBUG: 'text-gray-400',
-  MSG: 'text-white',
+  INFO: 'text-blue-600',
+  WARN: 'text-amber-600',
+  ERROR: 'text-red-600',
+  SUCCESS: 'text-green-600',
+  DEBUG: 'text-gray-500',
+  MSG: 'text-text-main',
 };
 
 function LogPanel({ logs }: { logs: LogEntry[] }) {
@@ -253,12 +253,12 @@ function LogPanel({ logs }: { logs: LogEntry[] }) {
   }, [logs]);
 
   return (
-    <div className="flex-1 bg-bg-panel border border-border-subtle rounded p-4 flex flex-col gap-4 overflow-hidden min-h-[300px]">
-      <div className="flex justify-between items-center border-b border-border-strong/10 pb-2">
-        <span className="text-xs uppercase tracking-widest opacity-50">Real-time System Logs</span>
+    <div className="flex-1 bg-bg-panel border border-border-subtle rounded-2xl p-5 flex flex-col gap-4 overflow-hidden min-h-[300px] shadow-sm">
+      <div className="flex justify-between items-center border-b border-border-subtle pb-2">
+        <span className="text-xs uppercase tracking-wide opacity-60 font-medium">Real-time System Logs</span>
         <span className="text-[10px] text-accent-primary">BAILEYS_SOCKET_STREAM</span>
       </div>
-      <div className="flex-1 overflow-y-auto space-y-0.5 text-xs font-mono custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-1 text-xs font-mono custom-scrollbar">
         {logs.map((log, i) => {
           const colorClass = LOG_TYPE_COLORS[log.type?.toUpperCase()] ?? 'text-text-muted';
           return (
@@ -266,16 +266,16 @@ function LogPanel({ logs }: { logs: LogEntry[] }) {
               key={i}
               initial={{ x: -10, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="hover:bg-accent-subtle px-1 py-0.5 rounded flex gap-2"
+              className="hover:bg-bg-panel-hover px-2 py-1.5 rounded-lg flex gap-2 transition-colors"
             >
               <span className="text-text-muted shrink-0">[{log.timestamp}]</span>
-              <span className={`shrink-0 font-bold ${colorClass}`}>{log.type}:</span>
+              <span className={`shrink-0 font-semibold ${colorClass}`}>{log.type}:</span>
               <span className="text-text-main break-all">{log.message}</span>
             </motion.div>
           );
         })}
         {logs.length === 0 && (
-          <div className="text-accent-primary opacity-30 text-center mt-20 italic">Waiting for backend data...</div>
+          <div className="text-accent-primary opacity-40 text-center mt-20 italic">Waiting for backend data...</div>
         )}
         <div ref={bottomRef} />
       </div>
@@ -294,40 +294,40 @@ interface TVConfigEditorProps {
 function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
   const config = tvConfig || DEFAULT_BOT_INFO.tvConfig!;
   return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4 text-xs">
-      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">TV Mode Configuration</h3>
+    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 text-xs shadow-sm">
+      <h3 className="text-xs uppercase tracking-wide opacity-60 border-b border-border-subtle pb-2 font-medium">TV Mode Configuration</h3>
 
-      <div className="bg-accent-subtle/20 border border-accent-subtle p-3 rounded text-accent-light space-y-1">
-        <span className="font-bold uppercase tracking-widest block mb-1">How it works</span>
+      <div className="bg-accent-subtle border border-accent-subtle p-4 rounded-xl text-accent-light space-y-1.5">
+        <span className="font-semibold uppercase tracking-wide block mb-1">How it works</span>
         When TV Mode is active, all normal commands are ignored for non-root users. Instead, if a user sends a message starting with the <strong>Trigger Text</strong>, the bot will extract their name and reply with the <strong>Welcome Message</strong>.
       </div>
 
-      <label className="block space-y-1">
-        <span className="text-text-muted uppercase tracking-wider">Trigger Text (lowercase)</span>
+      <label className="block space-y-2">
+        <span className="text-text-muted uppercase tracking-wide font-medium">Trigger Text (lowercase)</span>
         <input
           type="text"
           value={config.triggerText}
           onChange={e => onChange({ ...config, triggerText: e.target.value })}
-          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary transition-colors font-mono"
+          className="w-full bg-bg-panel-hover border border-border-subtle p-3 text-text-main outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle transition-all font-mono rounded-xl"
         />
       </label>
 
-      <label className="block space-y-1">
-        <span className="text-text-muted uppercase tracking-wider">Welcome Message</span>
+      <label className="block space-y-2">
+        <span className="text-text-muted uppercase tracking-wide font-medium">Welcome Message</span>
         <textarea
           value={config.welcomeMessage}
           onChange={e => onChange({ ...config, welcomeMessage: e.target.value })}
           rows={4}
-          className="w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary font-mono whitespace-pre-wrap transition-colors"
+          className="w-full bg-bg-panel-hover border border-border-subtle p-3 text-text-main outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle font-mono whitespace-pre-wrap transition-all rounded-xl"
         />
-        <span className="text-[10px] text-text-muted mt-1 block">Use <code>{`{{name}}`}</code> to inject the user's extracted name.</span>
+        <span className="text-[11px] text-text-muted mt-1 block">Use <code>{`{{name}}`}</code> to inject the user's extracted name.</span>
       </label>
 
       <button
         onClick={onSave}
-        className="w-full border border-border-strong bg-success-subtle text-accent-light hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors"
+        className="w-full border border-success-subtle bg-success-subtle text-success-text hover:bg-accent-subtle px-4 py-3 text-sm font-semibold transition-all rounded-xl shadow-sm"
       >
-        <Save className="w-3 h-3 inline mr-1" /> Save TV Config
+        <Save className="w-4 h-4 inline mr-1.5" /> Save TV Config
       </button>
     </div>
   );
@@ -340,6 +340,7 @@ import { TwitterGrabber } from '../components/TwitterGrabber';
 // ─── ThemeSwitcher ────────────────────────────────────────────────────────────
 
 const THEME_META: Record<string, { name: string; color: string }> = {
+  soft: { name: 'Soft & Friendly', color: '#a78bfa' },
   midnight: { name: 'Midnight', color: '#8b5cf6' },
   nord: { name: 'Nord', color: '#88c0d0' },
   cyberpunk: { name: 'Cyberpunk', color: '#ff00ff' },
@@ -364,13 +365,13 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 text-accent-light hover:text-accent-hover transition-colors focus:outline-none"
+        className="flex items-center gap-2 text-text-main hover:text-accent-primary transition-colors focus:outline-none border border-border-subtle bg-bg-panel px-3 py-2 rounded-xl hover:bg-bg-panel-hover shadow-sm"
       >
-        <span className="uppercase text-xs hidden sm:inline">{theme}</span>
+        <span className="text-xs font-medium">{theme}</span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-4 bg-bg-panel border border-border-strong rounded-xl shadow-2xl overflow-hidden z-50 min-w-[280px] p-4 backdrop-blur-md bg-opacity-90">
-          <div className="text-[10px] uppercase tracking-widest text-text-muted mb-3 border-b border-border-subtle pb-2">Select Visual Identity</div>
+        <div className="absolute right-0 top-full mt-3 bg-bg-panel border border-border-subtle rounded-2xl shadow-xl overflow-hidden z-50 min-w-[280px] p-4">
+          <div className="text-xs uppercase tracking-wide text-text-muted mb-3 border-b border-border-subtle pb-2 font-medium">Select Visual Identity</div>
           <div className="grid grid-cols-2 gap-2">
             {KNOWN_THEMES.map(id => {
               const meta = THEME_META[id] ?? { name: id, color: '#888' };
@@ -378,10 +379,10 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
                 <button
                   key={id}
                   onClick={() => { setTheme(id); setOpen(false); }}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${theme === id ? 'bg-accent-subtle ring-1 ring-accent-primary' : 'hover:bg-bg-panel-hover'}`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${theme === id ? 'bg-accent-subtle ring-1 ring-accent-primary' : 'hover:bg-bg-panel-hover'}`}
                 >
-                  <div className="w-4 h-4 rounded-full border border-border-strong shrink-0" style={{ backgroundColor: meta.color }} />
-                  <span className={`text-[11px] font-bold uppercase tracking-tight ${theme === id ? 'text-accent-light' : 'text-text-main'}`}>
+                  <div className="w-4.5 h-4.5 rounded-full border border-border-subtle shrink-0" style={{ backgroundColor: meta.color }} />
+                  <span className={`text-sm font-semibold ${theme === id ? 'text-accent-light' : 'text-text-main'}`}>
                     {meta.name}
                   </span>
                 </button>
@@ -629,14 +630,14 @@ const TvDashboard = () => {
 
   // ── Main render ─────────────────────────────────────────────────────────────
   return (
-    <div className="text-text-main font-mono p-6 flex flex-col gap-6 h-screen overflow-hidden">
+    <div className="text-text-main p-6 flex flex-col gap-6 h-screen overflow-hidden" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <ToastContainer toasts={toasts} />
 
       {/* Header */}
       <header className="flex justify-between items-center border-b border-border-subtle pb-4">
         <div className="flex items-center gap-3">
-          <Terminal className="w-6 h-6" />
-          <h1 className="text-xl font-bold tracking-tighter text-text-main">WXATA_TV_DASHBOARD v1.0.0</h1>
+          <Terminal className="w-6 h-6 text-accent-primary" />
+          <h1 className="text-xl font-bold tracking-tight text-text-main">WXATA TV Dashboard</h1>
           {userData && (
             <span className="ml-4 text-sm text-text-muted">
               Welcome, {(userData.name as string) || (userData.username as string)}
@@ -644,12 +645,12 @@ const TvDashboard = () => {
           )}
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2 border border-border-strong rounded px-2 py-1 bg-bg-panel">
-            <span className="text-xs uppercase tracking-widest text-text-muted">Account:</span>
+          <div className="flex items-center gap-2 border border-border-subtle rounded-xl px-3 py-2 bg-bg-panel shadow-sm">
+            <span className="text-xs uppercase tracking-wide text-text-muted font-medium">Account:</span>
             <select
               value={selectedAccountId}
               onChange={e => setSelectedAccountId(e.target.value as 'primary' | 'secondary')}
-              className="bg-transparent text-accent-light outline-none text-xs font-bold uppercase cursor-pointer"
+              className="bg-transparent text-accent-light outline-none text-xs font-semibold uppercase cursor-pointer"
             >
               <option value="primary" className="bg-bg-panel text-accent-light">Primary</option>
               <option value="secondary" className="bg-bg-panel text-accent-light">Secondary</option>
@@ -658,20 +659,20 @@ const TvDashboard = () => {
 
           <button
             onClick={() => navigate('/docs')}
-            className="flex items-center gap-2 text-text-muted hover:text-accent-light transition-colors uppercase text-xs tracking-widest border border-border-strong px-2 py-1 rounded"
+            className="flex items-center gap-2 text-text-muted hover:text-accent-light transition-colors uppercase text-xs tracking-wide border border-border-subtle px-3 py-2 rounded-xl hover:bg-bg-panel-hover"
           >
-            <BookOpen className="w-3 h-3" /> Docs
+            <BookOpen className="w-4 h-4" /> Docs
           </button>
 
           <ThemeSwitcher theme={theme} setTheme={setTheme} open={showThemeMenu} setOpen={setShowThemeMenu} />
 
           <div className="flex items-center gap-2">
-            <Activity className={`w-4 h-4 ${botStatus.connection === 'CONNECTED' ? 'animate-pulse text-accent-light' : 'text-danger-base'}`} />
-            <span className="hidden sm:inline">SYSTEM: {botStatus.connection}</span>
+            <Activity className={`w-4.5 h-4.5 ${botStatus.connection === 'CONNECTED' ? 'animate-pulse text-success-text' : 'text-danger-text'}`} />
+            <span className="hidden sm:inline font-medium">SYSTEM: {botStatus.connection}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-accent-light" />
-            <span className="text-accent-light hidden sm:inline">ENCRYPTION: ACTIVE</span>
+            <Shield className="w-4.5 h-4.5 text-accent-light" />
+            <span className="text-accent-light hidden sm:inline font-medium">ENCRYPTION: ACTIVE</span>
           </div>
         </div>
       </header>
@@ -725,20 +726,20 @@ const TvDashboard = () => {
           />
 
           {/* Global Config */}
-          <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3 text-xs">
-            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Global Config</h3>
-            <label className="block space-y-1">
-              <span className="text-text-muted uppercase tracking-wider">Command Prefix</span>
+          <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 text-sm shadow-sm">
+            <h3 className="text-xs uppercase tracking-wide opacity-60 border-b border-border-subtle pb-2 font-medium">Global Config</h3>
+            <label className="block space-y-2">
+              <span className="text-text-muted uppercase tracking-wide font-medium">Command Prefix</span>
               <input
                 type="text"
                 value={botInfo.prefix}
                 onChange={e => handlePrefixChange(e.currentTarget.value)}
-                className="w-full bg-bg-panel border border-border-strong p-2 text-accent-light outline-none focus:border-border-strong"
+                className="w-full bg-bg-panel-hover border border-border-subtle p-3 text-text-main outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle rounded-xl transition-all"
               />
             </label>
             {(String(userData?.email || userData?.name || userData?.username || '').includes('motrenewed')) && (
-              <label className="flex items-center justify-between gap-3 border border-border-subtle p-2 rounded cursor-pointer mt-2 bg-accent-subtle/10">
-                <span className="text-accent-primary uppercase tracking-wider">Beta: TV Mode Automation</span>
+              <label className="flex items-center justify-between gap-3 border border-border-subtle p-3 rounded-xl cursor-pointer bg-accent-subtle/30 hover:bg-accent-subtle transition-colors">
+                <span className="text-accent-primary font-medium">Beta: TV Mode Automation</span>
                 <input
                   type="checkbox"
                   checked={!!botInfo.tvMode}
@@ -753,17 +754,17 @@ const TvDashboard = () => {
                     }
                     setConfigStatus('Unsaved changes');
                   }}
-                  className="w-4 h-4 accent-accent-primary"
+                  className="w-5 h-5 accent-accent-primary"
                 />
               </label>
             )}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-strong/10">
-              <span className="text-[10px] text-accent-primary uppercase tracking-wider">{configStatus || 'Ready'}</span>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-subtle">
+              <span className="text-xs text-accent-primary font-medium">{configStatus || 'Ready'}</span>
               <button
                 onClick={saveBotInfo}
-                className="border border-border-strong bg-success-subtle text-accent-light hover:bg-accent-subtle px-4 py-2 text-sm font-bold transition-colors shadow-[0_0_10px_var(--accent-subtle)]"
+                className="bg-accent-primary hover:bg-accent-hover text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm hover:shadow-md"
               >
-                SAVE CONFIG
+                Save Config
               </button>
             </div>
           </div>
@@ -776,37 +777,37 @@ const TvDashboard = () => {
           />
           <button
             onClick={() => setShowTwitterModal(true)}
-            className="w-full border border-border-strong hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors rounded uppercase tracking-widest bg-accent-subtle text-accent-light"
+            className="w-full bg-accent-subtle border border-border-subtle hover:bg-accent-subtle/80 text-accent-light px-4 py-3 font-semibold transition-all rounded-xl shadow-sm hover:shadow-md"
           >
-            𝕏 X LINK GRABBER
+            𝕏 X Link Grabber
           </button>
           {/* Quick Actions */}
-          <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4">
-            <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 shadow-sm">
+            <h3 className="text-xs uppercase tracking-wide opacity-60 border-b border-border-subtle pb-2 font-medium">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleQuickAction('RESTART_BOT')}
-                className="border border-border-strong hover:bg-accent-subtle p-2 text-xs transition-colors"
+                className="border border-border-subtle hover:bg-bg-panel-hover p-3 rounded-xl text-sm font-medium transition-colors"
               >
-                RESTART BOT
+                Restart Bot
               </button>
               <button
                 onClick={() => handleQuickAction('TERMINATE')}
-                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-2 text-xs transition-colors"
+                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-3 rounded-xl text-sm font-medium transition-colors"
               >
-                TERMINATE
+                Terminate
               </button>
               <button
                 onClick={() => handleQuickAction('CLEAR_LOGS')}
-                className="border border-border-strong hover:bg-accent-subtle p-2 text-xs transition-colors"
+                className="border border-border-subtle hover:bg-bg-panel-hover p-3 rounded-xl text-sm font-medium transition-colors"
               >
-                CLEAR LOGS
+                Clear Logs
               </button>
               <button
                 onClick={() => handleQuickAction('EXPORT_DATA')}
-                className="border border-accent-subtle hover:bg-accent-subtle p-2 text-xs transition-colors"
+                className="border border-accent-subtle text-accent-light hover:bg-accent-subtle p-3 rounded-xl text-sm font-medium transition-colors"
               >
-                EXPORT DATA
+                Export Data
               </button>
               <button
                 onClick={() => {
@@ -814,9 +815,9 @@ const TvDashboard = () => {
                     handleQuickAction('LOGOUT');
                   }
                 }}
-                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-2 text-xs transition-colors col-span-2 font-bold"
+                className="border border-danger-subtle text-danger-text hover:bg-danger-subtle p-3 rounded-xl text-sm font-semibold transition-colors col-span-2"
               >
-                RESET SESSION (NEW QR)
+                Reset Session (New QR)
               </button>
             </div>
           </div>
@@ -824,9 +825,9 @@ const TvDashboard = () => {
           {/* Sign Out */}
           <button
             onClick={handleSignOut}
-            className="border border-danger-base hover:bg-danger-subtle text-danger-text p-2 text-xs transition-colors flex items-center justify-center gap-2 w-full rounded"
+            className="border border-danger-subtle hover:bg-danger-subtle text-danger-text p-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 w-full"
           >
-            <LogOut size={14} /> SIGN OUT
+            <LogOut size={18} /> Sign Out
           </button>
         </div>
       </div>
@@ -838,23 +839,23 @@ const TvDashboard = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={() => setShowTwitterModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={e => e.stopPropagation()}
-              className="bg-bg-panel border border-border-strong rounded max-h-[90vh] overflow-y-auto w-full max-w-lg custom-scrollbar"
+              className="bg-bg-panel border border-border-subtle rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto w-full max-w-lg custom-scrollbar"
             >
-              <div className="sticky top-0 bg-bg-panel border-b border-border-strong flex justify-between items-center p-4 z-10">
-                <h2 className="text-lg font-bold uppercase tracking-widest">𝕏 X Link Grabber</h2>
-                <button onClick={() => setShowTwitterModal(false)} className="text-text-muted hover:text-accent-light transition-colors">
-                  <X className="w-5 h-5" />
+              <div className="sticky top-0 bg-bg-panel border-b border-border-subtle flex justify-between items-center px-5 py-4 z-10">
+                <h2 className="text-lg font-bold">𝕏 X Link Grabber</h2>
+                <button onClick={() => setShowTwitterModal(false)} className="text-text-muted hover:text-text-main transition-colors p-1 rounded-lg hover:bg-bg-panel-hover">
+                  <X className="w-6 h-6" />
                 </button>
               </div>
-              <div className="p-4">
+              <div className="p-5">
                 <TwitterGrabber addToast={addToast} selectedAccountId={selectedAccountId} />
               </div>
             </motion.div>
