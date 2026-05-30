@@ -389,10 +389,8 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
   const [fetching, setFetching] = useState(false);
   const [tweetData, setTweetData] = useState<{ text: string, imageUrls: string[], user?: {name: string, handle: string, profileImage: string} } | null>(null);
   const [error, setError] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [scheduling, setScheduling] = useState(false);
-  const [posting, setPosting] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingToPc, setSavingToPc] = useState(false);
+  const [sendingToSudo, setSendingToSudo] = useState(false);
   const [applyStickers, setApplyStickers] = useState(true);
   const [phoneNumber, setPhoneNumber] = useState('+2348083696903');
   
@@ -449,9 +447,10 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveToPc = async () => {
     if (!tweetData) return;
-    setSaving(true);
+    setSavingToPc(true);
+    addToast('Generating image for download...', 'success');
     try {
       const base64 = await generateImageData();
       if (!base64) throw new Error("Could not generate image.");
@@ -463,30 +462,6 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
       link.click();
       document.body.removeChild(link);
       
-      // Also send it to the sudo/owner number via backend API
-      addToast('Sending preview to mobile...', 'success');
-      try {
-        const response = await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageDataBase64: base64,
-            caption: tweetData.text,
-            accountId: selectedAccountId
-          })
-        });
-        
-        if (response.ok) {
-          addToast('Preview sent to mobile WhatsApp!', 'success');
-        } else {
-          const errData = await response.json();
-          addToast(`Mobile send failed: ${errData.error || response.statusText}`, 'error');
-        }
-      } catch (sendErr: any) {
-        console.error('Failed to send to sudo number:', sendErr);
-        addToast(`Mobile send error: ${sendErr.message}`, 'error');
-      }
-
       const draft = {
         text: tweetData.text,
         imageUrls: tweetData.imageUrls,
@@ -495,80 +470,43 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
         savedAt: new Date().toISOString()
       };
       localStorage.setItem('twitterGrabberDraft', JSON.stringify(draft));
-      addToast('Draft saved and image downloaded!', 'success');
-      setTweetData(null);
-      setUrl('');
+      addToast('Draft saved & image downloaded!', 'success');
     } catch (err: any) {
-      addToast(`Failed to save draft: ${err.message}`, 'error');
+      addToast(`Failed to save: ${err.message}`, 'error');
     } finally {
-      setSaving(false);
+      setSavingToPc(false);
     }
   };
 
-  const handlePostNow = async () => {
+  const handleSendToSudo = async () => {
     if (!tweetData) return;
-    setPosting(true);
+    setSendingToSudo(true);
+    addToast('Sending preview to mobile WhatsApp...', 'success');
     try {
       const base64 = await generateImageData();
       if (!base64) throw new Error("Could not generate image.");
-      const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postAt: Date.now(),
-          text: tweetData.text, // Backend might still require text or we send it as caption
-          imageUrls: tweetData.imageUrls,
-          imageDataBase64: base64,
-          applyStickers: false // stickers are baked in the image
-        })
-      });
-      const responseData = await res.json();
-      if (!res.ok) throw new Error(responseData.error || 'Failed to post');
-      addToast('Tweet posted successfully!', 'success');
-      setTweetData(null);
-      setUrl('');
-    } catch (err: any) {
-      console.error('Post error:', err);
-      addToast(`Error: ${err.message}`, 'error');
-    } finally {
-      setPosting(false);
-    }
-  };
 
-  const handleSchedule = async () => {
-    if (!tweetData || !scheduledTime) return;
-    setScheduling(true);
-    try {
-      const postAt = new Date(scheduledTime).getTime();
-      const base64 = await generateImageData();
-      if (!base64) throw new Error("Could not generate image.");
-      
-      const res = await fetch(`${getBackendUrl()}/api/twitter/schedule`, {
+      const response = await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          postAt,
-          text: tweetData.text,
-          imageUrls: tweetData.imageUrls,
           imageDataBase64: base64,
-          applyStickers: false // stickers are baked in
+          caption: tweetData.text,
+          accountId: selectedAccountId
         })
       });
       
-      const responseData = await res.json();
-      if (!res.ok) {
-        throw new Error(responseData.error || 'Failed to schedule');
+      const data = await response.json();
+      if (response.ok) {
+        addToast('Preview sent to mobile!', 'success');
+      } else {
+        throw new Error(data.error || response.statusText);
       }
-      
-      addToast('Tweet scheduled successfully!', 'success');
-      setTweetData(null);
-      setUrl('');
-      setScheduledTime('');
     } catch (err: any) {
-      console.error('Schedule error:', err);
-      addToast(`Error: ${err.message}`, 'error');
+      console.error('Failed to send to sudo number:', err);
+      addToast(`Mobile send failed: ${err.message}`, 'error');
     } finally {
-      setScheduling(false);
+      setSendingToSudo(false);
     }
   };
 
@@ -691,47 +629,33 @@ function TwitterGrabber({ addToast, selectedAccountId }: { addToast: (msg: strin
             </div>
           </div>
 
-          {/* Schedule Section */}
-          <div className="border-b border-border-strong/30 p-4 space-y-3">
-            <div className="text-xs uppercase tracking-widest text-text-muted font-bold">Schedule</div>
-            <input 
-              type="datetime-local" 
-              value={scheduledTime}
-              onChange={e => setScheduledTime(e.target.value)}
-              className="w-full bg-bg-panel border border-border-strong/50 p-2.5 text-xs text-text-main rounded outline-none focus:border-accent-primary/50"
-            />
-          </div>
-
           {/* Action Buttons */}
-          <div className="p-4 space-y-2">
-            <div className="grid grid-cols-3 gap-2">
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button 
-                onClick={handleSave}
-                disabled={saving}
-                className="border border-info-base bg-info-subtle hover:bg-info-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-info-text px-3 py-2 text-xs font-bold rounded transition-colors"
+                onClick={handleSaveToPc}
+                disabled={savingToPc}
+                className="flex items-center justify-center gap-2 border border-info-base bg-info-subtle hover:bg-info-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-info-text px-4 py-3 text-xs font-bold rounded-lg transition-all"
               >
-                {saving ? '⟳' : '💾'} Save
+                {savingToPc ? <RefreshCw className="w-3 h-3 animate-spin" /> : '💾'} 
+                {savingToPc ? 'Saving...' : 'Save to Computer'}
               </button>
+              
               <button 
-                onClick={handlePostNow}
-                disabled={posting}
-                className="border border-success-base bg-success-subtle hover:bg-success-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-success-text px-3 py-2 text-xs font-bold rounded transition-colors"
+                onClick={handleSendToSudo}
+                disabled={sendingToSudo}
+                className="flex items-center justify-center gap-2 border border-accent-primary bg-accent-subtle hover:bg-accent-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-accent-light px-4 py-3 text-xs font-bold rounded-lg transition-all shadow-[0_0_15px_rgba(139,92,246,0.1)]"
               >
-                {posting ? '⟳' : '🚀'} Post
-              </button>
-              <button 
-                onClick={handleSchedule}
-                disabled={scheduling || !scheduledTime}
-                className="border border-warning-base bg-warning-subtle hover:bg-warning-base/20 disabled:opacity-50 disabled:cursor-not-allowed text-warning-text px-3 py-2 text-xs font-bold rounded transition-colors"
-              >
-                {scheduling ? '⟳' : '⏰'} Schedule
+                {sendingToSudo ? <RefreshCw className="w-3 h-3 animate-spin" /> : '📱'} 
+                {sendingToSudo ? 'Sending...' : 'Send to Mobile (Sudo)'}
               </button>
             </div>
+            
             <button 
               onClick={() => setTweetData(null)}
-              className="w-full border border-border-strong text-text-muted hover:text-danger-text p-2 text-xs rounded transition-colors"
+              className="w-full border border-border-strong text-text-muted hover:text-danger-text p-2.5 text-[10px] uppercase tracking-widest rounded transition-colors"
             >
-              Clear
+              Discard Preview
             </button>
           </div>
         </div>
