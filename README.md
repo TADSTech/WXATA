@@ -34,9 +34,21 @@ A lightweight REST API service designed for programmatic integration. Send messa
 | **WhatsApp Core** | [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) | High-performance, lightweight WhatsApp Web API library |
 | **Frontend Dashboard** | Vite + React + Tailwind + Framer Motion | Premium responsive web dashboard with smooth animations |
 | **Authentication & Cloud DB** | Supabase (PostgreSQL + Auth + RLS) | Cloud database with secure Row Level Security policies |
-| **Local Cache** | SQLite (`bun:sqlite`) | Local database for caching messages (anti-delete feature) |
+| **Local Cache** | SQLite (`bun:sqlite`) | High-performance message cache optimized with WAL, synchronous NORMAL, and dynamic capacity-based pruning (capped to 200 messages by default) |
 | **Payment Gateway** | Flutterwave | Secure webhook-backed payments for API topups & subscriptions |
 | **Process Management**| PM2 / Docker | Process daemon for zero-downtime hosting on Linux VPS |
+
+---
+
+## ⚡ High-Performance SQLite Cache & Stability
+To prevent the WhatsApp bot from stalling, disconnecting, or crashing during heavy message bursts:
+* **Concurrent Journaling (WAL):** Enabled Write-Ahead Logging (`PRAGMA journal_mode = WAL`) so readers and writers never block each other.
+* **Non-blocking Synchronous Mode:** Set `PRAGMA synchronous = NORMAL` and `temp_store = MEMORY` to drastically reduce CPU thread-blocking disk I/O barriers.
+* **Bounded Capacity Pruning:** Set a strict limit of **200 messages** (via `DB_MAX_MESSAGES`) to prevent the SQLite database from inflating indefinitely. This is pruned in the background via non-blocking microtasks every 100 stored messages.
+* **On-the-Fly Configuration:** Configure settings live via the `!vs` command directly from WhatsApp without rebooting the bot:
+  * Check current variables: `!vs`
+  * Change capacity limit: `!vs set DB_MAX_MESSAGES 500`
+  * Change retention days: `!vs set DB_RETENTION_DAYS 5`
 
 ---
 

@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw,
-  LogOut, Save, X, BookOpen
-} from 'lucide-react';
+import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Palette, GripVertical } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
-import { useWXATASocket } from '../hooks/useWXATASocket';
+import { useToast } from '../components/useToast';
+import { ToastContainer } from '../components/ToastContainer';
+import { StatusBar } from '../components/StatusBar';
+import { ConnectionPanel } from '../components/ConnectionPanel';
+import { LogPanel } from '../components/LogPanel';
+import { TVConfigEditor } from '../components/TVConfigEditor';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -16,6 +18,56 @@ interface BotTvConfig {
   triggerText: string;
   welcomeMessage: string;
 }
+
+interface BotInfo {
+  prefix: string;
+  scripts: Record<string, BotScript>;
+  root: BotRoot;
+  welcome: BotWelcome;
+  permissions: BotPermissions;
+  tvMode?: boolean;
+  tvConfig?: BotTvConfig;
+}
+
+interface BotScript {
+  name?: string;
+  desc?: string;
+  trigger: string;
+  aliases?: string[];
+  type?: string;
+  response: string;
+  target: string;
+  code?: string;
+  defaultArgument?: string;
+  arguments?: Record<string, BotScriptArgument>;
+}
+
+interface BotScriptArgument {
+  target?: string;
+  response?: string;
+}
+
+interface BotWelcome {
+  enabled: boolean;
+  text: string;
+}
+
+interface BotRoot {
+  target: string;
+}
+
+interface BotPermissions {
+  allowAll: boolean;
+  chats: string[];
+  numbers: string[];
+}
+
+interface LogEntry {
+  timestamp: string;
+  type: string;
+  message: string;
+}
+
 
 interface BotInfo {
   prefix: string;
@@ -780,6 +832,12 @@ const TvDashboard = () => {
             className="w-full bg-accent-subtle border border-border-subtle hover:bg-accent-subtle/80 text-accent-light px-4 py-3 font-semibold transition-all rounded-xl shadow-sm hover:shadow-md"
           >
             𝕏 X Link Grabber
+          </button>
+          <button
+            onClick={() => navigate(`/tv/tools/${username}`)}
+            className="w-full bg-bg-panel border border-accent-subtle hover:bg-accent-subtle text-accent-light px-4 py-3 font-semibold transition-all rounded-xl shadow-sm hover:shadow-md"
+          >
+            🛠 TV Tools Suite
           </button>
           {/* Quick Actions */}
           <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 shadow-sm">

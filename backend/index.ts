@@ -705,6 +705,7 @@ let configVars = {
   TAGADMINS_MESSAGE: '👑 *ATTENTION ADMINS* 👑',
   WELCOME_ENABLED: 'true',
   DB_RETENTION_DAYS: '3',
+  DB_MAX_MESSAGES: '200',
 };
 if (fs.existsSync(varsFile)) {
   try { Object.assign(configVars, JSON.parse(fs.readFileSync(varsFile, 'utf8'))); } catch(e) {}

@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import TvDashboard from "./pages/TvDashboard";
 import XGrabberPage from "./pages/XGrabberPage";
+import TvTools from "./pages/TvTools";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Admin from "./pages/Admin";
@@ -66,6 +67,15 @@ function App() {
             element={
               <PrivateRoute>
                 <TvDashboard />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/tv/tools/:username"
+            element={
+              <PrivateRoute>
+                <TvTools />
               </PrivateRoute>
             }
           />
