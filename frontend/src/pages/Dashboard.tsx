@@ -1693,9 +1693,8 @@ const Dashboard = () => {
                 </button>
               </div>
               <TwitterGrabber
-                username={username!}
-                backendUrl={backendUrl}
                 addToast={addToast}
+                selectedAccountId={selectedAccountId}
               />
             </motion.div>
           </motion.div>

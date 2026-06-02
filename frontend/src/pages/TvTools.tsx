@@ -165,7 +165,7 @@ const TvTools = () => {
   const [userData, setUserData] = useState<Record<string, unknown> | null>(null);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
-  const { status: wsStatus, attempt: wsAttempt, send, lastMessage } = useWXATASocket(backendUrl);
+  const { status: wsStatus, attempt: wsAttempt, lastMessage } = useWXATASocket(backendUrl);
 
   const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>(() => {
     return (localStorage.getItem('selectedAccountId') as 'primary' | 'secondary') || 'primary';

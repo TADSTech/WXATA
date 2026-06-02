@@ -1,83 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, QrCode, Phone, Wifi, LogOut, Save, X, BookOpen, Palette, GripVertical } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { RefreshCw, QrCode, Phone, Wifi, LogOut, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useTheme, KNOWN_THEMES, type Theme } from './ThemeProvider';
-import { useToast } from './useToast';
-import { ToastContainer } from './ToastContainer';
+import { KNOWN_THEMES, type Theme } from './ThemeProvider';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
-
-interface BotTvConfig {
-  triggerText: string;
-  welcomeMessage: string;
-}
-
-interface BotInfo {
-  prefix: string;
-  scripts: Record<string, BotScript>;
-  root: BotRoot;
-  welcome: BotWelcome;
-  permissions: BotPermissions;
-  tvMode?: boolean;
-  tvConfig?: BotTvConfig;
-}
-
-interface BotScript {
-  name?: string;
-  desc?: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  response: string;
-  target: string;
-  code?: string;
-  defaultArgument?: string;
-  arguments?: Record<string, BotScriptArgument>;
-}
-
-interface BotScriptArgument {
-  target?: string;
-  response?: string;
-}
-
-interface BotWelcome {
-  enabled: boolean;
-  text: string;
-}
-
-interface BotRoot {
-  target: string;
-}
-
-interface BotPermissions {
-  allowAll: boolean;
-  chats: string[];
-  numbers: string[];
-}
 
 interface LogEntry {
   timestamp: string;
   type: string;
   message: string;
-}
-
-interface MarketplaceExtension {
-  id: string;
-  name: string;
-  description: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  target?: string;
-  response: string;
-  code?: string;
-  defaultArgument?: string;
-  downloads: number;
-  untrusted?: boolean;
-  disabled?: boolean;
-  author: string;
-  authorUid: string;
 }
 
 // ─── StatusBar ────────────────────────────────────────────────────────────────

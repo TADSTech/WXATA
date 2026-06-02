@@ -1,85 +1,14 @@
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
-import { useTheme, KNOWN_THEMES, type Theme } from './ThemeProvider';
-import { useToast } from './useToast';
-import { ToastContainer } from './ToastContainer';
-import { Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw, LogOut, Save, X, BookOpen, GripVertical, Plus, Trash2, Edit3, Package, Download } from 'lucide-react';
+import { QrCode, Phone, Wifi, RefreshCw, LogOut, X } from 'lucide-react';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
-
-interface BotTvConfig {
-  triggerText: string;
-  welcomeMessage: string;
-}
-
-interface BotInfo {
-  prefix: string;
-  scripts: Record<string, BotScript>;
-  root: BotRoot;
-  welcome: BotWelcome;
-  permissions: BotPermissions;
-  tvMode?: boolean;
-  tvConfig?: BotTvConfig;
-}
-
-interface BotScript {
-  name?: string;
-  desc?: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  response: string;
-  target: string;
-  code?: string;
-  defaultArgument?: string;
-  arguments?: Record<string, BotScriptArgument>;
-}
-
-interface BotScriptArgument {
-  target?: string;
-  response?: string;
-}
-
-interface BotWelcome {
-  enabled: boolean;
-  text: string;
-}
-
-interface BotRoot {
-  target: string;
-}
-
-interface BotPermissions {
-  allowAll: boolean;
-  chats: string[];
-  numbers: string[];
-}
 
 interface LogEntry {
   timestamp: string;
   type: string;
   message: string;
-}
-
-interface MarketplaceExtension {
-  id: string;
-  name: string;
-  description: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  target?: string;
-  response: string;
-  code?: string;
-  defaultArgument?: string;
-  downloads: number;
-  untrusted?: boolean;
-  disabled?: boolean;
-  author: string;
-  authorUid: string;
 }
 
 // ─── StatusBar ────────────────────────────────────────────────────────────────

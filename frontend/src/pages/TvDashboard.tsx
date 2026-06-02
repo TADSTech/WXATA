@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Palette, GripVertical } from 'lucide-react';
+import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Wifi, Phone, Activity, Terminal, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
-import { useToast } from '../components/useToast';
+import { useToast } from '../hooks/useToast';
 import { ToastContainer } from '../components/ToastContainer';
-import { StatusBar } from '../components/StatusBar';
-import { ConnectionPanel } from '../components/ConnectionPanel';
-import { LogPanel } from '../components/LogPanel';
-import { TVConfigEditor } from '../components/TVConfigEditor';
+import { useWXATASocket } from '../hooks/useWXATASocket';
+import { TwitterGrabber } from '../components/TwitterGrabber';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -67,61 +65,6 @@ interface LogEntry {
   type: string;
   message: string;
 }
-
-
-interface BotInfo {
-  prefix: string;
-  scripts: Record<string, BotScript>;
-  root: BotRoot;
-  welcome: BotWelcome;
-  permissions: BotPermissions;
-  tvMode?: boolean;
-  tvConfig?: BotTvConfig;
-}
-
-interface BotScript {
-  name?: string;
-  desc?: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  response: string;
-  target: string;
-  code?: string;
-  defaultArgument?: string;
-  arguments?: Record<string, BotScriptArgument>;
-}
-
-interface BotScriptArgument {
-  target?: string;
-  response?: string;
-}
-
-interface BotWelcome {
-  enabled: boolean;
-  text: string;
-}
-
-interface BotRoot {
-  target: string;
-}
-
-interface BotPermissions {
-  allowAll: boolean;
-  chats: string[];
-  numbers: string[];
-}
-
-interface LogEntry {
-  timestamp: string;
-  type: string;
-  message: string;
-}
-
-
-
-import { useToast } from '../hooks/useToast';
-import { ToastContainer } from '../components/ToastContainer';
 
 // ─── StatusBar ────────────────────────────────────────────────────────────────
 
@@ -384,10 +327,6 @@ function TVConfigEditor({ tvConfig, onChange, onSave }: TVConfigEditorProps) {
     </div>
   );
 }
-
-// ─── TwitterGrabber ──────────────────────────────────────────────────────────
-
-import { TwitterGrabber } from '../components/TwitterGrabber';
 
 // ─── ThemeSwitcher ────────────────────────────────────────────────────────────
 
