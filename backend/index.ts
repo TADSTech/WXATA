@@ -1303,6 +1303,28 @@ function resolveTargetJid(
   return resolveSelfJid(sock);
 }
 
+interface AutoReplyRule {
+  trigger: string;
+  response: string;
+  enabled: boolean;
+}
+
+async function readAutoReply(accountId: string): Promise<AutoReplyRule[]> {
+  const filePath = path.resolve(getAccountDir(accountId), "autoreply.json");
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw) as AutoReplyRule[];
+  } catch {
+    await fs.writeFile(filePath, JSON.stringify([], null, 2), "utf-8");
+    return [];
+  }
+}
+
+async function writeAutoReply(accountId: string, rules: AutoReplyRule[]): Promise<void> {
+  const filePath = path.resolve(getAccountDir(accountId), "autoreply.json");
+  await fs.writeFile(filePath, JSON.stringify(rules, null, 2), "utf-8");
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2451,6 +2473,17 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
               continue;
             }
           }
+
+          // Auto-reply rule matching (after all command processing)
+          const autoReplyRules = await readAutoReply(accountId);
+          for (const rule of autoReplyRules) {
+            if (!rule.enabled) continue;
+            if (normalizedText.includes(rule.trigger.trim().toLowerCase())) {
+              await sendTrackedMessage(sock, remoteJid!, rule.response);
+              dashboard.log(accountId, "SUCCESS", `Auto-reply matched "${rule.trigger}" → sent to ${remoteJid}`);
+              break;
+            }
+          }
         } // end of if (remoteJid)
 
         if (text?.toLowerCase() === "ping" && remoteJid) {
@@ -2869,6 +2902,18 @@ async function startBot() {
             });
           }
         }
+      }
+
+      if (payload.command === "GET_AUTOREPLY") {
+        const rules = await readAutoReply(accountId);
+        dashboard.broadcast({ event: "autoreply", accountId, data: rules });
+      }
+
+      if (payload.command === "UPDATE_AUTOREPLY") {
+        const rules = payload.data as AutoReplyRule[];
+        await writeAutoReply(accountId, rules);
+        dashboard.broadcast({ event: "autoreply", accountId, data: rules });
+        dashboard.log(accountId, "SUCCESS", `Auto-reply rules updated (${rules.length} rules)`);
       }
 
       if (payload.command === "QUICK_ACTION") {

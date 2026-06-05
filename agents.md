@@ -115,3 +115,4 @@ This test suite evaluates:
 2. **Dynamic Configurations first:** When asked to edit parameters (like message limits, triggers, or intervals), ensure you implement them dynamically using `vars.json` getters rather than hardcoding.
 3. **Always Run Type-Checks:** After modifying the backend, run `bun run backend:type-check` to verify no TypeScript compilation errors were introduced.
 4. **Isolate Webhook Web-Errors:** When servicing the Flutterwave webhooks in `backend/DashboardServer.ts`, always return `200 OK` responses in catch-blocks to prevent infinite payment-processor retries.
+5. make sure everything compiles. enter the server using the ssh in @ipman. then restart the wxata server using the .wxata_start.sh in the WXATA folder. 
