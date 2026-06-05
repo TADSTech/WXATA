@@ -153,6 +153,177 @@ function ToolCard({ icon, title, description, children, defaultOpen = false }: {
   );
 }
 
+// ─── AutoReplyManager ──────────────────────────────────────────────────────────
+
+interface AutoReplyRule {
+  trigger: string;
+  response: string;
+  enabled: boolean;
+}
+
+interface AutoReplyManagerProps {
+  rules: AutoReplyRule[];
+  onChange: (rules: AutoReplyRule[]) => void;
+  onSave: () => void;
+  status: string;
+}
+
+function AutoReplyManager({ rules, onChange, onSave, status }: AutoReplyManagerProps) {
+  const [showForm, setShowForm] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [trigger, setTrigger] = useState('');
+  const [response, setResponse] = useState('');
+
+  const resetForm = () => {
+    setTrigger('');
+    setResponse('');
+    setEditIndex(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (index: number) => {
+    setTrigger(rules[index].trigger);
+    setResponse(rules[index].response);
+    setEditIndex(index);
+    setShowForm(true);
+  };
+
+  const handleSaveRule = () => {
+    if (!trigger.trim() || !response.trim()) return;
+    const newRules = [...rules];
+    if (editIndex !== null) {
+      newRules[editIndex] = { trigger: trigger.trim(), response: response.trim(), enabled: rules[editIndex].enabled };
+    } else {
+      newRules.push({ trigger: trigger.trim(), response: response.trim(), enabled: true });
+    }
+    onChange(newRules);
+    resetForm();
+  };
+
+  const handleDelete = (index: number) => {
+    if (confirm('Delete this auto-reply rule?')) {
+      onChange(rules.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleToggle = (index: number) => {
+    const newRules = rules.map((r, i) => i === index ? { ...r, enabled: !r.enabled } : r);
+    onChange(newRules);
+  };
+
+  const enabledCount = rules.filter(r => r.enabled).length;
+
+  return (
+    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 shadow-sm">
+      <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+        <h3 className="text-xs uppercase tracking-wide opacity-60 font-medium">Auto Reply Rules</h3>
+        <span className="text-[10px] text-accent-primary font-mono">{enabledCount}/{rules.length} active</span>
+      </div>
+
+      {rules.length === 0 && !showForm && (
+        <div className="text-xs text-text-muted text-center py-4 border border-dashed border-border-subtle rounded-xl">
+          No auto-reply rules yet.
+        </div>
+      )}
+
+      {rules.map((rule, i) => (
+        <div key={i} className={`border rounded-xl p-3 space-y-2 transition-all ${rule.enabled ? 'border-border-subtle' : 'border-dashed border-border-subtle opacity-50'}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-mono bg-accent-subtle text-accent-light px-1.5 py-0.5 rounded-md truncate max-w-[120px]">
+                  {rule.trigger}
+                </span>
+                <span className="text-[10px] text-text-muted">&rarr;</span>
+              </div>
+              <p className="text-xs text-text-main truncate">{rule.response}</p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => handleToggle(i)}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-colors ${rule.enabled ? 'bg-success-subtle text-success-text' : 'bg-bg-panel-hover text-text-muted'}`}
+                title={rule.enabled ? 'Disable' : 'Enable'}
+              >
+                {rule.enabled ? 'ON' : 'OFF'}
+              </button>
+              <button
+                onClick={() => handleEdit(i)}
+                className="w-7 h-7 rounded-lg bg-bg-panel-hover hover:bg-accent-subtle text-text-muted hover:text-accent-light flex items-center justify-center text-xs transition-colors"
+                title="Edit"
+              >
+                ✎
+              </button>
+              <button
+                onClick={() => handleDelete(i)}
+                className="w-7 h-7 rounded-lg bg-bg-panel-hover hover:bg-danger-subtle text-text-muted hover:text-danger-text flex items-center justify-center text-xs transition-colors"
+                title="Delete"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {showForm && (
+        <div className="border border-accent-subtle rounded-xl p-3 space-y-3 bg-accent-subtle/20">
+          <input
+            type="text"
+            placeholder="Trigger text (message contains...)"
+            value={trigger}
+            onChange={e => setTrigger(e.target.value)}
+            className="w-full bg-bg-panel-hover border border-border-subtle p-2.5 text-text-main text-xs outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle rounded-xl transition-all"
+          />
+          <textarea
+            placeholder="Response message..."
+            value={response}
+            onChange={e => setResponse(e.target.value)}
+            rows={3}
+            className="w-full bg-bg-panel-hover border border-border-subtle p-2.5 text-text-main text-xs outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle rounded-xl transition-all"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveRule}
+              disabled={!trigger.trim() || !response.trim()}
+              className="flex-1 bg-accent-primary hover:bg-accent-hover disabled:opacity-50 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+            >
+              {editIndex !== null ? 'Update' : 'Add'} Rule
+            </button>
+            <button
+              onClick={resetForm}
+              className="border border-border-subtle hover:bg-bg-panel-hover px-3 py-2 rounded-xl text-xs transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center justify-center gap-1.5 border border-dashed border-border-subtle hover:border-accent-subtle hover:text-accent-light text-text-muted w-full px-3 py-2.5 rounded-xl text-xs font-medium transition-all"
+          >
+            + Add Rule
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle">
+        <span className="text-[10px] text-accent-primary">{status || `${rules.length} rules`}</span>
+        <button
+          onClick={onSave}
+          disabled={rules.length === 0}
+          className="bg-accent-primary hover:bg-accent-hover disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm"
+        >
+          Save Rules
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
 
 const TvTools = () => {
@@ -165,12 +336,14 @@ const TvTools = () => {
   const [userData, setUserData] = useState<Record<string, unknown> | null>(null);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
-  const { status: wsStatus, attempt: wsAttempt, lastMessage } = useWXATASocket(backendUrl);
+  const { status: wsStatus, attempt: wsAttempt, lastMessage, send } = useWXATASocket(backendUrl);
 
   const [selectedAccountId, setSelectedAccountId] = useState<'primary' | 'secondary'>(() => {
     return (localStorage.getItem('selectedAccountId') as 'primary' | 'secondary') || 'primary';
   });
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
+  const [autoReplyRules, setAutoReplyRules] = useState<{ trigger: string; response: string; enabled: boolean }[]>([]);
+  const [autoReplyStatus, setAutoReplyStatus] = useState('');
 
   useEffect(() => {
     const checkSession = async () => {
@@ -206,10 +379,21 @@ const TvTools = () => {
   }, [selectedAccountId]);
 
   useEffect(() => {
+    if (wsStatus === 'connected') {
+      send({ command: 'GET_AUTOREPLY', accountId: selectedAccountId });
+    }
+  }, [wsStatus, send, selectedAccountId]);
+
+  useEffect(() => {
     if (!lastMessage || typeof lastMessage !== 'object') return;
     const msg = lastMessage as Record<string, unknown>;
     const event = msg.event as string;
     const data = msg.data;
+
+    if (event === 'autoreply' && data) {
+      setAutoReplyRules(data as { trigger: string; response: string; enabled: boolean }[]);
+      setAutoReplyStatus('Rules synced');
+    }
 
     if (event === 'status' && data && typeof data === 'object') {
       const s = data as Record<string, unknown>;
@@ -222,6 +406,16 @@ const TvTools = () => {
       });
     }
   }, [lastMessage, selectedAccountId]);
+
+  const sendCommand = (command: string, data?: unknown) => {
+    if (wsStatus !== 'connected') return;
+    send({ command, data, accountId: selectedAccountId });
+  };
+
+  const saveAutoReply = () => {
+    sendCommand('UPDATE_AUTOREPLY', autoReplyRules);
+    setAutoReplyStatus('Saving...');
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -370,6 +564,13 @@ const TvTools = () => {
             memory={botStatus.memory}
             wsStatus={wsStatus}
             wsAttempt={wsAttempt}
+          />
+
+          <AutoReplyManager
+            rules={autoReplyRules}
+            onChange={setAutoReplyRules}
+            onSave={saveAutoReply}
+            status={autoReplyStatus}
           />
 
           <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 space-y-4 shadow-sm">
