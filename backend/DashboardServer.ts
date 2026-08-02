@@ -7,7 +7,14 @@ import {
   insertApiKey,
   updateApiKeyById,
   insertUserCode,
+  findUserCodeByCode,
+  listUserCodes,
+  updateUserCodeById,
+  deleteUserCodeById,
   updateUserCodesWhere,
+  listAllExtensions,
+  updateExtensionById,
+  deleteExtensionById,
   insertUsageLog,
   getServiceConfigValue,
   listServiceConfig,
@@ -1381,6 +1388,299 @@ class DashboardServer {
             res.end(JSON.stringify({ error: "Internal server error" }));
           }
         })();
+        return;
+      }
+
+      // ── Helper: ADMIN_SECRET bearer guard ─────────────────────────────────
+      const isAdmin = (): boolean => {
+        const authHeader = req.headers["authorization"] ?? "";
+        const adminSecret = process.env.ADMIN_SECRET ?? "";
+        return (
+          authHeader.startsWith("Bearer ") &&
+          authHeader.slice(7) === adminSecret
+        );
+      };
+
+      // ── GET /api/admin/codes ──────────────────────────────────────────────
+      if (req.method === "GET" && req.url === "/api/admin/codes") {
+        setCorsHeaders(res);
+        (async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const data = await listUserCodes();
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(data ?? []));
+          } catch (err) {
+            logger.error({ err }, "GET /api/admin/codes error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        })();
+        return;
+      }
+
+      // ── POST /api/admin/codes/create ──────────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/admin/codes/create") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as Record<string, unknown>;
+            const code =
+              typeof body.code === "string" && body.code.trim()
+                ? body.code.trim()
+                : generateUserCode();
+            const id = await insertUserCode({
+              code,
+              used: Boolean(body.used),
+              suspended: Boolean(body.suspended),
+              created_at: new Date().toISOString(),
+            });
+            res.writeHead(201, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, id, code }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/admin/codes/create error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
+        return;
+      }
+
+      // ── POST /api/admin/codes/update ──────────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/admin/codes/update") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as { id?: string; patch?: Record<string, unknown> };
+            if (!body.id || !body.patch) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "id and patch are required" }));
+              return;
+            }
+            await updateUserCodeById(body.id, body.patch);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/admin/codes/update error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
+        return;
+      }
+
+      // ── POST /api/admin/codes/delete ──────────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/admin/codes/delete") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as { id?: string };
+            if (!body.id) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "id is required" }));
+              return;
+            }
+            await deleteUserCodeById(body.id);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/admin/codes/delete error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
+        return;
+      }
+
+      // ── GET /api/admin/extensions ─────────────────────────────────────────
+      if (req.method === "GET" && req.url === "/api/admin/extensions") {
+        setCorsHeaders(res);
+        (async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const data = await listAllExtensions();
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(data ?? []));
+          } catch (err) {
+            logger.error({ err }, "GET /api/admin/extensions error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        })();
+        return;
+      }
+
+      // ── POST /api/admin/extensions/update ─────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/admin/extensions/update") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as { id?: string; patch?: Record<string, unknown> };
+            if (!body.id || !body.patch) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "id and patch are required" }));
+              return;
+            }
+            await updateExtensionById(body.id, body.patch);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/admin/extensions/update error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
+        return;
+      }
+
+      // ── POST /api/admin/extensions/delete ─────────────────────────────────
+      if (req.method === "POST" && req.url === "/api/admin/extensions/delete") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            if (!isAdmin()) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as { id?: string };
+            if (!body.id) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "id is required" }));
+              return;
+            }
+            await deleteExtensionById(body.id);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/admin/extensions/delete error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
+        return;
+      }
+
+      // ── POST /api/codes/redeem ────────────────────────────────────────────
+      // Marks a user_code as used, authenticated via Firebase idToken so that
+      // client-side writes to the user_codes collection can be locked down.
+      if (req.method === "POST" && req.url === "/api/codes/redeem") {
+        setCorsHeaders(res);
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", async () => {
+          try {
+            const authHeader = req.headers["authorization"] ?? "";
+            const idToken = extractBearerToken(authHeader);
+            if (!idToken) {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            let email = "";
+            try {
+              const decoded = await verifyIdToken(idToken);
+              email = decoded.email ?? "";
+            } catch {
+              res.writeHead(401, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Unauthorized" }));
+              return;
+            }
+            if (!email) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Email is required" }));
+              return;
+            }
+
+            const body = JSON.parse(
+              Buffer.concat(chunks).toString("utf-8"),
+            ) as { code?: string };
+            if (!body.code) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "code is required" }));
+              return;
+            }
+
+            const codeData = await findUserCodeByCode(body.code);
+            if (!codeData) {
+              res.writeHead(404, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Invalid code" }));
+              return;
+            }
+            if (codeData.suspended) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Code has been suspended" }));
+              return;
+            }
+            if (codeData.used) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Code has already been used" }));
+              return;
+            }
+
+            const id = String(codeData.id);
+            await updateUserCodeById(id, {
+              used: true,
+              used_by: email,
+              used_at: new Date().toISOString(),
+            });
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, id }));
+          } catch (err) {
+            logger.error({ err }, "POST /api/codes/redeem error");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Internal server error" }));
+          }
+        });
         return;
       }
 

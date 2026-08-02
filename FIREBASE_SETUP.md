@@ -79,8 +79,18 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMII...==\n-----END PRIVATE KE
 
 ## 4. Firestore Security Rules
 
-Direct Firestore reads/writes from the browser are **denied**. All data access
-goes through the backend (firebase-admin), which bypasses security rules.
+The frontend reads/writes Firestore **directly** via the web SDK (see
+`frontend/src/firebase.ts`), and the backend uses the Admin SDK (which bypasses
+rules). The rules below match what the frontend actually does: public reads for
+lookups/marketplace/config, owner-scoped writes for `users`, and authenticated
+writes for submission flows. Only `api_usage_log` stays fully backend-only.
+
+> ⚠️ **Security caveat:** the Admin panel (user codes, extensions, config)
+> performs its writes directly from the browser, gated only by `VITE_ADMIN_PASS`
+> (client-side). Firestore rules cannot tell an admin from a regular signed-in
+> user, so these rules allow any authenticated user to write `user_codes` /
+> `service_config`. Routing admin mutations through the backend endpoints
+> (`/api/admin/config`, `/api/admin/keys`) is the recommended hardening step.
 
 Console → Firestore Database → **Rules** → replace with:
 
@@ -88,12 +98,57 @@ Console → Firestore Database → **Rules** → replace with:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+    // users — public reads for login/register lookups; only the owner can
+    // create/update their own doc (doc id = uid, or google_uid = uid).
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null &&
+        (request.auth.uid == uid || request.auth.uid == resource.data.google_uid);
+      allow delete: if false;
+    }
+
+    // marketplace_extensions — public read of the marketplace; authenticated
+    // users submit extensions, bump download counts, and admins approve/edit.
+    match /marketplace_extensions/{ext} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // user_codes — read for registration code validation; the register flow
+    // marks a code used via update; the admin panel manages codes.
+    match /user_codes/{code} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // service_config — public read (client feature flags); the admin panel
+    // writes config values from the browser.
+    match /service_config/{key} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // api_keys — read for the admin panel; create/update/delete only via the
+    // backend Admin SDK.
+    match /api_keys/{key} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // api_usage_log — backend-only.
+    match /api_usage_log/{log} {
       allow read, write: if false;
     }
   }
 }
 ```
+
+> To deploy with the Firebase CLI: `firebase deploy --only firestore:rules`
+> (requires `firebase.json` + a rules file). Or paste the rules directly in the
+> console.
 
 ---
 

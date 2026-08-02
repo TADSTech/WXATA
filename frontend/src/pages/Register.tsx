@@ -7,7 +7,6 @@ import {
   findCodeByCode,
   findUserByUsername,
   insertUser,
-  updateUserCode,
 } from "../firebase";
 import { SocialBanner } from "../components/SocialBanner";
 
@@ -84,12 +83,8 @@ export default function Register() {
           created_at: new Date().toISOString(),
         });
 
-        // 6. Mark code as used — do this before redirecting
-        await updateUserCode(codeData.id, {
-          used: true,
-          used_by: email,
-          used_at: new Date().toISOString(),
-        });
+        // 6. Mark code as used via backend (client-write blocked by rules)
+        await redeemUserCode(userCredential.user, userCode);
 
         navigate(
           `/verify?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`,
@@ -347,4 +342,39 @@ export default function Register() {
       </div>
     </div>
   );
+}
+
+// Redeem (mark-as-used) a user code through the backend, authenticated with the
+// newly created user's Firebase idToken so client-side writes are not required.
+async function redeemUserCode(
+  user: unknown,
+  code: string,
+): Promise<void> {
+  const userObj = user as {
+    getIdToken: () => Promise<string>;
+  };
+  const idToken = await userObj.getIdToken();
+  const backendUrl = (
+    (import.meta.env.VITE_BACKEND_URL as string | undefined)
+      ?.replace(/^wss?:\/\//, "https://")
+      ?.replace(/\/ws$/, "") ?? "http://localhost:5000"
+  );
+  const res = await fetch(`${backendUrl}/api/codes/redeem`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data.error) detail = data.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
 }

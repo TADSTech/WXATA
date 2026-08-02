@@ -78,7 +78,7 @@ describe('Sign-up success path', () => {
       suspended: false,
     });
     (createBotAccount as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      user: { uid: 'uid-123' },
+      user: { uid: 'uid-123', getIdToken: () => Promise.resolve('fake-token') },
     });
     (sendBotVerificationEmail as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       undefined
@@ -89,6 +89,12 @@ describe('Sign-up success path', () => {
     (updateUserCode as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       undefined
     );
+
+    // Stub global fetch so redeemUserCode succeeds without a real server.
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    fetchSpy.mockClear();
 
     render(
       <MemoryRouter initialEntries={['/register']}>

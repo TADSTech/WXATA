@@ -105,6 +105,13 @@ export async function updateWhere(
   await Promise.all(snap.docs.map((d) => d.ref.update(patch)));
 }
 
+export async function deleteById(
+  collectionName: string,
+  id: string,
+): Promise<void> {
+  await db().collection(collectionName).doc(id).delete();
+}
+
 export async function listAll(
   collectionName: string,
   orderByField?: string,
@@ -137,11 +144,39 @@ export const listApiKeys = () => listAll("api_keys", "created_at");
 export const insertUserCode = (data: Record<string, unknown>) =>
   insert("user_codes", data);
 
+export const findUserCodeByCode = (code: string) =>
+  findWhere("user_codes", "code", code);
+
+export const getUserCodeById = (id: string) => getById("user_codes", id);
+
+export const listUserCodes = () => listAll("user_codes", "created_at");
+
+export const updateUserCodeById = (
+  id: string,
+  patch: Record<string, unknown>,
+) => updateById("user_codes", id, patch);
+
+export const deleteUserCodeById = (id: string) => deleteById("user_codes", id);
+
 export const updateUserCodesWhere = (
   field: string,
   value: unknown,
   patch: Record<string, unknown>,
 ) => updateWhere("user_codes", field, value, patch);
+
+// marketplace_extensions
+export const listAllExtensions = () => listAll("marketplace_extensions");
+
+export const getExtensionById = (id: string) =>
+  getById("marketplace_extensions", id);
+
+export const updateExtensionById = (
+  id: string,
+  patch: Record<string, unknown>,
+) => updateById("marketplace_extensions", id, patch);
+
+export const deleteExtensionById = (id: string) =>
+  deleteById("marketplace_extensions", id);
 
 // api_usage_log
 export const insertUsageLog = (data: Record<string, unknown>) =>

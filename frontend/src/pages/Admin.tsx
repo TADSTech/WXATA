@@ -1,16 +1,39 @@
 import { useState, useEffect } from "react";
-import {
-  listUserCodes,
-  insertUserCode,
-  updateUserCode,
-  deleteUserCode,
-  listAllExtensions,
-  updateExtension,
-  deleteExtension,
-  listServiceConfig,
-  upsertServiceConfig,
-  listApiKeys,
-} from "../firebase";
+
+function getBackendUrl(): string {
+  return (
+    (import.meta.env.VITE_BACKEND_URL as string | undefined)
+      ?.replace(/^wss?:\/\//, "https://")
+      ?.replace(/\/ws$/, "") ?? "http://localhost:5000"
+  );
+}
+
+async function adminRequest(
+  path: string,
+  adminPass: string,
+  method: "GET" | "POST" = "GET",
+  body?: unknown,
+): Promise<any> {
+  const res = await fetch(`${getBackendUrl()}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminPass}`,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      if (data.error) detail = data.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return (await res.json()) as any;
+}
 
 // Inline error banner component used throughout the admin panel
 function ErrorBanner({
@@ -128,7 +151,7 @@ export default function Admin() {
 
   const fetchCodes = async () => {
     try {
-      const data = await listUserCodes();
+      const data = await adminRequest("/api/admin/codes", adminPass);
       const fetched: UserCode[] = (data || []).map((row: any) => ({
         id: row.id,
         code: row.code,
@@ -148,7 +171,7 @@ export default function Admin() {
 
   const fetchExtensions = async () => {
     try {
-      const data = await listAllExtensions();
+      const data = await adminRequest("/api/admin/extensions", adminPass);
       const fetchedPending: Extension[] = [];
       const fetchedApproved: Extension[] = [];
       (data || []).forEach((row: any) => {
@@ -184,9 +207,9 @@ export default function Admin() {
   const fetchServiceConfig = async () => {
     setConfigLoading(true);
     try {
-      const data = await listServiceConfig();
+      const data = await adminRequest("/api/admin/config", adminPass);
       setServiceConfig(
-        (data || []).map((row) => ({
+        (data || []).map((row: any) => ({
           key: String(row.key ?? ""),
           value: String(row.value ?? ""),
           description: String(row.description ?? ""),
@@ -204,7 +227,7 @@ export default function Admin() {
   const saveConfigValue = async (key: string, value: string) => {
     setConfigSaving(true);
     try {
-      await upsertServiceConfig(key, value);
+      await adminRequest("/api/admin/config", adminPass, "POST", { key, value });
       setEditingConfig(null);
       fetchServiceConfig();
     } catch (err: any) {
@@ -217,9 +240,9 @@ export default function Admin() {
   const fetchApiKeys = async () => {
     setApiKeysLoading(true);
     try {
-      const data = await listApiKeys();
+      const data = await adminRequest("/api/admin/keys", adminPass);
       setApiKeys(
-        (data || []).map((row) => ({
+        (data || []).map((row: any) => ({
           id: String(row.id ?? ""),
           owner_email: String(row.owner_email ?? ""),
           owner_name: String(row.owner_name ?? ""),
@@ -253,7 +276,10 @@ export default function Admin() {
     status: "approved" | "rejected",
   ) => {
     try {
-      await updateExtension(id, { status });
+      await adminRequest("/api/admin/extensions/update", adminPass, "POST", {
+        id,
+        patch: { status },
+      });
       fetchExtensions(); // Refresh the list
     } catch (e: any) {
       setExtError(
@@ -268,7 +294,10 @@ export default function Admin() {
     currentValue: boolean | undefined,
   ) => {
     try {
-      await updateExtension(id, { [field]: !currentValue });
+      await adminRequest("/api/admin/extensions/update", adminPass, "POST", {
+        id,
+        patch: { [field]: !currentValue },
+      });
       fetchExtensions();
     } catch (e: any) {
       setExtError("Failed to update extension: " + (e?.message ?? String(e)));
@@ -282,7 +311,9 @@ export default function Admin() {
       )
     ) {
       try {
-        await deleteExtension(id);
+        await adminRequest("/api/admin/extensions/delete", adminPass, "POST", {
+          id,
+        });
         fetchExtensions();
       } catch (e: any) {
         setExtError("Failed to delete extension: " + (e?.message ?? String(e)));
@@ -304,12 +335,15 @@ export default function Admin() {
   const handleSaveEdit = async () => {
     if (!adminEditingExt) return;
     try {
-      await updateExtension(adminEditingExt.id, {
-        name: editForm.name,
-        description: editForm.description,
-        trigger: editForm.trigger,
-        response: editForm.response,
-        code: editForm.code,
+      await adminRequest("/api/admin/extensions/update", adminPass, "POST", {
+        id: adminEditingExt.id,
+        patch: {
+          name: editForm.name,
+          description: editForm.description,
+          trigger: editForm.trigger,
+          response: editForm.response,
+          code: editForm.code,
+        },
       });
       setAdminEditingExt(null);
       setEditError("");
@@ -374,8 +408,9 @@ export default function Admin() {
     )
       return;
     try {
-      await updateUserCode(id, {
-        suspended: !currentSuspended,
+      await adminRequest("/api/admin/codes/update", adminPass, "POST", {
+        id,
+        patch: { suspended: !currentSuspended },
       });
       fetchCodes();
     } catch (e: any) {
@@ -387,7 +422,9 @@ export default function Admin() {
     if (!confirm("Permanently delete this code? This cannot be undone."))
       return;
     try {
-      await deleteUserCode(id);
+      await adminRequest("/api/admin/codes/delete", adminPass, "POST", {
+        id,
+      });
       fetchCodes();
     } catch (e: any) {
       setCodesError("Failed to delete code: " + (e?.message ?? String(e)));
@@ -406,11 +443,10 @@ export default function Admin() {
   const saveCode = async () => {
     if (!code) return;
     try {
-      await insertUserCode({
+      await adminRequest("/api/admin/codes/create", adminPass, "POST", {
         code,
         used: false,
         suspended: false,
-        created_at: new Date().toISOString(),
       });
       setMessage(`Code ${code} saved successfully!`);
       setCode("");
