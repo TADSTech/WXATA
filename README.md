@@ -1,5 +1,5 @@
 # WXATA 🟢
-
+---
 A high-performance, premium WhatsApp automation and developer API platform built with **Baileys** and **Bun**. Connect, script, and scale WhatsApp interactions with ease through a beautiful web dashboard.
 
 **Live Frontend:** [wxata.vercel.app](https://wxata.vercel.app)
