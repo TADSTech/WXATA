@@ -185,7 +185,13 @@ export default function Admin() {
     setConfigLoading(true);
     try {
       const data = await listServiceConfig();
-      setServiceConfig(data || []);
+      setServiceConfig(
+        (data || []).map((row) => ({
+          key: String(row.key ?? ""),
+          value: String(row.value ?? ""),
+          description: String(row.description ?? ""),
+        })),
+      );
     } catch (err: any) {
       setConfigError(
         "Failed to fetch config: " + (err?.message ?? String(err)),
@@ -212,7 +218,18 @@ export default function Admin() {
     setApiKeysLoading(true);
     try {
       const data = await listApiKeys();
-      setApiKeys(data || []);
+      setApiKeys(
+        (data || []).map((row) => ({
+          id: String(row.id ?? ""),
+          owner_email: String(row.owner_email ?? ""),
+          owner_name: String(row.owner_name ?? ""),
+          messages_sent: Number(row.messages_sent ?? 0),
+          messages_limit: Number(row.messages_limit ?? 0),
+          paid_credits: Number(row.paid_credits ?? 0),
+          active: Boolean(row.active ?? false),
+          created_at: String(row.created_at ?? ""),
+        })),
+      );
     } catch (err: any) {
       setApiKeysError(
         "Failed to fetch API keys: " + (err?.message ?? String(err)),
