@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   signInBotWithPassword,
@@ -6,9 +6,11 @@ import {
   signInBotWithGoogle,
   findUserByUsername,
   findUserByEmail,
-  findUserByUid,
+  findUserByAuthUid,
   updateUser,
+  auth,
 } from "../firebase";
+import { getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 
 function looksLikeEmail(value: string): boolean {
   return value.includes("@");
@@ -26,6 +28,65 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Handle redirect results (Google or GitHub) when the page loads after redirect
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!result || cancelled) return;
+
+        const provider = result.user.providerData[0]?.providerId;
+
+        if (provider === GoogleAuthProvider.PROVIDER_ID) {
+          // Google redirect completed — link or create user, then navigate
+          const googleUser = result.user;
+          const googleEmail = (googleUser.email ?? "").toLowerCase();
+          const googleUid = googleUser.uid;
+
+          const byEmail = await findUserByEmail(googleEmail);
+          if (byEmail && byEmail.google_uid !== googleUid) {
+            await updateUser(byEmail.id, {
+              google_uid: googleUid,
+              linked_at: new Date().toISOString(),
+            });
+          }
+          if (!byEmail) {
+            const existingUidUser = await findUserByAuthUid(googleUid);
+            if (!existingUidUser) {
+              await updateUser(googleUid, {
+                name: googleUser.displayName ?? googleUser.email?.split("@")[0] ?? "",
+                username: "",
+                email: googleEmail,
+                auth_provider: "google",
+                created_at: new Date().toISOString(),
+              });
+            }
+          }
+          const userRow = byEmail ?? (await findUserByAuthUid(googleUid));
+          if (!cancelled) {
+            if (userRow?.username) {
+              navigate(`/dashboard/${userRow.username}`);
+            } else {
+              navigate("/dashboard/user");
+            }
+          }
+        } else {
+          // GitHub redirect completed (developer) — navigate to developer portal
+          if (!cancelled) {
+            navigate("/developer/auth/callback");
+          }
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message ?? "Sign-in redirect failed");
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   const handleBotLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +112,7 @@ export default function Login() {
       const userCredential = await signInBotWithPassword(emailToUse, password);
 
       // Look up username to route to the correct dashboard
-      const userRow = await findUserByUid(userCredential.user.uid);
+      const userRow = await findUserByAuthUid(userCredential.user.uid);
 
       if (userRow?.username) {
         navigate(`/dashboard/${userRow.username}`);
@@ -116,57 +177,15 @@ export default function Login() {
     }
   };
 
-  // Google sign-in for bot accounts. If the Google email matches an existing
-  // bot account (created via email/password), link it so the user can sign in
-  // without typing a password. We keep the Firestore `users` doc under its
-  // original uid and record the Google uid in a `google_uid` field.
+  // Google sign-in for bot accounts — triggers redirect to Google, then
+  // the useEffect above handles the return (linking / user creation).
   const handleGoogleLogin = async () => {
     setError("");
     setLoading(true);
-
     try {
-      const userCredential = await signInBotWithGoogle();
-      const googleUser = userCredential.user;
-      const googleUid = googleUser.uid;
-      const googleEmail = (googleUser.email ?? "").toLowerCase();
-
-      // 1. Already linked — the users doc has this uid in `google_uid`
-      const byGoogleUid = await findUserByEmail(googleEmail);
-
-      // 2. Existing email/password account — attach the Google uid to it
-      if (byGoogleUid && byGoogleUid.google_uid !== googleUid) {
-        await updateUser(byGoogleUid.id, {
-          google_uid: googleUid,
-          linked_at: new Date().toISOString(),
-        });
-      }
-
-      // 3. No bot account yet — create a starter record keyed by the Google uid
-      if (!byGoogleUid) {
-        const existingUidUser = await findUserByUid(googleUid);
-        if (!existingUidUser) {
-          await updateUser(googleUid, {
-            name: googleUser.displayName ?? googleUser.email?.split("@")[0] ?? "",
-            username: "",
-            email: googleEmail,
-            auth_provider: "google",
-            created_at: new Date().toISOString(),
-          });
-        }
-      }
-
-      const userRow =
-        byGoogleUid ??
-        (await findUserByUid(googleUid));
-
-      if (userRow?.username) {
-        navigate(`/dashboard/${userRow.username}`);
-      } else {
-        navigate("/dashboard/user");
-      }
+      await signInBotWithGoogle(); // never resolves — page redirects
     } catch (err: any) {
       setError(err.message || "Google sign-in failed");
-    } finally {
       setLoading(false);
     }
   };

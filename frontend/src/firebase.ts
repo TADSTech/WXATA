@@ -12,7 +12,6 @@ import {
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
-  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -63,7 +62,7 @@ export function signInDeveloperWithGithub(): Promise<void> {
 }
 
 export function signInBotWithGoogle() {
-  return signInWithPopup(auth, googleProvider);
+  return signInWithRedirect(auth, googleProvider);
 }
 
 export function getGithubRedirectResult() {
