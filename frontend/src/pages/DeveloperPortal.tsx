@@ -11,7 +11,6 @@ import {
   Code2,
 } from "lucide-react";
 import { SocialBanner } from "../components/SocialBanner";
-import { supabase } from "../supabase";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,15 +135,8 @@ export default function DeveloperPortal() {
     setError("");
     setResult(null);
     try {
-      const redirectTo = `${window.location.origin}/developer/auth/callback`;
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo },
-      });
-
-      if (oauthError) {
-        throw new Error(oauthError.message || "GitHub sign-in failed");
-      }
+      // Firebase GitHub OAuth is handled by the dedicated callback route.
+      navigate("/developer/auth/callback");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

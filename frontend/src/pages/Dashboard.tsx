@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { getCurrentUser, subscribeToAuth, findUserByAuthUid, listDocs, insertExtension, updateExtension, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useWXATASocket } from '../hooks/useWXATASocket';
 import { TwitterGrabber } from '../components/TwitterGrabber';
@@ -812,13 +812,13 @@ function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplace
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        const { data, error } = await supabase
-          .from('marketplace_extensions')
-          .select('*')
-          .eq('status', 'approved')
-          .order('downloads', { ascending: false });
-        if (error) throw error;
-        const list: MarketplaceExtension[] = (data || []).map((row: Record<string, unknown>) => ({
+        const rows = await listDocs('marketplace_extensions', {
+          whereField: 'status',
+          whereValue: 'approved',
+          orderByField: 'downloads',
+          descending: true,
+        });
+        const list: MarketplaceExtension[] = rows.map((row: Record<string, unknown>) => ({
           id: row.id as string,
           name: row.name as string,
           description: row.description as string,
@@ -848,10 +848,7 @@ function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplace
   const handleInstall = async (ext: MarketplaceExtension) => {
     setInstalling(ext.id);
     try {
-      await supabase
-        .from('marketplace_extensions')
-        .update({ downloads: (ext.downloads || 0) + 1 })
-        .eq('id', ext.id);
+      await updateExtension(ext.id, { downloads: (ext.downloads || 0) + 1 });
       onInstall(ext);
       setInstalled(prev => new Set(prev).add(ext.id));
     } catch (e) {
@@ -1053,33 +1050,29 @@ const Dashboard = () => {
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const user = getCurrentUser();
+      if (!user) {
         navigate('/login');
         return;
       }
       // Try to find the user row — if found, use it; otherwise just allow access
       // with the session (avoids blocking users whose metadata doesn't match URL)
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', session.user.id)
-        .maybeSingle();
+      const userRow = await findUserByAuthUid(user.uid);
       if (userRow) {
-        setUserData(userRow as Record<string, unknown>);
+        setUserData(userRow as unknown as Record<string, unknown>);
       } else {
-        setUserData({ name: session.user.email, username });
+        setUserData({ name: user.email, username });
       }
       setIsAuthenticated(true);
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'SIGNED_OUT') navigate('/login');
+    const unsubscribe = subscribeToAuth((u) => {
+      if (!u) navigate('/login');
     });
 
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, [username, navigate]);
 
   // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
@@ -1241,24 +1234,23 @@ const Dashboard = () => {
   };
 
   const handlePublishScript = async (_key: string, script: BotScript) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { addToast('Must be logged in to publish', 'error'); return; }
+    const user = getCurrentUser();
+    if (!user) { addToast('Must be logged in to publish', 'error'); return; }
     if (!script.name || !script.desc) { addToast('Add a name and description first', 'error'); return; }
     if (confirm(`Publish "${script.name}" to the Marketplace? It will undergo admin review.`)) {
       try {
-        const { error } = await supabase.from('marketplace_extensions').insert({
+        await insertExtension({
           name: script.name,
           description: script.desc,
           trigger: script.trigger,
           response: script.response || '',
           code: script.code || '',
-          author: session.user.email?.split('@')[0] || 'Unknown',
-          author_uid: session.user.id,
+          author: user.email?.split('@')[0] || 'Unknown',
+          author_uid: user.uid,
           status: 'pending',
           created_at: new Date().toISOString(),
           downloads: 0,
         });
-        if (error) throw error;
         addToast('Extension submitted for review', 'success');
       } catch (err: unknown) {
         addToast('Error: ' + (err instanceof Error ? err.message : String(err)), 'error');
@@ -1304,7 +1296,7 @@ const Dashboard = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOutBot();
     navigate('/');
   };
 

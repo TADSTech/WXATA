@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, RefreshCw, CheckCircle } from 'lucide-react';
-import { supabase } from '../supabase';
+import { auth, sendBotVerificationEmail } from '../firebase';
 
 export default function Verify() {
   const [searchParams] = useSearchParams();
@@ -19,11 +19,13 @@ export default function Verify() {
     setResending(true);
     setResendError('');
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-      });
-      if (error) throw error;
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error(
+          'Your session has expired. Please sign in again to resend the verification email.',
+        );
+      }
+      await sendBotVerificationEmail(user, `${window.location.origin}/confirm`);
       setResent(true);
       setTimeout(() => setResent(false), 5000);
     } catch (err: any) {

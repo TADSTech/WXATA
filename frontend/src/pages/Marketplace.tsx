@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Download, ArrowLeft, ShieldAlert, Search, Code2, BookOpen, X, ChevronDown, ChevronUp, Zap, Copy, Check } from 'lucide-react';
-import { supabase } from '../supabase';
 import { useNavigate } from 'react-router-dom';
+import { listDocs, insertExtension, updateExtension, subscribeToAuth } from '../firebase';
 
 interface Extension {
   id: string;
@@ -175,12 +175,11 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('marketplace_extensions')
-          .select('*')
-          .eq('status', 'approved');
-        if (error) throw error;
-        const list: Extension[] = (data || []).map(d => ({
+        const rows = await listDocs('marketplace_extensions', {
+          whereField: 'status',
+          whereValue: 'approved',
+        });
+        const list: Extension[] = rows.map(d => ({
           id: d.id,
           name: d.name,
           description: d.description,
@@ -221,10 +220,7 @@ function BrowseTab({ user, navigate }: { user: any; navigate: (p: string, o?: an
     if (!user) { navigate('/login'); return; }
     setInstalling(ext.id);
     try {
-      await supabase
-        .from('marketplace_extensions')
-        .update({ downloads: (ext.downloads || 0) + 1 })
-        .eq('id', ext.id);
+      await updateExtension(ext.id, { downloads: (ext.downloads || 0) + 1 });
       setInstalled(prev => new Set([...prev, ext.id]));
       const username = user.email?.split('@')[0] || 'user';
       navigate(`/dashboard/${username}`, { state: { installExtension: ext } });
@@ -348,15 +344,10 @@ function BuildTab({ user, onPublished }: { user: any; onPublished: () => void })
     try {
       const payload = { name, description: desc, trigger: trigger.trim().toLowerCase(), aliases, type, target, response, code, default_argument: defaultArg, tags, version: '1.0.0', author: user.email?.split('@')[0] || 'Unknown', status: 'pending', downloads: 0 };
       if (editingId) {
-        await supabase
-          .from('marketplace_extensions')
-          .update({ ...payload, status: 'pending' })
-          .eq('id', editingId);
+        await updateExtension(editingId, { ...payload, status: 'pending' });
         setStatusMsg('Updated! Awaiting re-approval.');
       } else {
-        await supabase
-          .from('marketplace_extensions')
-          .insert({ ...payload, author_uid: user.id, created_at: new Date().toISOString() });
+        await insertExtension({ ...payload, author_uid: user.uid, created_at: new Date().toISOString() });
         setStatusMsg('Submitted for review! It will appear in the marketplace once approved.');
       }
       setStatus('success');
@@ -655,10 +646,10 @@ export default function Marketplace() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const unsubscribe = subscribeToAuth((user) => {
+      setUser(user);
     });
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, []);
 
   const tabs = [

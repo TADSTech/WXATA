@@ -21,7 +21,7 @@ import {
 import { SocialBanner } from "../components/SocialBanner";
 import { useTheme, KNOWN_THEMES } from "../components/ThemeProvider";
 import { useState, useEffect } from "react";
-import { supabase } from "../supabase";
+import { subscribeToAuth } from "../firebase";
 
 // ── Feature card ──────────────────────────────────────────────────────────────
 function FeatureCard({
@@ -86,11 +86,11 @@ const Landing = () => {
   const [isTvModeSecondary, setIsTvModeSecondary] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSessionUser(session?.user ?? null);
+    const unsubscribe = subscribeToAuth((user) => {
+      setSessionUser(user);
     });
-    
     setIsTvModeSecondary(localStorage.getItem('tvModeEnabled_secondary') === 'true');
+    return unsubscribe;
   }, []);
 
   const scrollToSection = (id: string) => {

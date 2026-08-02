@@ -1,5 +1,5 @@
 /**
- * Unit tests for Supabase auth flows
+ * Unit tests for Firebase auth flows
  * Requirements: 7.2, 7.6, 7.7
  */
 
@@ -12,27 +12,24 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 
 // ---------------------------------------------------------------------------
-// Mock the supabase module
+// Mock the firebase module
 // ---------------------------------------------------------------------------
-vi.mock('../supabase', () => {
-  const mockFrom = vi.fn();
-  const mockSignUp = vi.fn();
-  const mockSignInWithPassword = vi.fn();
-  const mockOnAuthStateChange = vi.fn();
-  const mockSignOut = vi.fn();
-  const mockGetSession = vi.fn();
-
+vi.mock('../firebase', () => {
   return {
-    supabase: {
-      auth: {
-        signUp: mockSignUp,
-        signInWithPassword: mockSignInWithPassword,
-        onAuthStateChange: mockOnAuthStateChange,
-        signOut: mockSignOut,
-        getSession: mockGetSession,
-      },
-      from: mockFrom,
-    },
+    findUserByUsername: vi.fn(),
+    findUserByUid: vi.fn(),
+    findCodeByCode: vi.fn(),
+    createBotAccount: vi.fn(),
+    sendBotVerificationEmail: vi.fn(),
+    insertUser: vi.fn(),
+    updateUserCode: vi.fn(),
+    signInBotWithPassword: vi.fn(),
+    signOutBot: vi.fn(),
+    subscribeToAuth: vi.fn(() => vi.fn()),
+    getCurrentUser: vi.fn(),
+    listDocs: vi.fn(),
+    insertExtension: vi.fn(),
+    updateExtension: vi.fn(),
   };
 });
 
@@ -49,9 +46,19 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 // ---------------------------------------------------------------------------
-// Import the mocked supabase so we can configure it per test
+// Import the mocked firebase helpers so we can configure them per test
 // ---------------------------------------------------------------------------
-import { supabase } from '../supabase';
+import {
+  findUserByUsername,
+  findUserByUid,
+  findCodeByCode,
+  createBotAccount,
+  sendBotVerificationEmail,
+  insertUser,
+  updateUserCode,
+  signInBotWithPassword,
+  getCurrentUser,
+} from '../firebase';
 
 // ---------------------------------------------------------------------------
 // Test: Sign-up success path
@@ -61,64 +68,27 @@ describe('Sign-up success path', () => {
     vi.clearAllMocks();
   });
 
-  it('navigates to dashboard after successful registration', async () => {
-    const mockSupabase = supabase as unknown as {
-      auth: {
-        signUp: ReturnType<typeof vi.fn>;
-        signInWithPassword: ReturnType<typeof vi.fn>;
-        onAuthStateChange: ReturnType<typeof vi.fn>;
-        signOut: ReturnType<typeof vi.fn>;
-      };
-      from: ReturnType<typeof vi.fn>;
-    };
-
-    // Mock supabase.from() to return appropriate responses for each table call
-    mockSupabase.from.mockImplementation((table: string) => {
-      if (table === 'user_codes') {
-        // First call: select (verify code) → valid, unused code
-        // Second call: update (mark used) → success
-        const chain = {
-          select: vi.fn().mockReturnThis(),
-          insert: vi.fn().mockResolvedValue({ error: null }),
-          update: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'code-id-1', used: false, suspended: false },
-            error: null,
-          }),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        };
-        // update().eq() should be awaitable
-        chain.update.mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        });
-        return chain;
-      }
-      if (table === 'users') {
-        return {
-          select: vi.fn().mockReturnThis(),
-          insert: vi.fn().mockResolvedValue({ error: null }),
-          update: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockResolvedValue({ error: null }),
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      };
+  it('navigates to verify after successful registration', async () => {
+    (findUserByUsername as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      null
+    );
+    (findCodeByCode as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'code-id-1',
+      used: false,
+      suspended: false,
     });
-
-    // Mock supabase.auth.signUp to return a user
-    mockSupabase.auth.signUp.mockResolvedValue({
-      data: { user: { id: 'uid-123' } },
-      error: null,
+    (createBotAccount as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { uid: 'uid-123' },
     });
+    (sendBotVerificationEmail as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      undefined
+    );
+    (insertUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      undefined
+    );
+    (updateUserCode as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      undefined
+    );
 
     render(
       <MemoryRouter initialEntries={['/register']}>
@@ -148,7 +118,7 @@ describe('Sign-up success path', () => {
     // Submit the form
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
 
-    // Assert navigation to verify page
+    // Assert navigation to the verify page
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.stringMatching(/^\/verify\?email=/)
@@ -166,35 +136,13 @@ describe('Sign-in success path', () => {
   });
 
   it('navigates to /dashboard/testuser after successful login', async () => {
-    const mockSupabase = supabase as unknown as {
-      auth: {
-        signUp: ReturnType<typeof vi.fn>;
-        signInWithPassword: ReturnType<typeof vi.fn>;
-        onAuthStateChange: ReturnType<typeof vi.fn>;
-        signOut: ReturnType<typeof vi.fn>;
-      };
-      from: ReturnType<typeof vi.fn>;
-    };
-
-    // Mock signInWithPassword to return a session
-    mockSupabase.auth.signInWithPassword.mockResolvedValue({
-      data: { user: { id: 'uid-123' }, session: { access_token: 'tok' } },
-      error: null,
+    // Email identifier → straight to Firebase sign-in
+    (signInBotWithPassword as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      { user: { uid: 'uid-123' } }
+    );
+    (findUserByUid as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      username: 'testuser',
     });
-
-    // Mock supabase.from('users').select('username').eq(...).maybeSingle() → username
-    mockSupabase.from.mockImplementation((_table: string) => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { username: 'testuser' },
-        error: null,
-      }),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { username: 'testuser' },
-        error: null,
-      }),
-    }));
 
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -231,45 +179,11 @@ describe('Session expiry redirect', () => {
   });
 
   it('redirects to /login when session is null', async () => {
-    const mockSupabase = supabase as unknown as {
-      auth: {
-        signUp: ReturnType<typeof vi.fn>;
-        signInWithPassword: ReturnType<typeof vi.fn>;
-        onAuthStateChange: ReturnType<typeof vi.fn>;
-        signOut: ReturnType<typeof vi.fn>;
-        getSession: ReturnType<typeof vi.fn>;
-      };
-      from: ReturnType<typeof vi.fn>;
-    };
-
-    // Mock getSession to return null session (simulates expired/missing session)
-    mockSupabase.auth.getSession.mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
-
-    // Mock onAuthStateChange to immediately call the callback with null session
-    mockSupabase.auth.onAuthStateChange.mockImplementation(
-      (callback: (event: string, session: null) => void) => {
-        // Simulate session expiry: call with null session synchronously
-        callback('SIGNED_OUT', null);
-        return {
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        };
-      }
+    // Simulate an expired/missing session. getCurrentUser() is synchronous
+    // (returns auth.currentUser), so the mock must return null, not a Promise.
+    (getCurrentUser as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      null
     );
-
-    // from() is not expected to be called when session is null, but mock it anyway
-    mockSupabase.from.mockImplementation((_table: string) => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }));
 
     render(
       <MemoryRouter initialEntries={['/dashboard/testuser']}>

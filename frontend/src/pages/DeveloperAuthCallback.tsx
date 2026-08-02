@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { supabase } from "../supabase";
+import {
+  getGithubRedirectResult,
+  signInDeveloperWithGithub,
+} from "../firebase";
 
 type State = "loading" | "success" | "error";
 
@@ -22,19 +25,22 @@ export default function DeveloperAuthCallback() {
   useEffect(() => {
     const run = async () => {
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        // First visit: no pending redirect result yet — kick off GitHub sign-in.
+        // Firebase redirects the browser to GitHub and lands back here, where
+        // getRedirectResult resolves on the next effect run.
+        const result = await getGithubRedirectResult();
 
-        if (sessionError || !session?.access_token) {
-          throw new Error("GitHub session not found. Please try signing in again.");
+        if (!result?.user) {
+          await signInDeveloperWithGithub();
+          return;
         }
+
+        const idToken = await result.user.getIdToken();
 
         const response = await fetch(`${getBaseUrl()}/api/keys/github/upsert`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${idToken}`,
             "Content-Type": "application/json",
           },
         });

@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
-import { supabase } from '../supabase';
+import {
+  applyVerificationCode,
+  refreshCurrentUser,
+  getCurrentUser,
+  findUserByAuthUid,
+} from '../firebase';
 
 type State = 'loading' | 'success' | 'error';
 
@@ -53,27 +58,30 @@ export default function Confirm() {
         return;
       }
 
-      // Supabase appends token_hash + type to the confirmation URL.
-      // When the user clicks the link, Supabase JS SDK picks up the
-      // hash fragment automatically and exchanges it for a session.
-      // We just need to wait for the session to be established.
-      const tokenHash = searchParams.get('token_hash');
-      const type = searchParams.get('type') as 'signup' | 'recovery' | null;
+      // Firebase email verification links arrive as:
+      //   /confirm?mode=verifyEmail&oobCode=...&apiKey=...
+      // We exchange the oobCode for a verified email on the signed-in user.
+      const oobCode = searchParams.get('oobCode');
+      const mode = searchParams.get('mode');
 
-      if (tokenHash && type) {
-        // Exchange the token for a session
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-        if (error) {
-          setErrorMsg(error.message);
+      if (oobCode && mode === 'verifyEmail') {
+        try {
+          await applyVerificationCode(oobCode);
+          await refreshCurrentUser();
+        } catch (err) {
+          setErrorMsg(
+            err instanceof Error
+              ? err.message
+              : 'Email verification failed. The link may have expired.',
+          );
           setState('error');
           return;
         }
       }
 
-      // Get the now-active session
-      const { data: { session } } = await supabase.auth.getSession();
+      const user = getCurrentUser();
 
-      if (!session) {
+      if (!user) {
         // No token in URL and no session — might be a direct visit
         setErrorMsg('No confirmation token found. Please check your email link.');
         setState('error');
@@ -81,11 +89,7 @@ export default function Confirm() {
       }
 
       // Look up the username so we can redirect to the right dashboard
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('username')
-        .eq('uid', session.user.id)
-        .maybeSingle();
+      const userRow = await findUserByAuthUid(user.uid);
 
       setUsername(userRow?.username ?? '');
       setState('success');

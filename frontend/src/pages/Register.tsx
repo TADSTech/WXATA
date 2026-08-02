@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "../supabase";
+import {
+  createBotAccount,
+  sendBotVerificationEmail,
+  signInDeveloperWithGithub,
+  findCodeByCode,
+  findUserByUsername,
+  insertUser,
+  updateUserCode,
+} from "../firebase";
 import { SocialBanner } from "../components/SocialBanner";
 
 const WHATSAPP_LINK = "https://wa.me/2347041029093";
@@ -24,29 +32,16 @@ export default function Register() {
 
     try {
       if (accountType === "developer") {
-        const redirectTo = `${window.location.origin}/developer/auth/callback`;
-        const { error: oauthError } = await supabase.auth.signInWithOAuth({
-          provider: "github",
-          options: { redirectTo },
-        });
-
-        if (oauthError) {
-          throw new Error(oauthError.message || "GitHub sign-in failed");
-        }
-
+        await signInDeveloperWithGithub();
         return;
       } else {
-        // Bot registration: Supabase auth + user record
+        // Bot registration: Firebase auth + Firestore user record
         // 1. Verify user_code exists and is valid
-        const { data: codeData, error: codeError } = await supabase
-          .from("user_codes")
-          .select("id, used, suspended")
-          .eq("code", userCode)
-          .single();
+        const codeData = await findCodeByCode(userCode);
 
-        if (codeError || !codeData) {
+        if (!codeData) {
           throw new Error(
-            `Invalid User Code. Purchase access instantly here: https://selar.co/wxata`,
+            `Invalid User Code. Purchase access instantly here: https://selar.co/wxata or contact support: ${WHATSAPP_LINK}`,
           );
         }
 
@@ -63,49 +58,25 @@ export default function Register() {
         }
 
         // 2. Check if username is taken
-        const { data: existingUser, error: usernameError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("username", username)
-          .maybeSingle();
-
-        if (usernameError) {
-          throw new Error(
-            "Error checking username availability. Please try again.",
-          );
-        }
+        const existingUser = await findUserByUsername(username);
 
         if (existingUser) {
           throw new Error("Username is already taken.");
         }
 
-        // 3. Create auth user — pass profile data as metadata so it's stored
-        // even if email confirmation is pending
-        const { data: authData, error: signUpError } =
-          await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { name, username },
-            },
-          });
+        // 3. Create auth user — the profile is stored separately in Firestore
+        // (doc id = Firebase uid) so it survives until email confirmation.
+        const userCredential = await createBotAccount(email, password);
+        const uid = userCredential.user.uid;
 
-        if (signUpError || !authData.user) {
-          throw new Error(
-            signUpError?.message ??
-              "Failed to create account. Please try again.",
-          );
-        }
+        // 4. Send verification email (Firebase email action links to /confirm)
+        await sendBotVerificationEmail(
+          userCredential.user,
+          `${window.location.origin}/confirm`,
+        );
 
-        const uid = authData.user.id;
-
-        // 4. Insert user record
-        // Note: if email confirmation is enabled, signUp returns a user but no
-        // active session — auth.uid() is null. We use the service-role-bypass
-        // approach: insert with the uid from the signUp response directly.
-        // The RLS policy allows anon inserts so this works regardless of session state.
-        const { error: insertError } = await supabase.from("users").insert({
-          uid,
+        // 5. Insert user record
+        await insertUser(uid, {
           name,
           username,
           email,
@@ -113,31 +84,12 @@ export default function Register() {
           created_at: new Date().toISOString(),
         });
 
-        if (insertError) {
-          // Clean up: delete the auth user so they can retry
-          console.error("Profile insert failed:", insertError);
-          throw new Error(
-            `Failed to save user profile: ${insertError.message}`,
-          );
-        }
-
-        // 5. Mark code as used — do this before redirecting
-        const { error: updateError } = await supabase
-          .from("user_codes")
-          .update({
-            used: true,
-            used_by: email,
-            used_at: new Date().toISOString(),
-          })
-          .eq("id", codeData.id);
-
-        if (updateError) {
-          // Log but don't block — user is created, code marking is best-effort
-          console.error(
-            "Failed to mark user_code as used:",
-            updateError.message,
-          );
-        }
+        // 6. Mark code as used — do this before redirecting
+        await updateUserCode(codeData.id, {
+          used: true,
+          used_by: email,
+          used_at: new Date().toISOString(),
+        });
 
         navigate(
           `/verify?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}`,

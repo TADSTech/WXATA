@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Terminal, BookOpen, LogOut, Activity, Shield, ChevronRight } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { getCurrentUser, subscribeToAuth, findUserByAuthUid, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from '../components/ToastContainer';
@@ -347,31 +347,27 @@ const TvTools = () => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const user = getCurrentUser();
+      if (!user) {
         navigate('/login');
         return;
       }
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', session.user.id)
-        .maybeSingle();
+      const userRow = await findUserByAuthUid(user.uid);
       if (userRow) {
-        setUserData(userRow as Record<string, unknown>);
+        setUserData(userRow as unknown as Record<string, unknown>);
       } else {
-        setUserData({ name: session.user.email, username });
+        setUserData({ name: user.email, username });
       }
       setIsAuthenticated(true);
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'SIGNED_OUT') navigate('/login');
+    const unsubscribe = subscribeToAuth((u) => {
+      if (!u) navigate('/login');
     });
 
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, [username, navigate]);
 
   useEffect(() => {
@@ -418,7 +414,7 @@ const TvTools = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOutBot();
     navigate('/');
   };
 

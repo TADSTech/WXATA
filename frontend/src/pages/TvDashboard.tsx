@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Wifi, Phone, Activity, Terminal, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { getCurrentUser, subscribeToAuth, findUserByAuthUid, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from '../components/ToastContainer';
@@ -449,33 +449,29 @@ const TvDashboard = () => {
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const user = getCurrentUser();
+      if (!user) {
         navigate('/login');
         return;
       }
       // Try to find the user row — if found, use it; otherwise just allow access
       // with the session (avoids blocking users whose metadata doesn't match URL)
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('*')
-        .eq('uid', session.user.id)
-        .maybeSingle();
+      const userRow = await findUserByAuthUid(user.uid);
       if (userRow) {
-        setUserData(userRow as Record<string, unknown>);
+        setUserData(userRow as unknown as Record<string, unknown>);
       } else {
-        setUserData({ name: session.user.email, username });
+        setUserData({ name: user.email, username });
       }
       setIsAuthenticated(true);
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'SIGNED_OUT') navigate('/login');
+    const unsubscribe = subscribeToAuth((u) => {
+      if (!u) navigate('/login');
     });
 
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, [username, navigate]);
 
   // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
@@ -586,7 +582,7 @@ const TvDashboard = () => {
 
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOutBot();
     navigate('/');
   };
 

@@ -1,5 +1,16 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../supabase";
+import {
+  listUserCodes,
+  insertUserCode,
+  updateUserCode,
+  deleteUserCode,
+  listAllExtensions,
+  updateExtension,
+  deleteExtension,
+  listServiceConfig,
+  upsertServiceConfig,
+  listApiKeys,
+} from "../firebase";
 
 // Inline error banner component used throughout the admin panel
 function ErrorBanner({
@@ -117,11 +128,7 @@ export default function Admin() {
 
   const fetchCodes = async () => {
     try {
-      const { data, error } = await supabase
-        .from("user_codes")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const data = await listUserCodes();
       const fetched: UserCode[] = (data || []).map((row: any) => ({
         id: row.id,
         code: row.code,
@@ -141,10 +148,7 @@ export default function Admin() {
 
   const fetchExtensions = async () => {
     try {
-      const { data, error } = await supabase
-        .from("marketplace_extensions")
-        .select("*");
-      if (error) throw error;
+      const data = await listAllExtensions();
       const fetchedPending: Extension[] = [];
       const fetchedApproved: Extension[] = [];
       (data || []).forEach((row: any) => {
@@ -180,11 +184,7 @@ export default function Admin() {
   const fetchServiceConfig = async () => {
     setConfigLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("service_config")
-        .select("*")
-        .order("key");
-      if (error) throw error;
+      const data = await listServiceConfig();
       setServiceConfig(data || []);
     } catch (err: any) {
       setConfigError(
@@ -198,10 +198,7 @@ export default function Admin() {
   const saveConfigValue = async (key: string, value: string) => {
     setConfigSaving(true);
     try {
-      const { error } = await supabase
-        .from("service_config")
-        .upsert({ key, value, updated_at: new Date().toISOString() });
-      if (error) throw error;
+      await upsertServiceConfig(key, value);
       setEditingConfig(null);
       fetchServiceConfig();
     } catch (err: any) {
@@ -214,13 +211,7 @@ export default function Admin() {
   const fetchApiKeys = async () => {
     setApiKeysLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("api_keys")
-        .select(
-          "id, owner_email, owner_name, messages_sent, messages_limit, paid_credits, active, created_at",
-        )
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const data = await listApiKeys();
       setApiKeys(data || []);
     } catch (err: any) {
       setApiKeysError(
@@ -245,11 +236,7 @@ export default function Admin() {
     status: "approved" | "rejected",
   ) => {
     try {
-      const { error } = await supabase
-        .from("marketplace_extensions")
-        .update({ status })
-        .eq("id", id);
-      if (error) throw error;
+      await updateExtension(id, { status });
       fetchExtensions(); // Refresh the list
     } catch (e: any) {
       setExtError(
@@ -264,11 +251,7 @@ export default function Admin() {
     currentValue: boolean | undefined,
   ) => {
     try {
-      const { error } = await supabase
-        .from("marketplace_extensions")
-        .update({ [field]: !currentValue })
-        .eq("id", id);
-      if (error) throw error;
+      await updateExtension(id, { [field]: !currentValue });
       fetchExtensions();
     } catch (e: any) {
       setExtError("Failed to update extension: " + (e?.message ?? String(e)));
@@ -282,11 +265,7 @@ export default function Admin() {
       )
     ) {
       try {
-        const { error } = await supabase
-          .from("marketplace_extensions")
-          .delete()
-          .eq("id", id);
-        if (error) throw error;
+        await deleteExtension(id);
         fetchExtensions();
       } catch (e: any) {
         setExtError("Failed to delete extension: " + (e?.message ?? String(e)));
@@ -308,17 +287,13 @@ export default function Admin() {
   const handleSaveEdit = async () => {
     if (!adminEditingExt) return;
     try {
-      const { error } = await supabase
-        .from("marketplace_extensions")
-        .update({
-          name: editForm.name,
-          description: editForm.description,
-          trigger: editForm.trigger,
-          response: editForm.response,
-          code: editForm.code,
-        })
-        .eq("id", adminEditingExt.id);
-      if (error) throw error;
+      await updateExtension(adminEditingExt.id, {
+        name: editForm.name,
+        description: editForm.description,
+        trigger: editForm.trigger,
+        response: editForm.response,
+        code: editForm.code,
+      });
       setAdminEditingExt(null);
       setEditError("");
       fetchExtensions();
@@ -382,11 +357,9 @@ export default function Admin() {
     )
       return;
     try {
-      const { error } = await supabase
-        .from("user_codes")
-        .update({ suspended: !currentSuspended })
-        .eq("id", id);
-      if (error) throw error;
+      await updateUserCode(id, {
+        suspended: !currentSuspended,
+      });
       fetchCodes();
     } catch (e: any) {
       setCodesError("Failed to update code: " + (e?.message ?? String(e)));
@@ -397,8 +370,7 @@ export default function Admin() {
     if (!confirm("Permanently delete this code? This cannot be undone."))
       return;
     try {
-      const { error } = await supabase.from("user_codes").delete().eq("id", id);
-      if (error) throw error;
+      await deleteUserCode(id);
       fetchCodes();
     } catch (e: any) {
       setCodesError("Failed to delete code: " + (e?.message ?? String(e)));
@@ -417,15 +389,12 @@ export default function Admin() {
   const saveCode = async () => {
     if (!code) return;
     try {
-      const { error } = await supabase
-        .from("user_codes")
-        .insert({
-          code,
-          used: false,
-          suspended: false,
-          created_at: new Date().toISOString(),
-        });
-      if (error) throw error;
+      await insertUserCode({
+        code,
+        used: false,
+        suspended: false,
+        created_at: new Date().toISOString(),
+      });
       setMessage(`Code ${code} saved successfully!`);
       setCode("");
       fetchCodes(); // Refresh the list

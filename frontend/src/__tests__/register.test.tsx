@@ -16,25 +16,16 @@ import Register from '../pages/Register';
 const WHATSAPP_LINK = 'https://wa.me/2347041029093';
 
 // ---------------------------------------------------------------------------
-// Mock supabase — always return "not found" for any user_code
+// Mock firebase — always return "not found" for any user_code
 // ---------------------------------------------------------------------------
-vi.mock('../supabase', () => ({
-  supabase: {
-    auth: {
-      signUp: vi.fn(),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      insert: vi.fn().mockResolvedValue({ error: null }),
-      update: vi.fn().mockReturnThis(),
-    })),
-  },
+vi.mock('../firebase', () => ({
+  findUserByUsername: vi.fn().mockResolvedValue(null),
+  findCodeByCode: vi.fn().mockResolvedValue(null),
+  createBotAccount: vi.fn().mockResolvedValue({ user: { uid: 'uid-123' } }),
+  sendBotVerificationEmail: vi.fn().mockResolvedValue(undefined),
+  signInDeveloperWithGithub: vi.fn(),
+  insertUser: vi.fn().mockResolvedValue(undefined),
+  updateUserCode: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockNavigate = vi.fn();

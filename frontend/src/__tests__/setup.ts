@@ -1,5 +1,11 @@
 import '@testing-library/jest-dom';
 
+// jsdom does not implement scrollIntoView — components that call it in
+// effects would crash tests otherwise.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket mock — jsdom does not provide a native WebSocket implementation.
 // The Dashboard component uses useWXATASocket which creates a WebSocket.

@@ -2,7 +2,19 @@ import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import pino from "pino";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
+import {
+  findApiKeyBy,
+  insertApiKey,
+  updateApiKeyById,
+  insertUserCode,
+  updateUserCodesWhere,
+  insertUsageLog,
+  getServiceConfigValue,
+  listServiceConfig,
+  upsertServiceConfig,
+  listApiKeys,
+  verifyIdToken,
+} from "./firebase";
 import nodemailer from "nodemailer";
 import { generateLicenseKey } from "./licenseValidator";
 import type { WASocket } from "@whiskeysockets/baileys";
@@ -14,24 +26,6 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// ---------------------------------------------------------------------------
-// Supabase service-role client (lazy — initialized on first use)
-// ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabaseAdmin: ReturnType<typeof createClient<any>> | null = null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSupabaseAdmin(): ReturnType<typeof createClient<any>> {
-  if (!_supabaseAdmin) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _supabaseAdmin = createClient<any>(
-      process.env.SUPABASE_URL ?? "",
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-    );
-  }
-  return _supabaseAdmin;
-}
 
 // ---------------------------------------------------------------------------
 // Helper: generate a 16-char cryptographically random alphanumeric user code
@@ -173,10 +167,6 @@ async function findDeveloperAccount(identifiers: {
   recoveryEmail?: string;
   recoveryPhone?: string;
 }) {
-  const supabase = getSupabaseAdmin();
-  const selectFields =
-    "id, key, owner_email, owner_name, recovery_email, recovery_phone, messages_sent, messages_limit, paid_credits, active, email_verified_at, verification_token_hash, verification_sent_at, created_at, last_used";
-
   const searchOrder = [
     ["owner_email", normalizeEmail(identifiers.email)],
     ["recovery_email", normalizeEmail(identifiers.email)],
@@ -186,13 +176,8 @@ async function findDeveloperAccount(identifiers: {
 
   for (const [column, value] of searchOrder) {
     if (!value) continue;
-    const { data } = await supabase
-      .from("api_keys")
-      .select(selectFields)
-      .eq(column, value)
-      .maybeSingle();
-
-    if (data) return data;
+    const row = await findApiKeyBy(column, value);
+    if (row) return row;
   }
 
   return null;
@@ -378,19 +363,17 @@ class DashboardServer {
                   hmacSecret,
                 );
 
-                const { error: dbError } = await getSupabaseAdmin()
-                  .from("user_codes")
-                  .insert({
+                try {
+                  await insertUserCode({
                     code: userCode,
                     used: false,
                     suspended: false,
                     created_at: new Date().toISOString(),
                   });
-
-                if (dbError) {
+                } catch (dbError) {
                   logger.error(
                     { dbError },
-                    "Flutterwave webhook: Supabase insert failed",
+                    "Flutterwave webhook: Firestore insert failed",
                   );
                   throw new Error("DB write failed");
                 }
@@ -406,12 +389,11 @@ class DashboardServer {
                 event.data.status === "cancelled"
               ) {
                 // Suspend: set suspended=true where used_by = customerEmail
-                const { error: dbError } = await getSupabaseAdmin()
-                  .from("user_codes")
-                  .update({ suspended: true })
-                  .eq("used_by", customerEmail);
-
-                if (dbError) {
+                try {
+                  await updateUserCodesWhere("used_by", customerEmail, {
+                    suspended: true,
+                  });
+                } catch (dbError) {
                   logger.error(
                     { dbError },
                     "Flutterwave webhook: suspend update failed",
@@ -536,21 +518,17 @@ class DashboardServer {
               return;
             }
 
-            const {
-              data: { user },
-              error: userError,
-            } = await getSupabaseAdmin().auth.getUser(bearer);
-
-            if (userError || !user) {
+            let decodedUser;
+            try {
+              decodedUser = await verifyIdToken(bearer);
+            } catch {
               res.writeHead(401, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: "Invalid auth token" }));
               return;
             }
 
             const hasGithubIdentity =
-              user.app_metadata?.provider === "github" ||
-              (Array.isArray(user.identities) &&
-                user.identities.some((identity) => identity.provider === "github"));
+              decodedUser.firebase?.sign_in_provider === "github.com";
 
             if (!hasGithubIdentity) {
               res.writeHead(403, { "Content-Type": "application/json" });
@@ -558,41 +536,36 @@ class DashboardServer {
               return;
             }
 
-            const email = normalizeEmail(user.email ?? undefined);
+            const email = normalizeEmail(decodedUser.email ?? undefined);
             if (!email) {
               res.writeHead(400, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: "GitHub account email is required" }));
               return;
             }
 
-            const githubUserId = String(user.id);
+            const githubUserId = decodedUser.uid;
             const displayName =
-              user.user_metadata?.full_name ??
-              user.user_metadata?.name ??
-              user.user_metadata?.user_name ??
+              decodedUser.name ??
+              decodedUser.email?.split("@")[0] ??
               "GitHub Developer";
 
             const freeLimit = await this.getServiceConfig("api_free_limit", "100");
 
-            const { data: existingByGithub } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select("id, key, messages_limit, messages_sent")
-              .eq("github_user_id", githubUserId)
-              .maybeSingle();
+            const existingByGithub = await findApiKeyBy(
+              "github_user_id",
+              githubUserId,
+            );
 
             if (existingByGithub) {
-              await getSupabaseAdmin()
-                .from("api_keys")
-                .update({
-                  owner_email: email,
-                  owner_name: displayName,
-                  auth_provider: "github",
-                  email_verified_at: new Date().toISOString(),
-                  profile_completed_at: new Date().toISOString(),
-                  active: true,
-                  verification_token_hash: null,
-                })
-                .eq("id", existingByGithub.id);
+              await updateApiKeyById(existingByGithub.id, {
+                owner_email: email,
+                owner_name: displayName,
+                auth_provider: "github",
+                email_verified_at: new Date().toISOString(),
+                profile_completed_at: new Date().toISOString(),
+                active: true,
+                verification_token_hash: null,
+              });
 
               res.writeHead(200, { "Content-Type": "application/json" });
               res.end(
@@ -609,25 +582,18 @@ class DashboardServer {
               return;
             }
 
-            const { data: existingByEmail } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select("id, key, messages_limit, messages_sent")
-              .eq("owner_email", email)
-              .maybeSingle();
+            const existingByEmail = await findApiKeyBy("owner_email", email);
 
             if (existingByEmail) {
-              await getSupabaseAdmin()
-                .from("api_keys")
-                .update({
-                  owner_name: displayName,
-                  github_user_id: githubUserId,
-                  auth_provider: "github",
-                  email_verified_at: new Date().toISOString(),
-                  profile_completed_at: new Date().toISOString(),
-                  active: true,
-                  verification_token_hash: null,
-                })
-                .eq("id", existingByEmail.id);
+              await updateApiKeyById(existingByEmail.id, {
+                owner_name: displayName,
+                github_user_id: githubUserId,
+                auth_provider: "github",
+                email_verified_at: new Date().toISOString(),
+                profile_completed_at: new Date().toISOString(),
+                active: true,
+                verification_token_hash: null,
+              });
 
               res.writeHead(200, { "Content-Type": "application/json" });
               res.end(
@@ -645,7 +611,7 @@ class DashboardServer {
             }
 
             const apiKey = this.generateApiKey();
-            await getSupabaseAdmin().from("api_keys").insert({
+            await insertApiKey({
               key: apiKey,
               owner_email: email,
               owner_name: displayName,
@@ -743,16 +709,13 @@ class DashboardServer {
               }
 
               const verificationToken = generateVerificationToken();
-              await getSupabaseAdmin()
-                .from("api_keys")
-                .update({
-                  verification_token_hash: hashVerificationToken(
-                    verificationToken,
-                  ),
-                  verification_sent_at: new Date().toISOString(),
-                  active: false,
-                })
-                .eq("id", existing.id);
+              await updateApiKeyById(existing.id, {
+                verification_token_hash: hashVerificationToken(
+                  verificationToken,
+                ),
+                verification_sent_at: new Date().toISOString(),
+                active: false,
+              });
 
               await sendDeveloperVerificationEmail({
                 to: existing.owner_email,
@@ -782,26 +745,24 @@ class DashboardServer {
               "100",
             );
 
-            await getSupabaseAdmin()
-              .from("api_keys")
-              .insert({
-                key: apiKey,
-                owner_email: email,
-                owner_name: name,
-                recovery_email: recoveryEmail,
-                recovery_phone: recoveryPhone,
-                messages_sent: 0,
-                messages_limit: parseInt(freeLimit, 10),
-                paid_credits: 0,
-                active: false,
-                email_verified_at: null,
-                profile_completed_at: null,
-                verification_token_hash: hashVerificationToken(
-                  verificationToken,
-                ),
-                verification_sent_at: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-              });
+            await insertApiKey({
+              key: apiKey,
+              owner_email: email,
+              owner_name: name,
+              recovery_email: recoveryEmail,
+              recovery_phone: recoveryPhone,
+              messages_sent: 0,
+              messages_limit: parseInt(freeLimit, 10),
+              paid_credits: 0,
+              active: false,
+              email_verified_at: null,
+              profile_completed_at: null,
+              verification_token_hash: hashVerificationToken(
+                verificationToken,
+              ),
+              verification_sent_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            });
 
             await sendDeveloperVerificationEmail({
               to: email,
@@ -849,13 +810,7 @@ class DashboardServer {
             }
 
             const tokenHash = hashVerificationToken(token);
-            const { data: row } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select(
-                "id, key, owner_email, owner_name, messages_sent, messages_limit, paid_credits, active, email_verified_at",
-              )
-              .eq("verification_token_hash", tokenHash)
-              .maybeSingle();
+            const row = await findApiKeyBy("verification_token_hash", tokenHash);
 
             if (!row) {
               res.writeHead(404, { "Content-Type": "application/json" });
@@ -864,15 +819,12 @@ class DashboardServer {
             }
 
             if (!row.email_verified_at) {
-              await getSupabaseAdmin()
-                .from("api_keys")
-                .update({
-                  email_verified_at: new Date().toISOString(),
-                  profile_completed_at: new Date().toISOString(),
-                  verification_token_hash: null,
-                  active: true,
-                })
-                .eq("id", row.id);
+              await updateApiKeyById(row.id, {
+                email_verified_at: new Date().toISOString(),
+                profile_completed_at: new Date().toISOString(),
+                verification_token_hash: null,
+                active: true,
+              });
             }
 
             res.writeHead(200, { "Content-Type": "application/json" });
@@ -918,15 +870,7 @@ class DashboardServer {
             }) ??
               (isEmail || isPhone
                 ? null
-                : (
-                    await getSupabaseAdmin()
-                      .from("api_keys")
-                      .select(
-                        "key, owner_email, owner_name, messages_sent, messages_limit, paid_credits, active, email_verified_at",
-                      )
-                      .eq("key", apiKeyHeader)
-                      .maybeSingle()
-                  ).data);
+                : await findApiKeyBy("key", apiKeyHeader));
 
             if (!row) {
               res.writeHead(401, { "Content-Type": "application/json" });
@@ -1109,13 +1053,7 @@ class DashboardServer {
               return;
             }
 
-            const { data: row } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select(
-                "id, messages_sent, messages_limit, paid_credits, active, email_verified_at",
-              )
-              .eq("key", apiKeyHeader)
-              .maybeSingle();
+            const row = await findApiKeyBy("key", apiKeyHeader);
 
             if (!row) {
               res.writeHead(401, { "Content-Type": "application/json" });
@@ -1167,22 +1105,17 @@ class DashboardServer {
               text: body.message,
             });
 
-            await getSupabaseAdmin()
-              .from("api_keys")
-              .update({
-                messages_sent: row.messages_sent + 1,
-                last_used: new Date().toISOString(),
-              })
-              .eq("id", row.id);
+            await updateApiKeyById(row.id, {
+              messages_sent: row.messages_sent + 1,
+              last_used: new Date().toISOString(),
+            });
 
-            await getSupabaseAdmin()
-              .from("api_usage_log")
-              .insert({
-                api_key_id: row.id,
-                to_number: body.to,
-                message_text: body.message.slice(0, 200),
-                status: "sent",
-              });
+            await insertUsageLog({
+              api_key_id: row.id,
+              to_number: body.to,
+              message_text: body.message.slice(0, 200),
+              status: "sent",
+            });
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(
@@ -1217,11 +1150,7 @@ class DashboardServer {
               return;
             }
 
-            const { data: row } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select("id, owner_email, active, email_verified_at")
-              .eq("key", apiKeyHeader)
-              .maybeSingle();
+            const row = await findApiKeyBy("key", apiKeyHeader);
 
             if (!row) {
               res.writeHead(401, { "Content-Type": "application/json" });
@@ -1307,11 +1236,7 @@ class DashboardServer {
 
               if (apiKey) {
                 try {
-                  const { data: row } = await getSupabaseAdmin()
-                    .from("api_keys")
-                    .select("id, paid_credits")
-                    .eq("key", apiKey)
-                    .maybeSingle();
+                  const row = await findApiKeyBy("key", apiKey);
 
                   if (row) {
                     const creditsStr = await this.getServiceConfig(
@@ -1319,13 +1244,10 @@ class DashboardServer {
                       "500",
                     );
                     const credits = parseInt(creditsStr, 10);
-                    await getSupabaseAdmin()
-                      .from("api_keys")
-                      .update({
-                        paid_credits: (row.paid_credits ?? 0) + credits,
-                        last_used: new Date().toISOString(),
-                      })
-                      .eq("id", row.id);
+                    await updateApiKeyById(row.id, {
+                      paid_credits: (row.paid_credits ?? 0) + credits,
+                      last_used: new Date().toISOString(),
+                    });
                     logger.info(
                       { apiKey, credits, txRef },
                       "API key topped up via Flutterwave",
@@ -1380,11 +1302,7 @@ class DashboardServer {
               return;
             }
 
-            const { data, error } = await getSupabaseAdmin()
-              .from("service_config")
-              .select("key, value, description");
-
-            if (error) throw error;
+            const data = await listServiceConfig();
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify(data ?? []));
@@ -1424,14 +1342,7 @@ class DashboardServer {
               return;
             }
 
-            const { error } = await getSupabaseAdmin()
-              .from("service_config")
-              .upsert(
-                { key: body.key, value: body.value },
-                { onConflict: "key" },
-              );
-
-            if (error) throw error;
+            await upsertServiceConfig(body.key, body.value);
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
@@ -1460,14 +1371,7 @@ class DashboardServer {
               return;
             }
 
-            const { data, error } = await getSupabaseAdmin()
-              .from("api_keys")
-              .select(
-                "id, owner_email, owner_name, messages_sent, messages_limit, paid_credits, active, created_at",
-              )
-              .order("created_at", { ascending: false });
-
-            if (error) throw error;
+            const data = await listApiKeys();
 
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify(data ?? []));
@@ -1662,18 +1566,13 @@ class DashboardServer {
     return "wxata_live_" + bytes.toString("hex");
   }
 
-  // ── WhatsApp API: read a value from the service_config table ─────────────
+  // ── WhatsApp API: read a value from the service_config collection ───────
   private async getServiceConfig(
     key: string,
     fallback: string,
   ): Promise<string> {
     try {
-      const { data } = await getSupabaseAdmin()
-        .from("service_config")
-        .select("value")
-        .eq("key", key)
-        .single();
-      return data?.value ?? fallback;
+      return await getServiceConfigValue(key, fallback);
     } catch {
       return fallback;
     }
