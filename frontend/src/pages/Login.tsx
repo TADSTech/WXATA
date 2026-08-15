@@ -177,13 +177,42 @@ export default function Login() {
     }
   };
 
-  // Google sign-in for bot accounts — triggers redirect to Google, then
-  // the useEffect above handles the return (linking / user creation).
+  // Google sign-in for bot accounts — triggers popup, then
+  // handles user creation and navigation.
   const handleGoogleLogin = async () => {
     setError("");
     setLoading(true);
     try {
-      await signInBotWithGoogle(); // never resolves — page redirects
+      const result = await signInBotWithGoogle();
+      const googleUser = result.user;
+      const googleEmail = (googleUser.email ?? "").toLowerCase();
+      const googleUid = googleUser.uid;
+
+      const byEmail = await findUserByEmail(googleEmail);
+      if (byEmail && byEmail.google_uid !== googleUid) {
+        await updateUser(byEmail.id, {
+          google_uid: googleUid,
+          linked_at: new Date().toISOString(),
+        });
+      }
+      if (!byEmail) {
+        const existingUidUser = await findUserByAuthUid(googleUid);
+        if (!existingUidUser) {
+          await updateUser(googleUid, {
+            name: googleUser.displayName ?? googleUser.email?.split("@")[0] ?? "",
+            username: "",
+            email: googleEmail,
+            auth_provider: "google",
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+      const userRow = byEmail ?? (await findUserByAuthUid(googleUid));
+      if (userRow?.username) {
+        navigate(`/dashboard/${userRow.username}`);
+      } else {
+        navigate("/dashboard/user");
+      }
     } catch (err: any) {
       setError(err.message || "Google sign-in failed");
       setLoading(false);
