@@ -57,7 +57,7 @@ class DashboardServer {
     const httpServer = http.createServer((req, res) => {
       // Serve landing page at /
       if (req.url === "/") {
-        const landingPath = path.join(__dirname, "../../index.html");
+        const landingPath = path.join(__dirname, "../index.html");
         try {
           const html = fs.readFileSync(landingPath, "utf-8");
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
