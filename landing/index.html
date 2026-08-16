@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WXATA Documentation</title>
+  <meta name="description" content="Documentation for WXATA — FOSS WhatsApp Bot Platform">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .doc-layout { display: flex; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 6rem 1.5rem 3rem; }
+    .doc-nav { flex-shrink: 0; width: 220px; position: sticky; top: 5rem; align-self: flex-start; }
+    .doc-nav h3 { font-size: 0.8rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.8rem; letter-spacing: 0.1em; }
+    .doc-nav a { display: block; padding: 0.3rem 0; color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .doc-nav a:hover, .doc-nav a.active { color: var(--accent); text-decoration: none; }
+    .doc-content { flex: 1; min-width: 0; }
+    .doc-content h1 { font-size: 2rem; margin-bottom: 1rem; }
+    .doc-content h2 { font-size: 1.4rem; margin-top: 3rem; margin-bottom: 0.8rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .doc-content h3 { font-size: 1.1rem; margin-top: 2rem; margin-bottom: 0.5rem; }
+    .doc-content p { margin-bottom: 1rem; color: var(--text-dim); line-height: 1.7; }
+    .doc-content pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin-bottom: 1rem; }
+    .doc-content code { background: none; padding: 0; font-size: 0.85rem; }
+    .doc-content ul, .doc-content ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-dim); }
+    .doc-content li { margin-bottom: 0.3rem; }
+    .doc-content table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    .doc-content th, .doc-content td { padding: 0.6rem 1rem; border: 1px solid var(--border); text-align: left; font-size: 0.9rem; }
+    .doc-content th { background: var(--surface); color: var(--text); }
+    .doc-content td { color: var(--text-dim); }
+    .back-link { display: inline-block; margin-bottom: 1rem; color: var(--text-dim); font-size: 0.9rem; }
+    .back-link:hover { color: var(--accent); text-decoration: none; }
+    @media (max-width: 768px) { .doc-layout { flex-direction: column; } .doc-nav { width: 100%; position: static; } }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo">WXATA</a>
+      <div class="nav-links">
+        <a href="../index.html">Home</a>
+        <a href="index.html" style="color: var(--accent)">Docs</a>
+        <a href="https://github.com/TADSTech/wxata" target="_blank" class="github-link">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="doc-layout">
+    <aside class="doc-nav">
+      <h3>Documentation</h3>
+      <a href="#getting-started">Getting Started</a>
+      <a href="#installation">Installation</a>
+      <a href="#configuration">Configuration</a>
+      <a href="#commands">Commands</a>
+      <a href="#custom-scripts">Custom Scripts</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#deployment">Deployment</a>
+      <a href="#api">Developer API</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#contributing">Contributing</a>
+    </aside>
+
+    <main class="doc-content">
+      <a href="../index.html" class="back-link">← Back to Home</a>
+      <h1>WXATA Documentation</h1>
+      <p>Welcome to the official documentation for <strong>WXATA</strong> — the FOSS WhatsApp Automation &amp; Tactical Assistant.</p>
+      <p>WXATA is built on Baileys and Bun, designed for high-performance automation. Connect your WhatsApp account, write custom scripts, and automate anything.</p>
+
+      <h2 id="getting-started">Getting Started</h2>
+      <h3>Prerequisites</h3>
+      <ul>
+        <li><a href="https://bun.sh">Bun</a> runtime</li>
+        <li>Node.js 18+ (for compatibility)</li>
+        <li>Git</li>
+      </ul>
+
+      <h2 id="installation">Installation</h2>
+      <pre><code># Clone the repository
+git clone https://github.com/TADSTech/wxata.git
+cd wxata
+
+# Run the setup script
+# Windows:
+.\setup.ps1
+
+# Linux/Mac:
+chmod +x setup.sh
+./setup.sh
+
+# Or manually:
+cp .env.example .env
+cp botinfo.example.json botinfo.json
+bun run install:all</code></pre>
+
+      <h2 id="configuration">Configuration</h2>
+      <h3>.env</h3>
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+        <tr><td><code>PORT</code></td><td>5000</td><td>Backend server port</td></tr>
+        <tr><td><code>DB_RETENTION_DAYS</code></td><td>3</td><td>Message cache retention</td></tr>
+        <tr><td><code>VITE_BACKEND_URL</code></td><td>http://localhost:5000/ws</td><td>WebSocket URL for frontend</td></tr>
+        <tr><td><code>FIREBASE_PROJECT_ID</code></td><td>—</td><td>Firebase project (optional)</td></tr>
+      </table>
+
+      <h3>botinfo.json</h3>
+      <p>The main bot configuration file. Controls commands, prefix, permissions, and behavior.</p>
+      <pre><code>{
+  "prefix": "+",
+  "scripts": { ... },
+  "root": { "target": "self" },
+  "welcome": { "enabled": true, "text": "Welcome!" },
+  "permissions": { "allowAll": true }
+}</code></pre>
+
+      <h2 id="commands">Commands</h2>
+      <p>WXATA ships with built-in commands. The prefix is configurable (default: <code>+</code>).</p>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>+menu</code></td><td>Show the bot menu</td></tr>
+        <tr><td><code>+ping</code></td><td>Check if bot is alive</td></tr>
+        <tr><td><code>+help</code></td><td>List available commands</td></tr>
+        <tr><td><code>+tagall</code></td><td>Mention all group members</td></tr>
+        <tr><td><code>+warn</code></td><td>Warn a member (3 = kick)</td></tr>
+        <tr><td><code>+antidel</code></td><td>Show deleted messages</td></tr>
+        <tr><td><code>+sticker</code></td><td>Convert image to sticker</td></tr>
+        <tr><td><code>+ss &lt;url&gt;</code></td><td>Screenshot a website</td></tr>
+        <tr><td><code>+vars</code></td><td>View/set bot variables</td></tr>
+        <tr><td><code>+perm</code></td><td>Manage permissions</td></tr>
+      </table>
+
+      <h2 id="custom-scripts">Custom Scripts</h2>
+      <p>Add your own commands by editing <code>botinfo.json</code>:</p>
+      <pre><code>{
+  "scripts": {
+    "hello": {
+      "name": "Hello",
+      "desc": "Say hello",
+      "trigger": "hello",
+      "aliases": ["hi"],
+      "type": "fun",
+      "response": "Hello there!",
+      "target": "chat",
+      "code": ""
+    }
+  }
+}</code></pre>
+      <h3>Script Fields</h3>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>name</code></td><td>string</td><td>Display name</td></tr>
+        <tr><td><code>desc</code></td><td>string</td><td>Description</td></tr>
+        <tr><td><code>trigger</code></td><td>string</td><td>Primary trigger word</td></tr>
+        <tr><td><code>aliases</code></td><td>string[]</td><td>Alternative triggers</td></tr>
+        <tr><td><code>type</code></td><td>string</td><td>Category: core, tools, admin, group, fun</td></tr>
+        <tr><td><code>response</code></td><td>string</td><td>Static reply text</td></tr>
+        <tr><td><code>target</code></td><td>string</td><td>Where to send: chat, self, or phone number</td></tr>
+        <tr><td><code>code</code></td><td>string</td><td>Optional JS code for dynamic execution</td></tr>
+      </table>
+
+      <h2 id="dashboard">Dashboard</h2>
+      <p>The dashboard runs alongside the backend on port 5000. Open <code>http://localhost:5173</code> (dev) or your server IP (production).</p>
+      <h3>Features</h3>
+      <ul>
+        <li>Real-time log streaming via WebSocket</li>
+        <li>QR code and phone pairing for WhatsApp connection</li>
+        <li>Bot info and script management</li>
+        <li>Connection status monitoring</li>
+        <li>PM2 process status</li>
+      </ul>
+
+      <h2 id="deployment">Deployment</h2>
+      <h3>Docker</h3>
+      <pre><code>docker compose up -d</code></pre>
+
+      <h3>PM2 (Production)</h3>
+      <pre><code>bun run pm2:start    # Start
+bun run pm2:restart  # Restart
+bun run pm2:logs     # View logs
+bun run pm2:status   # Status</code></pre>
+
+      <h3>Oracle Cloud / VPS</h3>
+      <p>Use <code>deploy-oracle.sh</code> for automated Oracle Cloud deployment. See the script for details.</p>
+
+      <h2 id="api">Developer API</h2>
+      <p>WXATA includes a REST API for sending WhatsApp messages programmatically.</p>
+      <h3>Send a Message</h3>
+      <pre><code>POST /api/send
+Content-Type: application/json
+
+{
+  "to": "2348012345678",
+  "message": "Hello from WXATA!"
+}</code></pre>
+      <p><strong>Note:</strong> The API requires the bot to be connected and the endpoint is protected by <code>ADMIN_SECRET</code> if set.</p>
+
+      <h2 id="architecture">Architecture</h2>
+      <pre><code>Frontend (Vite + React)
+  │  WebSocket
+  ▼
+Backend (Bun + Baileys)
+  ├── WhatsApp Protocol
+  ├── SQLite (message cache)
+  ├── botinfo.json (config)
+  └── Firebase (optional)</code></pre>
+
+      <h2 id="contributing">Contributing</h2>
+      <ol>
+        <li>Fork the repository</li>
+        <li>Create a feature branch</li>
+        <li>Make your changes</li>
+        <li>Run <code>bun run type-check</code></li>
+        <li>Submit a pull request</li>
+      </ol>
+
+      <p style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.85rem;">
+        Built by <a href="https://x.com/tads_tech">TADS Tech</a> · MIT License
+      </p>
+    </main>
+  </div>
+
+</body>
+</html>

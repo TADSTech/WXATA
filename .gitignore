@@ -1,54 +1,59 @@
-# dependencies (bun install)
-node_modules
+# ── Dependencies ───────────────────────────────────────────────────────────────
+node_modules/
 
-# output
-out
-dist
+# ── Build output ──────────────────────────────────────────────────────────────
+out/
+dist/
 *.tgz
 
-# code coverage
-coverage
+# ── Coverage ──────────────────────────────────────────────────────────────────
+coverage/
 *.lcov
 
-# logs
-logs
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
 *.log
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# caches
+# ── Caches ────────────────────────────────────────────────────────────────────
 .eslintcache
-.cache
+.cache/
 *.tsbuildinfo
 
-# IDE
-.idea
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
 .DS_Store
+.vscode/
 
-# ── WXATA: per-instance files (each deployment has its own) ──────────────────
-# WhatsApp session — never share, never commit
+# ── Environment & secrets (NEVER commit) ──────────────────────────────────────
+.env
+.env.*
+!.env.example
+root.env
+ipman
+
+# ── Runtime data (generated from *.example.json templates) ────────────────────
+botinfo.json
+vars.json
+warns.json
+antidel.json
+antibc.json
+primary/
+secondary/
+db/
+
+# ── WhatsApp session credentials (NEVER commit) ──────────────────────────────
 auth_info/
 backend/auth_info/
 
-# Runtime data files — generated on first run from *.example.json templates
-antidel.json
-antibc.json
-backend/antidel.json
-backend/antibc.json
-warns.json
-vars.json
-db/
-
-# SQLite database
+# ── SQLite ────────────────────────────────────────────────────────────────────
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
 
-
-root.env
-
-# Dev artifacts — scratch files and one-off refactor scripts
+# ── Scratch / one-off scripts ─────────────────────────────────────────────────
 scratch/
 refactor_v2.js
 frontend/refactor_themes.js
-
-wxata-public/
+frontend/clean_tv.py
+frontend/refactor_dash.py

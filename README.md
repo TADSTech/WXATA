@@ -1,176 +1,201 @@
-# WXATA 🟢
----
-A high-performance, premium WhatsApp automation and developer API platform built with **Baileys** and **Bun**. Connect, script, and scale WhatsApp interactions with ease through a beautiful web dashboard.
+# WXATA — FOSS WhatsApp Bot Platform
 
-**Live Frontend:** [wxata.vercel.app](https://wxata.vercel.app)
+A self-hosted WhatsApp automation bot built on [Baileys](https://github.com/WhiskeySockets/Baileys) and [Bun](https://bun.sh). Connect your WhatsApp account, use built-in commands, write custom scripts, and manage everything from a live web dashboard.
 
----
-
-## 🚀 Two Powerful Modes of Operation
-
-WXATA is divided into two distinct, optimized account tracks tailored to different use cases:
-
-### 1. 🤖 WhatsApp Bot Account
-Ideal for users wanting a fully-featured interactive bot with command modules and user interfaces.
-*   **Web Dashboard:** Manage bot connection (QR Code / Phone Pairing), view live execution logs, and configure bots in real time.
-*   **Interactive Script Engine:** Live editing of commands. Add, edit, or install JavaScript plugins/scripts dynamically without restarting the bot.
-*   **Extension Marketplace:** Publish and install community extensions directly through Firestore-backed Marketplace.
-*   **Built-in Commands:** Extensive set of tools (+menu, +ping, +perm, anti-delete, anti-broadcast, YouTube music streaming, web screenshots, casino games).
-
-### 2. 🔌 Developer API Account
-A lightweight REST API service designed for programmatic integration. Send messages to WhatsApp contacts from any external script or application.
-*   **Programmatic REST API:** Simple endpoints (`POST /api/send`, `GET /api/keys/usage`) with header authentication.
-*   **Developer Dashboard:** Beautiful React-based usage analytics, color-coded quota progress bars, and copyable code snippets (cURL, JS, Python).
-*   **Credits & Top-Ups:** Integrated with Flutterwave for instant, automated balance updates via webhooks.
-*   **Dual Auth System:** Register and log in instantly via email or API keys without needing standard passwords or a Bot account.
+**License:** MIT
 
 ---
 
-## 🛠️ The Tech Stack
+## Features
 
-| Layer | Tech | Description |
-|---|---|---|
-| **Runtime** | [Bun](https://bun.sh/) | Blazing-fast JavaScript runtime and package manager |
-| **WhatsApp Core** | [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) | High-performance, lightweight WhatsApp Web API library |
-| **Frontend Dashboard** | Vite + React + Tailwind + Framer Motion | Premium responsive web dashboard with smooth animations |
-| **Authentication & Cloud DB** | Supabase (PostgreSQL + Auth + RLS) | Cloud database with secure Row Level Security policies |
-| **Local Cache** | SQLite (`bun:sqlite`) | High-performance message cache optimized with WAL, synchronous NORMAL, and dynamic capacity-based pruning (capped to 200 messages by default) |
-| **Payment Gateway** | Flutterwave | Secure webhook-backed payments for API topups & subscriptions |
-| **Process Management**| PM2 / Docker | Process daemon for zero-downtime hosting on Linux VPS |
-
----
-
-## ⚡ High-Performance SQLite Cache & Stability
-To prevent the WhatsApp bot from stalling, disconnecting, or crashing during heavy message bursts:
-* **Concurrent Journaling (WAL):** Enabled Write-Ahead Logging (`PRAGMA journal_mode = WAL`) so readers and writers never block each other.
-* **Non-blocking Synchronous Mode:** Set `PRAGMA synchronous = NORMAL` and `temp_store = MEMORY` to drastically reduce CPU thread-blocking disk I/O barriers.
-* **Bounded Capacity Pruning:** Set a strict limit of **200 messages** (via `DB_MAX_MESSAGES`) to prevent the SQLite database from inflating indefinitely. This is pruned in the background via non-blocking microtasks every 100 stored messages.
-* **On-the-Fly Configuration:** Configure settings live via the `!vs` command directly from WhatsApp without rebooting the bot:
-  * Check current variables: `!vs`
-  * Change capacity limit: `!vs set DB_MAX_MESSAGES 500`
-  * Change retention days: `!vs set DB_RETENTION_DAYS 5`
+- **Dual Accounts** — Run primary and secondary WhatsApp accounts simultaneously
+- **Live Dashboard** — Real-time WebSocket dashboard for logs, QR codes, and bot control
+- **Anti-Delete** — Recover deleted messages with local SQLite cache
+- **Command System** — Built-in commands + custom JS script execution
+- **TV Mode** — Restrict bot to root user only
+- **Group Management** — Warn system, tag-all, anti-broadcast
+- **Developer API** — REST API for sending WhatsApp messages programmatically
+- **Extension Marketplace** — Community-contributed plugins
 
 ---
 
-## 📦 Project Structure
+## Quick Start
+
+### Prerequisites
+
+- [Bun](https://bun.sh) runtime
+- Node.js 18+ (for compatibility)
+
+### 1. Clone & Setup
+
+```bash
+git clone https://github.com/TADSTech/wxata.git
+cd wxata
+```
+
+**PowerShell (Windows):**
+```powershell
+.\setup.ps1
+```
+
+**Bash (Linux/Mac):**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+**Manual setup:**
+```bash
+cp .env.example .env
+cp botinfo.example.json botinfo.json
+bun run install:all
+```
+
+### 2. Configure
+
+Edit `.env` with your settings. At minimum, set:
+- `PORT` (default: 5000)
+- `VITE_BACKEND_URL` (default: `http://localhost:5000/ws`)
+
+Edit `botinfo.json` to customize commands and behavior.
+
+### 3. Run
+
+```bash
+bun run all
+```
+
+- Frontend: http://localhost:5173
+- Backend WebSocket: ws://localhost:5000
+
+### 4. Connect WhatsApp
+
+1. Open the dashboard at http://localhost:5173
+2. Click **Connect via QR** or **Connect via Phone**
+3. Scan the QR code or enter the pairing code on your phone
+
+---
+
+## Project Structure
 
 ```
 wxata/
-├── frontend/               # React Dashboard (Vite)
+├── backend/                 # Bun + Baileys core
+│   ├── index.ts             # Bot entrypoint, commands, message handling
+│   ├── connection.ts        # Baileys socket management
+│   ├── DashboardServer.ts   # HTTP + WebSocket server
+│   ├── db.ts                # SQLite message cache (anti-delete)
+│   ├── firebase.ts          # Firebase data layer (optional)
+│   └── commands/            # Modular command system
+├── frontend/                # Vite + React dashboard
 │   └── src/
-│       ├── pages/          # Dashboard, Landing, Login, Register, Marketplace, Admin, DeveloperPortal
-│       └── components/     # UI elements & progress loaders
-├── backend/                # WhatsApp Bot Core & API Service
-│   ├── index.ts            # Main bot initiator & message router
-│   ├── connection.ts       # Baileys session & connection state manager
-│   ├── DashboardServer.ts  # WebSocket server, HTTP REST endpoints & webhooks
-│   └── db.ts               # SQLite message cache
-├── botinfo.example.json    # Bot configuration template
-├── vars.json               # Auto-created key-value storage for custom bot vars
-├── warns.json              # Auto-created strike warning counter for group moderation
-├── deployment.md           # Full deployment instructions
-└── plugin_spec.md          # Guide for writing and publishing bot extensions
+│       ├── pages/           # Dashboard, TV mode, X Grabber
+│       └── components/      # UI components
+├── landing/                 # Static landing page + docs
+├── primary/                 # Primary account config
+├── secondary/               # Secondary account config
+├── .env.example             # Environment template
+├── botinfo.example.json     # Bot config template
+├── setup.ps1                # Windows setup script
+├── setup.sh                 # Linux/Mac setup script
+└── Dockerfile               # Docker deployment
 ```
 
 ---
 
-## ⚡ Quick Start (Local Development)
+## Commands
 
-WXATA prioritizes using **Bun** for all node/JS operations.
+| Command | Description |
+|---------|-------------|
+| `+menu` | Show the bot menu |
+| `+ping` | Check if bot is alive |
+| `+help` | List available commands |
+| `+tagall` | Mention all group members |
+| `+warn` | Warn a member (3 = kick) |
+| `+antidel` | Show deleted messages |
+| `+sticker` | Convert image to sticker |
+| `+ss <url>` | Screenshot a website |
+| `+vars` | View/set bot variables |
+| `+perm` | Manage permissions |
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/wxata.git
-cd wxata
-
-# 2. Seed configurations
-cp botinfo.example.json botinfo.json
-
-# 3. Install dependencies across frontend and backend
-bun run install:all
-
-# 4. Start both servers concurrently
-bun run all
-# Frontend → http://localhost:5173
-# Backend  → ws://localhost:4000 (REST API / Webhooks on port 5000/api)
-```
+Prefix is configurable in `botinfo.json` (default: `+`)
 
 ---
 
-## 🛡️ Built-in Bot Commands
+## Custom Scripts
 
-Commands in the Bot engine are prefix-based (default: `!`). Below are key commands, which can be modified dynamically via the dashboard:
+Add custom commands to `botinfo.json`:
 
-| Trigger | Alias | Target | Description |
-|---|---|---|---|
-| `mn` | `menu`, `m` | `chat` | Opens the premium, interactive system menu |
-| `hp` | `help`, `h` | `chat` | Shows detailed usage help for a specific command |
-| `pg` | `ping`, `p` | `chat` | Checks socket connection latency and status |
-| `pm` | `perm` | `chat` | Manage permissions (`!pm [grant\|revoke] chat\|all\|+number`) |
-| `vars` | - | `chat` | View and edit custom config variables on the fly |
-| `extract`| - | `chat` | Reveals and downloads view-once media |
-| `save` | - | `chat` | Saves quoted media directly to your saved messages DM |
-| `tagall` | - | `chat` | Mention all group members (admins only) |
-| `warn` | - | `chat` | Give a warning strike to a group user (3 strikes = kick) |
-| `antidel`| - | `chat` | Toggle anti-delete (caches and re-sends deleted messages) |
-| `antibc` | - | `chat` | Toggle anti-broadcast (auto-deletes/blocks broadcast spams) |
-| `ss` | - | `chat` | Take a high-resolution screenshot of a web URL |
-| `alexa` | - | `chat` | Download and stream audio from YouTube (`+alexa <song name>`) |
-| `sysinfo`| - | `chat` | Output detailed server system resource usage |
-| Games | `ship`, `fun`, `random`, `bt`, `wcg`, `wrg`, `wyr` | `chat` | Fun modules: Matchmaking, Hot Potato, Casino, Riddles, Word Chain/Scramble |
-
----
-
-## 🔌 Programmatic REST API
-
-The Developer API is fully documented in [DEVELOPER_SETUP.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/DEVELOPER_SETUP.md).
-
-### Send a Message
-```http
-POST /api/send
-X-API-Key: wxata_live_your_secret_key
-Content-Type: application/json
-
+```json
 {
-  "to": "2348012345678",
-  "message": "Hello from WXATA REST API!"
+  "scripts": {
+    "hello": {
+      "name": "Hello",
+      "desc": "Say hello",
+      "trigger": "hello",
+      "aliases": ["hi"],
+      "type": "fun",
+      "response": "Hello! 👋",
+      "target": "chat",
+      "code": ""
+    }
+  }
 }
 ```
 
-### Check Balance and Quota
-```http
-GET /api/keys/usage
-X-API-Key: wxata_live_your_secret_key
+---
+
+## Deployment
+
+### Docker
+
+```bash
+docker compose up -d
 ```
 
----
+### PM2 (Production)
 
-## 💳 Pricing & Subscriptions
+```bash
+bun run pm2:start
+bun run pm2:logs
+bun run pm2:status
+```
 
-| Feature | Developer Free | TopUp Tier 1 | TopUp Tier 2 | Developer Pro |
-|---------|----------|--------------|--------------|---------|
-| **Messages** | 100 | +2,000 | +5,000 | 10,000/mo |
-| **Price** | ₦0 | ₦1,000 | ₦2,000 | ₦3,200/mo |
-| **Commitment**| None | One-time | One-time | Monthly |
-| **Support** | Community | Community | Community | Priority |
-| **Webhooks** | ❌ | ❌ | ❌ | ✅ |
-| **Analytics** | Basic | Basic | Basic | Premium |
+### Oracle Cloud / VPS
 
-*TopUp purchases stack instantly and never expire. Payments are processed securely via the Flutterwave integration.*
+See `deploy-oracle.sh` for automated Oracle Cloud deployment.
 
 ---
 
-## 📚 Detailed Documentation
+## Environment Variables
 
-Explore more detailed aspects of the codebase:
-- **[DEVELOPER_SETUP.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/DEVELOPER_SETUP.md):** Step-by-step developer accounts onboarding & REST endpoints.
-- **[DEVELOPER_API_COMPLETE.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/DEVELOPER_API_COMPLETE.md):** Deep technical implementation details of the API core.
-- **[PLUGIN_SPEC.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/PLUGIN_SPEC.md):** authoritative reference for writing JavaScript plugins.
-- **[README_FLUTTERWAVE_INTEGRATION.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/README_FLUTTERWAVE_INTEGRATION.md):** Complete walkthrough of the payment topup webhook processor.
-- **[DOCUMENTATION.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/DOCUMENTATION.md):** General command syntax and user permission structures.
-- **[deployment.md](file:///c:/Users/TADS/WORK/TADSTech/WXATA/deployment.md):** Guide for running WXATA on Oracle Cloud VPS using PM2.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `5000` | Backend server port |
+| `DB_RETENTION_DAYS` | `3` | Message cache retention |
+| `VITE_BACKEND_URL` | `http://localhost:5000/ws` | WebSocket URL for frontend |
+| `FIREBASE_PROJECT_ID` | — | Firebase project (optional) |
+| `FIREBASE_CLIENT_EMAIL` | — | Firebase service account (optional) |
+| `FIREBASE_PRIVATE_KEY` | — | Firebase service account (optional) |
 
 ---
 
-*Built with passion by [TADS Tech](https://x.com/tads_tech)*
+## Contributing
 
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run `bun run type-check` to verify
+5. Submit a pull request
+
+---
+
+## License
+
+MIT — do whatever you want with it.
+
+---
+
+## Credits
+
+Built by [TADS Tech](https://x.com/tads_tech)

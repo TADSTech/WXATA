@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WXATA — FOSS WhatsApp Bot Platform</title>
+  <meta name="description" content="Self-hosted WhatsApp automation bot built on Baileys and Bun. Free and open source.">
+  <link rel="stylesheet" href="landing/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">WXATA</a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#commands">Commands</a>
+        <a href="landing/index.html">Docs</a>
+        <a href="https://github.com/TADSTech/wxata" target="_blank" class="github-link">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <h1>WXATA</h1>
+    <p class="hero-sub">The FOSS WhatsApp Bot Platform</p>
+    <p class="hero-desc">Self-hosted. No license keys. No subscriptions.<br>Just clone, configure, and run.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/TADSTech/wxata" target="_blank" class="btn btn-primary">View on GitHub</a>
+      <a href="#quickstart" class="btn btn-secondary">Get Started</a>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="section">
+    <h2>Features</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Bun Runtime</h3>
+        <p>Blazing fast startup and execution with the Bun JavaScript runtime.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Dual Accounts</h3>
+        <p>Run primary and secondary WhatsApp accounts simultaneously.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Anti-Delete</h3>
+        <p>Recover deleted messages with local SQLite caching.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🖥️</div>
+        <h3>Live Dashboard</h3>
+        <p>Real-time WebSocket dashboard for logs, QR codes, and control.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h3>Command System</h3>
+        <p>Built-in commands + custom JS script execution in botinfo.json.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <h3>Developer API</h3>
+        <p>REST API for sending WhatsApp messages programmatically.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎬</div>
+        <h3>TV Mode</h3>
+        <p>Restrict bot to root user only for personal automation.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Group Tools</h3>
+        <p>Warn system, tag-all, anti-broadcast, and more.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands -->
+  <section id="commands" class="section section-alt">
+    <h2>Built-in Commands</h2>
+    <div class="commands-grid">
+      <div class="cmd-pill"><code>+menu</code> <span>Show bot menu</span></div>
+      <div class="cmd-pill"><code>+ping</code> <span>Check bot status</span></div>
+      <div class="cmd-pill"><code>+help</code> <span>List commands</span></div>
+      <div class="cmd-pill"><code>+tagall</code> <span>Mention everyone</span></div>
+      <div class="cmd-pill"><code>+warn</code> <span>Warn a member</span></div>
+      <div class="cmd-pill"><code>+antidel</code> <span>Show deleted msgs</span></div>
+      <div class="cmd-pill"><code>+sticker</code> <span>Image → sticker</span></div>
+      <div class="cmd-pill"><code>+ss</code> <span>Screenshot URL</span></div>
+      <div class="cmd-pill"><code>+vars</code> <span>Manage variables</span></div>
+      <div class="cmd-pill"><code>+perm</code> <span>Permissions</span></div>
+    </div>
+  </section>
+
+  <!-- Quick Start -->
+  <section id="quickstart" class="section">
+    <h2>Quick Start</h2>
+    <div class="code-block">
+      <pre><code># Clone
+git clone https://github.com/TADSTech/wxata.git
+cd wxata
+
+# Setup (Windows)
+.\setup.ps1
+
+# Setup (Linux/Mac)
+chmod +x setup.sh && ./setup.sh
+
+# Run
+bun run all</code></pre>
+    </div>
+    <div class="quickstart-steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <div>
+          <h4>Clone & Setup</h4>
+          <p>Run the setup script to install dependencies and create config files.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <div>
+          <h4>Configure</h4>
+          <p>Edit <code>.env</code> and <code>botinfo.json</code> to your needs.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <div>
+          <h4>Connect</h4>
+          <p>Open the dashboard, scan the QR code, and you're live.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="section section-alt">
+    <h2>Architecture</h2>
+    <div class="arch-block">
+      <pre><code>Frontend (Vite + React)
+  │  WebSocket
+  ▼
+Backend (Bun + Baileys)
+  ├── WhatsApp Protocol
+  ├── SQLite (message cache)
+  ├── botinfo.json (config)
+  └── Firebase (optional)</code></pre>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section cta-section">
+    <h2>Your bot. Your rules.</h2>
+    <p>No vendor lock-in. No recurring fees. Fork it, mod it, own it.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/TADSTech/wxata" target="_blank" class="btn btn-primary">Star on GitHub</a>
+      <a href="landing/index.html" class="btn btn-secondary">Read the Docs</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>Built by <a href="https://x.com/tads_tech" target="_blank">TADS Tech</a> · MIT License</p>
+  </footer>
+
+</body>
+</html>

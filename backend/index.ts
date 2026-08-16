@@ -1,4 +1,3 @@
-import { validateLicense } from "./licenseValidator";
 import { WXATAConnection } from "./connection";
 // @ts-ignore
 import * as qrcode from "qrcode-terminal";
@@ -2787,7 +2786,6 @@ const lastConnectionParamsMap = new Map<string, { method: string; phoneNumber?: 
 const lastMessageAtMap = new Map<string, number>();
 
 async function startBot() {
-  await validateLicense();
   console.log("🚀 Initializing WXATA Backend for Dual Accounts...");
   
   await ensureConfigFiles("primary");
