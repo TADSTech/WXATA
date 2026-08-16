@@ -25,6 +25,11 @@ export function TwitterGrabber({ addToast, selectedAccountId }: TwitterGrabberPr
       .replace('wss://', 'https://');
   };
 
+  const getAuthHeaders = () => {
+    const password = localStorage.getItem('wxata_dashboard_password') || '';
+    return password ? { 'Authorization': `Bearer ${password}` } : {};
+  };
+
   const handleFetch = async () => {
     if (!url) return;
     setFetching(true);
@@ -32,7 +37,7 @@ export function TwitterGrabber({ addToast, selectedAccountId }: TwitterGrabberPr
     try {
       const res = await fetch(`${getBackendUrl()}/api/twitter/grab`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ url })
       });
       const data = await res.json();
@@ -97,7 +102,7 @@ export function TwitterGrabber({ addToast, selectedAccountId }: TwitterGrabberPr
 
       const response = await fetch(`${getBackendUrl()}/api/twitter/send-to-sudo`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           imageDataBase64: base64,
           caption: tweetData.text,

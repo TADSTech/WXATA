@@ -45,15 +45,26 @@ export function useWXATASocket(url: string): WXATASocketState {
     setStatus('connecting');
 
     ws.onopen = () => {
-      attemptRef.current = 0;
-      setAttempt(0);
-      setStatus('connected');
+      const password = localStorage.getItem('wxata_dashboard_password') || '';
+      if (password) {
+        ws.send(JSON.stringify({ type: 'auth', password }));
+      } else {
+        attemptRef.current = 0;
+        setAttempt(0);
+        setStatus('connected');
+      }
     };
 
     ws.onmessage = (event: MessageEvent) => {
       try {
         const parsed = JSON.parse(event.data as string);
         setLastMessage(parsed);
+        // First message from server after auth = confirmed connected
+        if (status !== 'connected') {
+          attemptRef.current = 0;
+          setAttempt(0);
+          setStatus('connected');
+        }
       } catch {
         // If the message isn't JSON, pass it through as-is
         setLastMessage(event.data);

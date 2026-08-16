@@ -5,11 +5,17 @@ import { Wifi, ArrowRight } from 'lucide-react';
 const Connect = () => {
   const navigate = useNavigate();
   const [url, setUrl] = useState(() => localStorage.getItem('wxata_backend_url') || 'ws://localhost:5000');
+  const [password, setPassword] = useState(() => localStorage.getItem('wxata_dashboard_password') || '');
 
   const handleConnect = () => {
     const trimmed = url.trim();
     if (!trimmed) return;
     localStorage.setItem('wxata_backend_url', trimmed);
+    if (password.trim()) {
+      localStorage.setItem('wxata_dashboard_password', password.trim());
+    } else {
+      localStorage.removeItem('wxata_dashboard_password');
+    }
     navigate('/dashboard');
   };
 
@@ -34,6 +40,18 @@ const Connect = () => {
               onChange={e => setUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleConnect()}
               placeholder="wss://wxata-api.tadstech.dev"
+              className="w-full bg-bg-panel border border-border-strong p-3 text-accent-light font-mono text-sm outline-none focus:border-border-strong transition-colors"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest text-text-muted">Password (optional)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleConnect()}
+              placeholder="Leave empty if no password set"
               className="w-full bg-bg-panel border border-border-strong p-3 text-accent-light font-mono text-sm outline-none focus:border-border-strong transition-colors"
             />
           </div>

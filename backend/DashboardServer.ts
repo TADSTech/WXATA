@@ -14,6 +14,20 @@ const __dirname = path.dirname(__filename);
 
 const logger = pino({ level: "warn" });
 
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || "";
+
+function checkAuth(req: http.IncomingMessage): boolean {
+  if (!DASHBOARD_PASSWORD) return true;
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
+  return token === DASHBOARD_PASSWORD;
+}
+
+function rejectAuth(res: http.ServerResponse): void {
+  res.writeHead(401, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Unauthorized" }));
+}
+
 export type LogType = "INFO" | "WARN" | "DEBUG" | "ERROR" | "SUCCESS" | "MSG";
 
 export interface DashboardLog {
@@ -113,6 +127,10 @@ class DashboardServer {
         res.writeHead(204);
         res.end();
         return;
+      }
+
+      if (req.url?.startsWith("/api/")) {
+        if (!checkAuth(req)) { rejectAuth(res); return; }
       }
 
       if (req.method === "POST" && req.url === "/api/twitter/grab") {
@@ -263,7 +281,40 @@ class DashboardServer {
 
     this.wss = new WebSocketServer({ server: httpServer });
 
-    this.wss.on("connection", (ws) => {
+    this.wss.on("connection", (ws, req) => {
+      // If password is set, require auth via query param or first message
+      if (DASHBOARD_PASSWORD) {
+        const url = new URL(req.url || "/", `http://${req.headers.host}`);
+        const qp = url.searchParams.get("password") || "";
+        if (qp === DASHBOARD_PASSWORD) {
+          (ws as any).authenticated = true;
+        } else {
+          (ws as any).authenticated = false;
+          (ws as any).authTimeout = setTimeout(() => {
+            if (!(ws as any).authenticated) {
+              ws.close(4001, "Auth required");
+            }
+          }, 5000);
+          const origOnMessage = ws.onmessage;
+          ws.on("message", (msg) => {
+            try {
+              const data = JSON.parse(msg.toString());
+              if (data.type === "auth" && data.password === DASHBOARD_PASSWORD) {
+                (ws as any).authenticated = true;
+                clearTimeout((ws as any).authTimeout);
+                ws.removeAllListeners("message");
+                this.sendStatus();
+                console.log("🖥️  Dashboard: Client authenticated");
+              } else {
+                ws.close(4001, "Auth required");
+              }
+            } catch {
+              ws.close(4001, "Auth required");
+            }
+          });
+        }
+      }
+
       (ws as any).isAlive = true;
       this.clients.add(ws);
       console.log("🖥️  Dashboard: Frontend client connected");

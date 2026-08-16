@@ -1165,6 +1165,7 @@ const Dashboard = () => {
                   onRestart={() => handleQuickAction('RESTART_BOT')}
                   onLogout={() => handleQuickAction('LOGOUT')}
                   onTerminate={() => handleQuickAction('TERMINATE')}
+                  onClearAuth={() => handleQuickAction('CLEAR_AUTH')}
                 />
               </motion.div>
             )}

@@ -2947,6 +2947,26 @@ async function startBot() {
             dashboard.setConnectionStatus(accountId, "DISCONNECTED");
             dashboard.log(accountId, "SUCCESS", "Session cleared. System ready for new pairing.");
             break;
+          case "CLEAR_AUTH":
+            dashboard.log(accountId, "WARN", "Force-clearing auth files...");
+            if (connectionManager) {
+              const sock = connectionManager.getSocket();
+              try { sock?.ev.removeAllListeners('connection.update'); } catch {}
+              try { sock?.ev.removeAllListeners('creds.update'); } catch {}
+              try { sock?.ev.removeAllListeners('messaging-history.set'); } catch {}
+              try { sock?.ws?.close(); } catch {}
+              await connectionManager.clearSession();
+              connectionManagers.delete(accountId);
+            } else {
+              // No connection manager — wipe files directly
+              const authDir = fsSync.existsSync('/data')
+                ? `/data/auth_info_${accountId}`
+                : path.resolve(__dirname, `auth_info_${accountId}`);
+              try { await fs.rm(authDir, { recursive: true, force: true }); } catch {}
+            }
+            dashboard.setConnectionStatus(accountId, "DISCONNECTED");
+            dashboard.log(accountId, "SUCCESS", "Auth files wiped. Re-pair from the dashboard.");
+            break;
         }
       }
     } catch (err) {
