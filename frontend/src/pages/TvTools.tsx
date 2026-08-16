@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Terminal, BookOpen, LogOut, Activity, Shield, ChevronRight } from 'lucide-react';
+import { Terminal, BookOpen, Activity, Shield, ChevronRight } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCurrentUser, subscribeToAuth, findUserByAuthUid, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from '../components/ToastContainer';
@@ -324,16 +323,13 @@ function AutoReplyManager({ rules, onChange, onSave, status }: AutoReplyManagerP
   );
 }
 
-const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
+const backendUrl = (localStorage.getItem('wxata_backend_url') || import.meta.env.VITE_BACKEND_URL as string || 'ws://localhost:5000').replace(/\/+$/, '');
 
 const TvTools = () => {
   const { username } = useParams();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { toasts, addToast } = useToast();
-
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<Record<string, unknown> | null>(null);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   const { status: wsStatus, attempt: wsAttempt, lastMessage, send } = useWXATASocket(backendUrl);
@@ -344,31 +340,6 @@ const TvTools = () => {
   const [botStatus, setBotStatus] = useState({ connection: 'DISCONNECTED', uptime: '00h 00m 00s', memory: '0MB / 512MB' });
   const [autoReplyRules, setAutoReplyRules] = useState<{ trigger: string; response: string; enabled: boolean }[]>([]);
   const [autoReplyStatus, setAutoReplyStatus] = useState('');
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const user = getCurrentUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      const userRow = await findUserByAuthUid(user.uid);
-      if (userRow) {
-        setUserData(userRow as unknown as Record<string, unknown>);
-      } else {
-        setUserData({ name: user.email, username });
-      }
-      setIsAuthenticated(true);
-    };
-
-    checkSession();
-
-    const unsubscribe = subscribeToAuth((u) => {
-      if (!u) navigate('/login');
-    });
-
-    return unsubscribe;
-  }, [username, navigate]);
 
   useEffect(() => {
     localStorage.setItem('selectedAccountId', selectedAccountId);
@@ -413,12 +384,7 @@ const TvTools = () => {
     setAutoReplyStatus('Saving...');
   };
 
-  const handleSignOut = async () => {
-    await signOutBot();
-    navigate('/');
-  };
-
-  if (!isAuthenticated) {
+  if (false) {
     return (
       <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center font-mono relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--theme-accent-subtle)_0%,transparent_70%)] opacity-50" />
@@ -453,11 +419,6 @@ const TvTools = () => {
         <div className="flex items-center gap-3">
           <Terminal className="w-6 h-6 text-accent-primary" />
           <h1 className="text-xl font-bold tracking-tight text-text-main">TV Tools</h1>
-          {userData && (
-            <span className="ml-4 text-sm text-text-muted">
-              Welcome, {(userData.name as string) || (userData.username as string)}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <div className="flex items-center gap-2 border border-border-subtle rounded-xl px-3 py-2 bg-bg-panel shadow-sm">
@@ -593,12 +554,6 @@ const TvTools = () => {
             </div>
           </div>
 
-          <button
-            onClick={handleSignOut}
-            className="border border-danger-subtle hover:bg-danger-subtle text-danger-text p-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 w-full"
-          >
-            <LogOut size={18} /> Sign Out
-          </button>
         </div>
       </div>
 

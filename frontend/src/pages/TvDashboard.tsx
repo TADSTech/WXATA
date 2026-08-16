@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Wifi, Phone, Activity, Terminal, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCurrentUser, subscribeToAuth, findUserByAuthUid, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from '../components/ToastContainer';
@@ -388,7 +387,7 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
 
 // ─── Dashboard (main component) ───────────────────────────────────────────────
 
-const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
+const backendUrl = (localStorage.getItem('wxata_backend_url') || import.meta.env.VITE_BACKEND_URL as string || 'ws://localhost:5000').replace(/\/+$/, '');
 
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
@@ -416,10 +415,6 @@ const TvDashboard = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { toasts, addToast } = useToast();
-
-  // ── Auth state ──────────────────────────────────────────────────────────────
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<Record<string, unknown> | null>(null);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   // ── WebSocket (useWXATASocket) ───────────────────────────────────────────────
@@ -446,41 +441,13 @@ const TvDashboard = () => {
 
   // ── Script editor state ─────────────────────────────────────────────────────
 
-  // ── Auth guard ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const checkSession = async () => {
-      const user = getCurrentUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      // Try to find the user row — if found, use it; otherwise just allow access
-      // with the session (avoids blocking users whose metadata doesn't match URL)
-      const userRow = await findUserByAuthUid(user.uid);
-      if (userRow) {
-        setUserData(userRow as unknown as Record<string, unknown>);
-      } else {
-        setUserData({ name: user.email, username });
-      }
-      setIsAuthenticated(true);
-    };
-
-    checkSession();
-
-    const unsubscribe = subscribeToAuth((u) => {
-      if (!u) navigate('/login');
-    });
-
-    return unsubscribe;
-  }, [username, navigate]);
-
   // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
   useEffect(() => {
     localStorage.setItem('selectedAccountId', selectedAccountId);
   }, [selectedAccountId]);
 
   useEffect(() => {
-    if (isAuthenticated && wsStatus === 'connected') {
+    if (wsStatus === 'connected') {
       setLogs([]);
       setQrData(null);
       setPairingCode(null);
@@ -490,7 +457,7 @@ const TvDashboard = () => {
       setBotInfo(DEFAULT_BOT_INFO);
       send({ command: 'GET_BOT_INFO', accountId: selectedAccountId });
     }
-  }, [isAuthenticated, wsStatus, send, selectedAccountId]);
+  }, [wsStatus, send, selectedAccountId]);
 
   // ── Route lastMessage by event field ────────────────────────────────────────
   useEffect(() => {
@@ -581,13 +548,8 @@ const TvDashboard = () => {
   };
 
 
-  const handleSignOut = async () => {
-    await signOutBot();
-    navigate('/');
-  };
-
   // ── Loading screen ──────────────────────────────────────────────────────────
-  if (!isAuthenticated) {
+  if (false) {
     return (
       <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center font-mono relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--theme-accent-subtle)_0%,transparent_70%)] opacity-50" />
@@ -624,11 +586,6 @@ const TvDashboard = () => {
         <div className="flex items-center gap-3">
           <Terminal className="w-6 h-6 text-accent-primary" />
           <h1 className="text-xl font-bold tracking-tight text-text-main">WXATA TV Dashboard</h1>
-          {userData && (
-            <span className="ml-4 text-sm text-text-muted">
-              Welcome, {(userData.name as string) || (userData.username as string)}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2 border border-border-subtle rounded-xl px-3 py-2 bg-bg-panel shadow-sm">
@@ -723,8 +680,7 @@ const TvDashboard = () => {
                 className="w-full bg-bg-panel-hover border border-border-subtle p-3 text-text-main outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-subtle rounded-xl transition-all"
               />
             </label>
-            {(String(userData?.email || userData?.name || userData?.username || '').includes('motrenewed')) && (
-              <label className="flex items-center justify-between gap-3 border border-border-subtle p-3 rounded-xl cursor-pointer bg-accent-subtle/30 hover:bg-accent-subtle transition-colors">
+            <label className="flex items-center justify-between gap-3 border border-border-subtle p-3 rounded-xl cursor-pointer bg-accent-subtle/30 hover:bg-accent-subtle transition-colors">
                 <span className="text-accent-primary font-medium">Beta: TV Mode Automation</span>
                 <input
                   type="checkbox"
@@ -743,7 +699,6 @@ const TvDashboard = () => {
                   className="w-5 h-5 accent-accent-primary"
                 />
               </label>
-            )}
             <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-subtle">
               <span className="text-xs text-accent-primary font-medium">{configStatus || 'Ready'}</span>
               <button
@@ -815,13 +770,6 @@ const TvDashboard = () => {
             </div>
           </div>
 
-          {/* Sign Out */}
-          <button
-            onClick={handleSignOut}
-            className="border border-danger-subtle hover:bg-danger-subtle text-danger-text p-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 w-full"
-          >
-            <LogOut size={18} /> Sign Out
-          </button>
         </div>
       </div>
 

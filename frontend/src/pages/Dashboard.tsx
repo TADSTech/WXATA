@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw,
   LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X,
-  Package, Download, ExternalLink, Palette, BookOpen, GripVertical
+  Palette, BookOpen, GripVertical
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCurrentUser, subscribeToAuth, findUserByAuthUid, listDocs, insertExtension, updateExtension, signOutBot } from '../firebase';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useWXATASocket } from '../hooks/useWXATASocket';
 import { TwitterGrabber } from '../components/TwitterGrabber';
@@ -72,24 +71,6 @@ interface LogEntry {
   timestamp: string;
   type: string;
   message: string;
-}
-
-interface MarketplaceExtension {
-  id: string;
-  name: string;
-  description: string;
-  trigger: string;
-  aliases?: string[];
-  type?: string;
-  target?: string;
-  response: string;
-  code?: string;
-  defaultArgument?: string;
-  downloads: number;
-  untrusted?: boolean;
-  disabled?: boolean;
-  author: string;
-  authorUid: string;
 }
 
 // ─── useToast hook ────────────────────────────────────────────────────────────
@@ -362,7 +343,6 @@ interface ScriptManagerProps {
   handleScriptArgumentChange: (argName: string, field: keyof BotScriptArgument, value: string) => void;
   handleDeleteScript: (key: string) => void;
   handleAddScript: () => void;
-  handlePublishScript: (key: string, script: BotScript) => void;
   onReorder: (newOrder: string[]) => void;
 }
 
@@ -371,7 +351,7 @@ function ScriptManager({
   addingScript, setAddingScript,
   newScriptDraft, setNewScriptDraft,
   handleScriptFieldChange, handleScriptArgumentChange,
-  handleDeleteScript, handleAddScript, handlePublishScript,
+  handleDeleteScript, handleAddScript,
   onReorder
 }: ScriptManagerProps) {
   const prefix = botInfo.prefix;
@@ -605,9 +585,6 @@ function ScriptManager({
                       )}
                       {!isCore && (
                         <div className="flex gap-2">
-                          <button onClick={() => handlePublishScript(key, script)} className="flex items-center gap-1 text-accent-light hover:text-accent-hover border border-border-strong hover:border-accent-subtle px-2 py-1 rounded text-[10px] transition-colors">
-                            <Package className="w-3 h-3" /> Publish to Marketplace
-                          </button>
                           <button onClick={() => handleDeleteScript(key)} className="flex items-center gap-1 text-danger-text hover:text-danger-base border border-danger-subtle hover:border-danger-base px-2 py-1 rounded text-[10px] transition-colors">
                             <Trash2 className="w-3 h-3" /> Delete Script
                           </button>
@@ -795,133 +772,6 @@ function WelcomeEditor({ welcome, root, onChange, onRootChange, onSave }: Welcom
   );
 }
 
-// ─── MiniMarketplace ──────────────────────────────────────────────────────────
-
-interface MiniMarketplaceProps {
-  installedKeys: string[];
-  onInstall: (ext: MarketplaceExtension) => void;
-  navigate: (path: string) => void;
-}
-
-function MiniMarketplace({ installedKeys, onInstall, navigate }: MiniMarketplaceProps) {
-  const [extensions, setExtensions] = useState<MarketplaceExtension[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [installing, setInstalling] = useState<string | null>(null);
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const rows = await listDocs('marketplace_extensions', {
-          whereField: 'status',
-          whereValue: 'approved',
-          orderByField: 'downloads',
-          descending: true,
-        });
-        const list: MarketplaceExtension[] = rows.map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          name: row.name as string,
-          description: row.description as string,
-          trigger: row.trigger as string,
-          aliases: row.aliases as string[] | undefined,
-          type: row.type as string | undefined,
-          target: row.target as string | undefined,
-          response: row.response as string,
-          code: row.code as string | undefined,
-          defaultArgument: row.default_argument as string | undefined,
-          downloads: row.downloads as number,
-          untrusted: row.untrusted as boolean | undefined,
-          disabled: row.disabled as boolean | undefined,
-          author: row.author as string,
-          authorUid: row.author_uid as string,
-        }));
-        setExtensions(list);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchExtensions();
-  }, []);
-
-  const handleInstall = async (ext: MarketplaceExtension) => {
-    setInstalling(ext.id);
-    try {
-      await updateExtension(ext.id, { downloads: (ext.downloads || 0) + 1 });
-      onInstall(ext);
-      setInstalled(prev => new Set(prev).add(ext.id));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setInstalling(null);
-    }
-  };
-
-  const keyFor = (ext: MarketplaceExtension) => ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-  const isAlreadyInstalled = (ext: MarketplaceExtension) =>
-    installedKeys.includes(keyFor(ext)) || installed.has(ext.id);
-
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
-      <div className="flex justify-between items-center border-b border-border-strong/10 pb-2">
-        <div className="flex items-center gap-2">
-          <Package className="w-3.5 h-3.5 text-accent-light" />
-          <h3 className="text-xs uppercase tracking-widest opacity-50">Marketplace</h3>
-        </div>
-        <button onClick={() => navigate('/extensions')} className="flex items-center gap-1 text-xs text-accent-light hover:text-accent-light">
-          <ExternalLink className="w-3 h-3" /> Full page
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="text-xs text-text-muted italic py-3 text-center">Loading extensions...</div>
-      ) : extensions.length === 0 ? (
-        <div className="text-xs text-text-muted italic py-3 text-center border border-dashed border-border-strong rounded">
-          No approved extensions yet.
-        </div>
-      ) : (
-        <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-          {extensions.map(ext => {
-            const alreadyIn = isAlreadyInstalled(ext);
-            return (
-              <div key={ext.id} className="border border-border-strong/10 rounded p-2.5 flex items-start justify-between gap-2 hover:bg-accent-subtle transition-colors">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-accent-light">{ext.name}</span>
-                    <span className="text-[10px] font-mono text-text-muted">!{ext.trigger}</span>
-                    {ext.untrusted && (
-                      <span className="text-[9px] text-warning-text border border-warning-subtle bg-warning-subtle px-1 rounded flex items-center gap-0.5">
-                        <Shield className="w-2.5 h-2.5" /> Untrusted
-                      </span>
-                    )}
-                    {ext.code && <span className="text-[9px] text-info-text border border-info-subtle px-1 rounded">JS</span>}
-                  </div>
-                  <p className="text-[10px] text-text-muted mt-0.5 line-clamp-1">{ext.description}</p>
-                  <span className="text-[9px] text-text-muted">by {ext.author} · {ext.downloads || 0} installs</span>
-                </div>
-                <button
-                  onClick={() => !alreadyIn && !ext.disabled && handleInstall(ext)}
-                  disabled={alreadyIn || installing === ext.id || ext.disabled}
-                  className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                    ext.disabled
-                      ? 'border-danger-subtle text-danger-text bg-danger-subtle cursor-not-allowed'
-                      : alreadyIn
-                        ? 'border-border-subtle text-accent-primary cursor-default'
-                        : 'border-border-strong/40 text-accent-light hover:bg-accent-subtle disabled:opacity-50'
-                  }`}
-                >
-                  {ext.disabled ? 'Disabled' : alreadyIn ? '✓ Added' : installing === ext.id ? '...' : <><Download className="w-2.5 h-2.5" /> Add</>}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── ThemeSwitcher ────────────────────────────────────────────────────────────
 
 const THEME_META: Record<string, { name: string; color: string }> = {
@@ -982,7 +832,7 @@ function ThemeSwitcher({ theme, setTheme, open, setOpen }: ThemeSwitcherProps) {
 
 // ─── Dashboard (main component) ───────────────────────────────────────────────
 
-const backendUrl = ((import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'ws://localhost:5000').replace(/\/+$/, '');
+const backendUrl = (localStorage.getItem('wxata_backend_url') || import.meta.env.VITE_BACKEND_URL as string || 'ws://localhost:5000').replace(/\/+$/, '');
 
 const DEFAULT_BOT_INFO: BotInfo = {
   prefix: '!',
@@ -1010,10 +860,6 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { toasts, addToast } = useToast();
-
-  // ── Auth state ──────────────────────────────────────────────────────────────
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<Record<string, unknown> | null>(null);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   // ── WebSocket (useWXATASocket) ───────────────────────────────────────────────
@@ -1047,41 +893,13 @@ const Dashboard = () => {
   const [showQuickActionsModal, setShowQuickActionsModal] = useState(false);
   const [showTwitterModal, setShowTwitterModal] = useState(false);
 
-  // ── Auth guard ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const checkSession = async () => {
-      const user = getCurrentUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      // Try to find the user row — if found, use it; otherwise just allow access
-      // with the session (avoids blocking users whose metadata doesn't match URL)
-      const userRow = await findUserByAuthUid(user.uid);
-      if (userRow) {
-        setUserData(userRow as unknown as Record<string, unknown>);
-      } else {
-        setUserData({ name: user.email, username });
-      }
-      setIsAuthenticated(true);
-    };
-
-    checkSession();
-
-    const unsubscribe = subscribeToAuth((u) => {
-      if (!u) navigate('/login');
-    });
-
-    return unsubscribe;
-  }, [username, navigate]);
-
   // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
   useEffect(() => {
     localStorage.setItem('selectedAccountId', selectedAccountId);
   }, [selectedAccountId]);
 
   useEffect(() => {
-    if (isAuthenticated && wsStatus === 'connected') {
+    if (wsStatus === 'connected') {
       setLogs([]);
       setQrData(null);
       setPairingCode(null);
@@ -1092,7 +910,7 @@ const Dashboard = () => {
       setBotInfo(DEFAULT_BOT_INFO);
       send({ command: 'GET_BOT_INFO', accountId: selectedAccountId });
     }
-  }, [isAuthenticated, wsStatus, send, selectedAccountId]);
+  }, [wsStatus, send, selectedAccountId]);
 
   // ── Route lastMessage by event field ────────────────────────────────────────
   useEffect(() => {
@@ -1233,53 +1051,6 @@ const Dashboard = () => {
     send({ command: 'UPDATE_BOT_INFO', data: updated });
   };
 
-  const handlePublishScript = async (_key: string, script: BotScript) => {
-    const user = getCurrentUser();
-    if (!user) { addToast('Must be logged in to publish', 'error'); return; }
-    if (!script.name || !script.desc) { addToast('Add a name and description first', 'error'); return; }
-    if (confirm(`Publish "${script.name}" to the Marketplace? It will undergo admin review.`)) {
-      try {
-        await insertExtension({
-          name: script.name,
-          description: script.desc,
-          trigger: script.trigger,
-          response: script.response || '',
-          code: script.code || '',
-          author: user.email?.split('@')[0] || 'Unknown',
-          author_uid: user.uid,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          downloads: 0,
-        });
-        addToast('Extension submitted for review', 'success');
-      } catch (err: unknown) {
-        addToast('Error: ' + (err instanceof Error ? err.message : String(err)), 'error');
-      }
-    }
-  };
-
-  const handleMarketplaceInstall = (ext: MarketplaceExtension) => {
-    const key = ext.trigger.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || ext.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    setBotInfo(prev => ({
-      ...prev,
-      scripts: {
-        ...prev.scripts,
-        [key]: {
-          name: ext.name,
-          desc: ext.description || `Installed: ${ext.name}`,
-          trigger: ext.trigger,
-          aliases: ext.aliases || [],
-          type: ext.type || 'misc',
-          target: ext.target || 'chat',
-          response: ext.response || '',
-          code: ext.code || '',
-          defaultArgument: ext.defaultArgument || 'self',
-        },
-      },
-    }));
-    setConfigStatus(`"${ext.name}" added — remember to Save Config`);
-  };
-
   const saveBotInfo = () => {
     sendCommand('UPDATE_BOT_INFO', botInfo);
     setConfigStatus('Saving...');
@@ -1295,13 +1066,8 @@ const Dashboard = () => {
     addToast('Saved', 'success');
   };
 
-  const handleSignOut = async () => {
-    await signOutBot();
-    navigate('/');
-  };
-
   // ── Loading screen ──────────────────────────────────────────────────────────
-  if (!isAuthenticated) {
+  if (false) {
     return (
       <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center font-mono relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--theme-accent-subtle)_0%,transparent_70%)] opacity-50" />
@@ -1338,11 +1104,6 @@ const Dashboard = () => {
         <div className="flex items-center gap-3">
           <Terminal className="w-6 h-6" />
           <h1 className="text-xl font-bold tracking-tighter text-text-main">WXATA_DASHBOARD v1.0.0</h1>
-          {userData && (
-            <span className="ml-4 text-sm text-text-muted">
-              Welcome, {(userData.name as string) || (userData.username as string)}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2 border border-border-strong rounded px-2 py-1 bg-bg-panel">
@@ -1437,8 +1198,7 @@ const Dashboard = () => {
                 className="w-full bg-bg-panel border border-border-strong p-2 text-accent-light outline-none focus:border-border-strong"
               />
             </label>
-            {(String(userData?.email || userData?.name || userData?.username || '').includes('motrenewed')) && (
-              <label className="flex items-center justify-between gap-3 border border-border-subtle p-2 rounded cursor-pointer mt-2 bg-accent-subtle/10">
+            <label className="flex items-center justify-between gap-3 border border-border-subtle p-2 rounded cursor-pointer mt-2 bg-accent-subtle/10">
                 <span className="text-accent-primary uppercase tracking-wider">Beta: TV Mode Automation</span>
                 <input
                   type="checkbox"
@@ -1460,7 +1220,6 @@ const Dashboard = () => {
                   className="w-4 h-4 accent-accent-primary"
                 />
               </label>
-            )}
             <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-strong/10">
               <span className="text-[10px] text-accent-primary uppercase tracking-wider">{configStatus || 'Ready'}</span>
               <button
@@ -1511,14 +1270,6 @@ const Dashboard = () => {
                 onSave={handleWelcomeSave}
               />
 
-              {/* Mini Marketplace */}
-              <MiniMarketplace
-                installedKeys={Object.keys(botInfo.scripts)}
-                onInstall={handleMarketplaceInstall}
-                navigate={navigate}
-              />
-            </div>
-
           {/* X Link Grabber Button */}
           <button
             onClick={() => setShowTwitterModal(true)}
@@ -1541,15 +1292,9 @@ const Dashboard = () => {
             ⚡ QUICK ACTIONS
           </button>
 
-          {/* Sign Out */}
-          <button
-            onClick={handleSignOut}
-            className="border border-danger-base hover:bg-danger-subtle text-danger-text p-2 text-xs transition-colors flex items-center justify-center gap-2 w-full rounded"
-          >
-            <LogOut size={14} /> SIGN OUT
-          </button>
         </div>
-      </div>
+        </div>
+        </div>
 
       {/* Script Manager Modal */}
       <AnimatePresence>
@@ -1587,7 +1332,6 @@ const Dashboard = () => {
                   handleScriptArgumentChange={handleScriptArgumentChange}
                   handleDeleteScript={handleDeleteScript}
                   handleAddScript={handleAddScript}
-                  handlePublishScript={handlePublishScript}
                   onReorder={handleScriptReorder}
                 />
               </div>

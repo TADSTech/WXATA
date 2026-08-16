@@ -25,6 +25,7 @@ WORKDIR /app
 COPY backend/ ./backend/
 COPY botinfo.example.json ./
 COPY ecosystem.config.cjs ./
+COPY index.html ./
 
 # ── Persistent data directories ───────────────────────────────────────────────
 # These are declared as VOLUME so Docker (or docker-compose) can mount them.

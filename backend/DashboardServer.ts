@@ -55,7 +55,30 @@ class DashboardServer {
     const port = parseInt(process.env.PORT || "5000", 10);
 
     const httpServer = http.createServer((req, res) => {
-      if (req.url === "/health" || req.url === "/") {
+      // Serve landing page at /
+      if (req.url === "/") {
+        const landingPath = path.join(__dirname, "../../index.html");
+        try {
+          const html = fs.readFileSync(landingPath, "utf-8");
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(html);
+        } catch {
+          // Fallback to health JSON if landing page missing
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              status: "ok",
+              connection: this.currentConnection,
+              uptime: this.getUptime(),
+              memory: this.getMemoryUsage(),
+              pm2: IS_PM2,
+            }),
+          );
+        }
+        return;
+      }
+
+      if (req.url === "/health") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({

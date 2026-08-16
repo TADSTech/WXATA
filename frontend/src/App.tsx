@@ -4,6 +4,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import Connect from "./pages/Connect";
 import Dashboard from "./pages/Dashboard";
 import TvDashboard from "./pages/TvDashboard";
 import XGrabberPage from "./pages/XGrabberPage";
@@ -16,7 +17,7 @@ function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Connect />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/:username" element={<Dashboard />} />
           <Route path="/tv" element={<TvDashboard />} />
@@ -25,7 +26,7 @@ function App() {
           <Route path="/tv/tools/:username" element={<TvTools />} />
           <Route path="/grabber" element={<XGrabberPage />} />
           <Route path="/grabber/:username" element={<XGrabberPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </ThemeProvider>
