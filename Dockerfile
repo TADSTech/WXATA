@@ -16,9 +16,9 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY backend/package.json backend/bun.lock ./backend/
 
-RUN bun install --frozen-lockfile
+RUN bun install
 WORKDIR /app/backend
-RUN bun install --frozen-lockfile
+RUN bun install
 WORKDIR /app
 
 # ── Copy source ───────────────────────────────────────────────────────────────
