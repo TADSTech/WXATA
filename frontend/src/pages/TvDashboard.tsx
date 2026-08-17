@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Wifi, Phone, Activity, Terminal, Shield } from 'lucide-react';
+import { QrCode, RefreshCw, LogOut, Save, X, BookOpen, Wifi, Phone, Activity, Terminal, Shield, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
@@ -120,12 +120,13 @@ interface ConnectionPanelProps {
   onRestart: () => void;
   onLogout: () => void;
   onTerminate: () => void;
+  onClearAuth: () => void;
 }
 
 function ConnectionPanel({
   qrData, pairingCode, authMethod, isConnecting,
   phoneNumber, setPhoneNumber,
-  onConnectQR, onConnectPhone, onRestart, onLogout, onTerminate
+  onConnectQR, onConnectPhone, onRestart, onLogout, onTerminate, onClearAuth
 }: ConnectionPanelProps) {
   const [showPhoneInput, setShowPhoneInput] = useState(false);
 
@@ -214,6 +215,14 @@ function ConnectionPanel({
           className="flex items-center gap-1.5 border border-warning-subtle text-warning-text hover:bg-warning-subtle px-4 py-2 text-xs rounded-xl transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" /> Logout
+        </button>
+        <button
+          onClick={() => {
+            if (confirm('Force-wipe all auth files? You will need to re-pair.')) onClearAuth();
+          }}
+          className="flex items-center gap-1.5 border border-danger-subtle text-danger-text hover:bg-danger-subtle px-4 py-2 text-xs rounded-xl transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Clear Auth
         </button>
         <button
           onClick={() => {

@@ -25,7 +25,7 @@ export function TwitterGrabber({ addToast, selectedAccountId }: TwitterGrabberPr
       .replace('wss://', 'https://');
   };
 
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const password = localStorage.getItem('wxata_dashboard_password') || '';
     return password ? { 'Authorization': `Bearer ${password}` } : {};
   };

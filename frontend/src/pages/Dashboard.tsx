@@ -172,12 +172,13 @@ interface ConnectionPanelProps {
   onRestart: () => void;
   onLogout: () => void;
   onTerminate: () => void;
+  onClearAuth: () => void;
 }
 
 function ConnectionPanel({
   qrData, pairingCode, authMethod, isConnecting,
   phoneNumber, setPhoneNumber,
-  onConnectQR, onConnectPhone, onRestart, onLogout, onTerminate
+  onConnectQR, onConnectPhone, onRestart, onLogout, onTerminate, onClearAuth
 }: ConnectionPanelProps) {
   const [showPhoneInput, setShowPhoneInput] = useState(false);
 
@@ -266,6 +267,14 @@ function ConnectionPanel({
           className="flex items-center gap-1.5 border border-warning-subtle text-warning-text hover:bg-warning-subtle/20 px-3 py-1.5 text-xs rounded transition-colors"
         >
           <LogOut className="w-3 h-3" /> Logout
+        </button>
+        <button
+          onClick={() => {
+            if (confirm('Force-wipe all auth files? You will need to re-pair.')) onClearAuth();
+          }}
+          className="flex items-center gap-1.5 border border-danger-subtle text-danger-text hover:bg-danger-subtle/20 px-3 py-1.5 text-xs rounded transition-colors"
+        >
+          <Trash2 className="w-3 h-3" /> Clear Auth
         </button>
         <button
           onClick={() => {
