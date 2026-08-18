@@ -57,3 +57,4 @@ refactor_v2.js
 frontend/refactor_themes.js
 frontend/clean_tv.py
 frontend/refactor_dash.py
+backend/.env
