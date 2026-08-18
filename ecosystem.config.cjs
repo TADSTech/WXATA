@@ -19,7 +19,7 @@ module.exports = {
       script: 'backend/index.ts',
 
       // Bun as the TypeScript interpreter
-      interpreter: 'bun',
+      interpreter: '/home/ubuntu/.bun/bin/bun',
       interpreter_args: 'run',
 
       // Environment

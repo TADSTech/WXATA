@@ -295,14 +295,13 @@ class DashboardServer {
               ws.close(4001, "Auth required");
             }
           }, 5000);
-          const origOnMessage = ws.onmessage;
-          ws.on("message", (msg) => {
+          const authHandler = (msg: any) => {
             try {
               const data = JSON.parse(msg.toString());
               if (data.type === "auth" && data.password === DASHBOARD_PASSWORD) {
                 (ws as any).authenticated = true;
                 clearTimeout((ws as any).authTimeout);
-                ws.removeAllListeners("message");
+                ws.removeListener("message", authHandler);
                 this.sendStatus();
                 console.log("🖥️  Dashboard: Client authenticated");
               } else {
@@ -311,7 +310,8 @@ class DashboardServer {
             } catch {
               ws.close(4001, "Auth required");
             }
-          });
+          };
+          ws.on("message", authHandler);
         }
       }
 
