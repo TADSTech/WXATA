@@ -23,7 +23,6 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "0.21.5",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
     "@testing-library/jest-dom": "^6.6.3",
