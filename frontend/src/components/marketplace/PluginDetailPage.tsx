@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Download, User, Tag, Clock, Copy, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, User, Tag, Clock, Copy, Check } from "lucide-react";
 import { fetchPlugin, downloadPlugin, type MarketplacePlugin } from "./api";
 
 export default function PluginDetailPage() {

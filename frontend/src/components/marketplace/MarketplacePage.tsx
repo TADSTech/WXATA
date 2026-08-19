@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Search, Download, Tag, User, ArrowUpDown, Package } from "lucide-react";
+import { Search, Download, Tag, User, Package } from "lucide-react";
 import { fetchPlugins, type MarketplacePlugin } from "./api";
 
 const CATEGORIES = [

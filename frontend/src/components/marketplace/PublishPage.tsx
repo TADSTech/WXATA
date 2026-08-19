@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Send, Code, Info, Tag } from "lucide-react";
+import { ArrowLeft, Send, Code, Info } from "lucide-react";
 import { publishPlugin, getMarketplaceUser } from "./api";
 
 const PLUGIN_TYPES = ["tools", "fun", "core", "admin", "group", "misc"];

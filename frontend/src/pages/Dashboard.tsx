@@ -343,6 +343,7 @@ function LogPanel({ logs }: { logs: LogEntry[] }) {
 
 interface ScriptManagerProps {
   botInfo: BotInfo;
+  setBotInfo: React.Dispatch<React.SetStateAction<BotInfo>>;
   expandedScript: string | null;
   setExpandedScript: (k: string | null) => void;
   addingScript: boolean;
@@ -357,7 +358,7 @@ interface ScriptManagerProps {
 }
 
 function ScriptManager({
-  botInfo, expandedScript, setExpandedScript,
+  botInfo, setBotInfo, expandedScript, setExpandedScript,
   addingScript, setAddingScript,
   newScriptDraft, setNewScriptDraft,
   handleScriptFieldChange, handleScriptArgumentChange,
@@ -1384,6 +1385,7 @@ const Dashboard = () => {
               <div className="p-4">
                 <ScriptManager
                   botInfo={botInfo}
+                  setBotInfo={setBotInfo}
                   expandedScript={expandedScript}
                   setExpandedScript={setExpandedScript}
                   addingScript={addingScript}
