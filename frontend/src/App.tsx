@@ -4,6 +4,8 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import DocsPage from "./pages/DocsPage";
 import Connect from "./pages/Connect";
 import Dashboard from "./pages/Dashboard";
 import TvDashboard from "./pages/TvDashboard";
@@ -22,7 +24,9 @@ function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Connect />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/docs" element={<DocsPage />} />
+          <Route path="/connect" element={<Connect />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/:username" element={<Dashboard />} />
           <Route path="/tv" element={<TvDashboard />} />

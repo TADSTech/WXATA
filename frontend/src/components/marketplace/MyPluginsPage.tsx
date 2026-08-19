@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Package, Plus, Trash2, Clock, Download } from "lucide-react";
+import { Package, Plus, ExternalLink, Clock, Download } from "lucide-react";
 import { fetchMyPlugins, getMarketplaceUser, type MarketplacePlugin } from "./api";
 
 export default function MyPluginsPage() {
