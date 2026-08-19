@@ -1,0 +1,13 @@
+{
+  "name": "Dictionary",
+  "desc": "Get the definition, phonetics, and example of any English word",
+  "trigger": "define",
+  "aliases": ["dict", "meaning"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const axios = require('axios');\nif (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !define <word>');\nawait sendTrackedMessage(sock, remoteJid, '📖 Looking up word...');\ntry {\n  const word = argumentName.trim().toLowerCase();\n  const res = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);\n  if (!res.data || !res.data[0]) {\n    return sendTrackedMessage(sock, remoteJid, `❌ No definition found for '${word}'`);\n  }\n  const entry = res.data[0];\n  let msg = `📖 *${entry.word}*`;\n  if (entry.phonetic) msg += ` ${entry.phonetic}`;\n  msg += '\\n\\n';\n  for (const meaning of entry.meanings.slice(0, 2)) {\n    msg += `_${meaning.partOfSpeech}_\\n`;\n    for (const def of meaning.definitions.slice(0, 2)) {\n      msg += `• ${def.definition}\\n`;\n      if (def.example) msg += `  _Example: ${def.example}_\\n`;\n    }\n    msg += '\\n';\n  }\n  await sendTrackedMessage(sock, remoteJid, msg);\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Word not found in dictionary.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "dictionary", "reference"]
+}

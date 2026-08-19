@@ -4,6 +4,7 @@ import pino from "pino";
 import type { WASocket } from "@whiskeysockets/baileys";
 import { fetchTweetContent } from "./twitter_grabber.js";
 import { scheduleTweetPost } from "./tv_miniapp.js";
+import * as marketplace from "./marketplace_db.js";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -68,7 +69,7 @@ class DashboardServer {
   constructor() {
     const port = parseInt(process.env.PORT || "5000", 10);
 
-    const httpServer = http.createServer((req, res) => {
+    const httpServer = http.createServer(async (req, res) => {
       // Serve landing page at /
       if (req.url === "/") {
         const landingPath = path.join(__dirname, "../index.html");
@@ -248,6 +249,336 @@ class DashboardServer {
         return;
       }
 
+      // ── Marketplace Routes ────────────────────────────────────
+
+      // Helper: parse JSON body
+      function parseBody(req: http.IncomingMessage): Promise<any> {
+        return new Promise((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          req.on("data", (c: Buffer) => chunks.push(c));
+          req.on("end", () => {
+            try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8"))); }
+            catch { reject(new Error("Invalid JSON")); }
+          });
+          req.on("error", reject);
+        });
+      }
+
+      // Helper: extract token from Authorization header
+      function getToken(req: http.IncomingMessage): string | null {
+        const auth = req.headers.authorization || "";
+        return auth.startsWith("Bearer ") ? auth.slice(7) : null;
+      }
+
+      // GET /api/marketplace/plugins — list plugins
+      if (req.method === "GET" && req.url?.startsWith("/api/marketplace/plugins") && !req.url.includes("/download")) {
+        setCorsHeaders(res);
+        try {
+          const urlObj = new URL(req.url, `http://${req.headers.host}`);
+          const result = marketplace.getPlugins({
+            status: urlObj.searchParams.get("status") || "approved",
+            type: urlObj.searchParams.get("type") || undefined,
+            search: urlObj.searchParams.get("search") || undefined,
+            author: urlObj.searchParams.get("author") || undefined,
+            sort: urlObj.searchParams.get("sort") || undefined,
+            limit: parseInt(urlObj.searchParams.get("limit") || "50"),
+            offset: parseInt(urlObj.searchParams.get("offset") || "0"),
+          });
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // GET /api/marketplace/plugins/pending — admin: pending plugins
+      if (req.method === "GET" && req.url === "/api/marketplace/plugins/pending") {
+        setCorsHeaders(res);
+        if (!checkAuth(req)) { rejectAuth(res); return; }
+        try {
+          const plugins = marketplace.getPendingPlugins();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ plugins }));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // GET /api/marketplace/my-plugins — user's own plugins
+      if (req.method === "GET" && req.url === "/api/marketplace/my-plugins") {
+        setCorsHeaders(res);
+        const token = getToken(req);
+        if (!token) { rejectAuth(res); return; }
+        const userId = marketplace.getUserIdFromToken(token);
+        if (!userId) { rejectAuth(res); return; }
+        try {
+          const plugins = marketplace.getMyPlugins(userId);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ plugins }));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // POST /api/marketplace/auth/register
+      if (req.method === "POST" && req.url === "/api/marketplace/auth/register") {
+        setCorsHeaders(res);
+        try {
+          const body = await parseBody(req);
+          if (!body.username || !body.email || !body.password) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "username, email, and password required" }));
+            return;
+          }
+          if (body.username.length < 3 || body.username.length > 20) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Username must be 3-20 characters" }));
+            return;
+          }
+          if (body.password.length < 6) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Password must be at least 6 characters" }));
+            return;
+          }
+          const result = marketplace.registerUser(body.username, body.email, body.password);
+          if ("error" in result) {
+            res.writeHead(409, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(201, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // POST /api/marketplace/auth/login
+      if (req.method === "POST" && req.url === "/api/marketplace/auth/login") {
+        setCorsHeaders(res);
+        try {
+          const body = await parseBody(req);
+          if (!body.username || !body.password) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "username and password required" }));
+            return;
+          }
+          const result = marketplace.loginUser(body.username, body.password);
+          if ("error" in result) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // POST /api/marketplace/plugins — publish a plugin
+      if (req.method === "POST" && req.url === "/api/marketplace/plugins") {
+        setCorsHeaders(res);
+        const token = getToken(req);
+        if (!token) { rejectAuth(res); return; }
+        const userId = marketplace.getUserIdFromToken(token);
+        if (!userId) { rejectAuth(res); return; }
+        try {
+          const body = await parseBody(req);
+          if (!body.name || !body.trigger || !body.description) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "name, trigger, and description required" }));
+            return;
+          }
+          const result = marketplace.publishPlugin({
+            name: body.name,
+            description: body.description,
+            trigger: body.trigger,
+            aliases: body.aliases || [],
+            type: body.type || "misc",
+            target: body.target || "chat",
+            response: body.response || "",
+            code: body.code || "",
+            default_argument: body.default_argument || "",
+            author_id: userId,
+            author_username: body.author_username || "unknown",
+            version: body.version || "1.0.0",
+            tags: body.tags || [],
+          });
+          if ("error" in result) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(201, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // PUT /api/marketplace/plugins/:id — update a plugin
+      if (req.method === "PUT" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+$/)) {
+        setCorsHeaders(res);
+        const token = getToken(req);
+        if (!token) { rejectAuth(res); return; }
+        const userId = marketplace.getUserIdFromToken(token);
+        if (!userId) { rejectAuth(res); return; }
+        try {
+          const id = req.url.split("/").pop()!;
+          const body = await parseBody(req);
+          const result = marketplace.updatePlugin(id, userId, body);
+          if ("error" in result) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // DELETE /api/marketplace/plugins/:id — delete a plugin
+      if (req.method === "DELETE" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+$/)) {
+        setCorsHeaders(res);
+        const token = getToken(req);
+        if (!token) { rejectAuth(res); return; }
+        const userId = marketplace.getUserIdFromToken(token);
+        if (!userId) { rejectAuth(res); return; }
+        try {
+          const id = req.url.split("/").pop()!;
+          const result = marketplace.deletePlugin(id, userId);
+          if ("error" in result) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // POST /api/marketplace/plugins/:id/approve — admin approve
+      if (req.method === "POST" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+\/approve$/)) {
+        setCorsHeaders(res);
+        if (!checkAuth(req)) { rejectAuth(res); return; }
+        try {
+          const id = req.url.split("/")[4]!;
+          const result = marketplace.approvePlugin(id);
+          if ("error" in result) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // POST /api/marketplace/plugins/:id/reject — admin reject
+      if (req.method === "POST" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+\/reject$/)) {
+        setCorsHeaders(res);
+        if (!checkAuth(req)) { rejectAuth(res); return; }
+        try {
+          const id = req.url.split("/")[4]!;
+          const result = marketplace.rejectPlugin(id);
+          if ("error" in result) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: result.error }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // GET /api/marketplace/plugins/:id/download — download .wxata.json
+      if (req.method === "GET" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+\/download$/)) {
+        setCorsHeaders(res);
+        try {
+          const id = req.url.split("/")[4]!;
+          const plugin = marketplace.getPluginById(id);
+          if (!plugin) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Plugin not found" }));
+            return;
+          }
+          marketplace.incrementDownload(id);
+
+          const wxataFile = {
+            name: plugin.name,
+            desc: plugin.description,
+            trigger: plugin.trigger,
+            aliases: plugin.aliases,
+            type: plugin.type,
+            target: plugin.target,
+            response: plugin.response,
+            code: plugin.code,
+            defaultArgument: plugin.default_argument,
+            disabled: false,
+          };
+
+          const slug = plugin.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Content-Disposition": `attachment; filename="${slug}.json"`,
+          });
+          res.end(JSON.stringify(wxataFile, null, 2));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
+      // GET /api/marketplace/plugins/:id — single plugin detail
+      if (req.method === "GET" && req.url?.match(/^\/api\/marketplace\/plugins\/[a-f0-9-]+$/)) {
+        setCorsHeaders(res);
+        try {
+          const id = req.url.split("/").pop()!;
+          const plugin = marketplace.getPluginById(id);
+          if (!plugin) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Plugin not found" }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ plugin }));
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+      }
+
       res.writeHead(404);
       res.end("Not found");
     });
@@ -256,6 +587,8 @@ class DashboardServer {
       console.log(
         `🌐 Server (HTTP & WS) listening on port ${port}${IS_PM2 ? " [PM2 managed]" : ""}`,
       );
+      // Seed marketplace starter plugins on first run
+      try { marketplace.seedStarterPlugins(); } catch (e) { console.error("Marketplace seed failed:", e); }
     });
 
     const externalUrl =

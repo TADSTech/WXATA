@@ -9,6 +9,11 @@ import Dashboard from "./pages/Dashboard";
 import TvDashboard from "./pages/TvDashboard";
 import XGrabberPage from "./pages/XGrabberPage";
 import TvTools from "./pages/TvTools";
+import MarketplacePage from "./components/marketplace/MarketplacePage";
+import PluginDetailPage from "./components/marketplace/PluginDetailPage";
+import PublishPage from "./components/marketplace/PublishPage";
+import MarketplaceAuthPage from "./components/marketplace/MarketplaceAuthPage";
+import MyPluginsPage from "./components/marketplace/MyPluginsPage";
 import "./index.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 
@@ -26,6 +31,11 @@ function App() {
           <Route path="/tv/tools/:username" element={<TvTools />} />
           <Route path="/grabber" element={<XGrabberPage />} />
           <Route path="/grabber/:username" element={<XGrabberPage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/marketplace/login" element={<MarketplaceAuthPage />} />
+          <Route path="/marketplace/publish" element={<PublishPage />} />
+          <Route path="/marketplace/my-plugins" element={<MyPluginsPage />} />
+          <Route path="/marketplace/:id" element={<PluginDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

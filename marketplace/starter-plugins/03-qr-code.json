@@ -1,0 +1,13 @@
+{
+  "name": "QR Code Generator",
+  "desc": "Generate a QR code image from any text or URL",
+  "trigger": "qr",
+  "aliases": ["qrcode"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !qr <text or URL>');\ntry {\n  const text = argumentName.trim();\n  const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;\n  await sock.sendMessage(remoteJid, { image: { url }, caption: `📱 QR for: ${text.substring(0, 50)}` });\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Failed to generate QR code.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "qr", "utility"]
+}

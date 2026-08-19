@@ -1,0 +1,13 @@
+{
+  "name": "Base64 Encoder/Decoder",
+  "desc": "Encode text to Base64 or decode Base64 to text",
+  "trigger": "base64",
+  "aliases": ["b64"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !base64 <text>\\nPrefix with \"decode:\" to decode');\nconst input = argumentName.trim();\ntry {\n  if (input.toLowerCase().startsWith('decode:')) {\n    const encoded = input.slice(7).trim();\n    const decoded = Buffer.from(encoded, 'base64').toString('utf-8');\n    await sendTrackedMessage(sock, remoteJid, `🔓 Decoded:\\n${decoded}`);\n  } else {\n    const encoded = Buffer.from(input).toString('base64');\n    await sendTrackedMessage(sock, remoteJid, `🔒 Encoded:\\n${encoded}`);\n  }\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Invalid input for encoding/decoding.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "encoding", "utility"]
+}

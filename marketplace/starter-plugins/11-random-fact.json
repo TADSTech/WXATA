@@ -1,0 +1,13 @@
+{
+  "name": "Random Fact",
+  "desc": "Get a random interesting fact from around the world",
+  "trigger": "fact",
+  "aliases": ["rf", "trivia"],
+  "type": "fun",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const axios = require('axios');\nawait sendTrackedMessage(sock, remoteJid, '🧠 Fetching a fact...');\ntry {\n  const res = await axios.get('https://uselessfacts.jsph.pl/api/v2/facts/random?language=en');\n  if (res.data && res.data.text) {\n    await sendTrackedMessage(sock, remoteJid, `🧠 ${res.data.text}`);\n  } else {\n    await sendTrackedMessage(sock, remoteJid, '❌ Could not fetch a fact.');\n  }\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Fact service unavailable.');\n}",
+  "version": "1.0.0",
+  "tags": ["fun", "facts", "trivia"]
+}

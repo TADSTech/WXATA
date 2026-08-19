@@ -1,0 +1,13 @@
+{
+  "name": "Text Case Converter",
+  "desc": "Convert text to UPPERCASE, lowercase, Title Case, or sWaPsCaSe",
+  "trigger": "case",
+  "aliases": ["textcase", "upper", "lower"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !case <text>\\n\\nAlso works with: !upper <text>, !lower <text>');\nconst text = argumentName;\nconst trigger = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';\nconst cmd = trigger.split(/\\s+/)[0].replace(/^[^a-zA-Z]/, '').toLowerCase();\nlet result;\nif (cmd === 'upper') {\n  result = text.toUpperCase();\n} else if (cmd === 'lower') {\n  result = text.toLowerCase();\n} else {\n  result = 'UPPER: ' + text.toUpperCase() + '\\n\\nlower: ' + text.toLowerCase() + '\\n\\ntitle: ' + text.replace(/\\b\\w/g, c => c.toUpperCase()) + '\\n\\nswap: ' + text.split('').map((c, i) => i % 2 === 0 ? c.toUpperCase() : c.toLowerCase()).join('');\n}\nawait sendTrackedMessage(sock, remoteJid, result);",
+  "version": "1.0.0",
+  "tags": ["tools", "text", "utility"]
+}

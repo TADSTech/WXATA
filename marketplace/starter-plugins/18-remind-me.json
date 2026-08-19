@@ -1,0 +1,13 @@
+{
+  "name": "Remind Me",
+  "desc": "Set timed reminders that the bot will send to you",
+  "trigger": "remind",
+  "aliases": ["reminder", "remindme"],
+  "type": "tools",
+  "target": "self",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const fs = require('fs');\nconst path = require('path');\nif (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !remind <minutes> <message>\\nExample: !remind 30 Check the oven');\nconst match = argumentName.trim().match(/^(\\d+)\\s+(.+)$/);\nif (!match) return sendTrackedMessage(sock, remoteJid, 'Usage: !remind <minutes> <message>');\nconst minutes = parseInt(match[1]);\nconst message = match[2];\nif (minutes < 1 || minutes > 1440) return sendTrackedMessage(sock, remoteJid, 'Minutes must be 1-1440 (24h max).');\nconst remindersFile = path.resolve(__rootdir, 'reminders.json');\nlet reminders = [];\ntry { reminders = JSON.parse(fs.readFileSync(remindersFile, 'utf-8')); } catch {}\nconst reminder = {\n  id: Date.now().toString(36),\n  chatJid: remoteJid,\n  message,\n  remindAt: Date.now() + minutes * 60 * 1000,\n  senderName: msg.pushName || 'You'\n};\nreminders.push(reminder);\nfs.writeFileSync(remindersFile, JSON.stringify(reminders, null, 2));\nawait sendTrackedMessage(sock, remoteJid, `⏰ Reminder set! I'll remind you in ${minutes} minute(s):\\n${message}`);\nsetTimeout(async () => {\n  try {\n    await sendTrackedMessage(sock, reminder.chatJid, `⏰ *Reminder for ${reminder.senderName}:*\\n${reminder.message}`);\n    let current = [];\n    try { current = JSON.parse(fs.readFileSync(remindersFile, 'utf-8')); } catch {}\n    current = current.filter(r => r.id !== reminder.id);\n    fs.writeFileSync(remindersFile, JSON.stringify(current, null, 2));\n  } catch (e) {}\n}, minutes * 60 * 1000);",
+  "version": "1.0.0",
+  "tags": ["tools", "reminder", "productivity"]
+}

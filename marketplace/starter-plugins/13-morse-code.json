@@ -1,0 +1,13 @@
+{
+  "name": "Morse Code",
+  "desc": "Translate text to Morse code or decode Morse to text",
+  "trigger": "morse",
+  "aliases": ["mc"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !morse <text>\\nPrefix with \"decode:\" to decode Morse');\nconst MORSE = { 'A':'.-', 'B':'-...', 'C':'-.-.', 'D':'-..', 'E':'.', 'F':'..-.', 'G':'--.', 'H':'....', 'I':'..', 'J':'.---', 'K':'-.-', 'L':'.-..', 'M':'--', 'N':'-.', 'O':'---', 'P':'.--.', 'Q':'--.-', 'R':'.-.', 'S':'...', 'T':'-', 'U':'..-', 'V':'...-', 'W':'.--', 'X':'-..-', 'Y':'-.--', 'Z':'--..', '0':'-----', '1':'.----', '2':'..---', '3':'...--', '4':'....-', '5':'.....', '6':'-....', '7':'--...', '8':'---..', '9':'----.', ' ':'/'};\nconst REVERSE = Object.fromEntries(Object.entries(MORSE).map(([k, v]) => [v, k]));\nconst input = argumentName.trim();\ntry {\n  if (input.toLowerCase().startsWith('decode:')) {\n    const morse = input.slice(7).trim();\n    const decoded = morse.split(' ').map(c => REVERSE[c] || REVERSE[c.toUpperCase()] || '?').join('');\n    await sendTrackedMessage(sock, remoteJid, `📝 Decoded: ${decoded}`);\n  } else {\n    const encoded = input.toUpperCase().split('').map(c => MORSE[c] || '?').join(' ');\n    await sendTrackedMessage(sock, remoteJid, `📡 Morse:\\n${encoded}`);\n  }\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Failed to convert.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "morse", "encoding"]
+}

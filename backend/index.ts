@@ -49,6 +49,7 @@ interface BotScript {
   code?: string;
   defaultArgument?: string;
   arguments?: Record<string, BotScriptArgument>;
+  disabled?: boolean;
 }
 
 interface BotScriptArgument {
@@ -231,6 +232,15 @@ await sock.sendMessage(remoteJid, {
       aliases: ["perm", "pms"],
       type: "core",
       response: "Permission updated.",
+      target: "chat",
+    },
+    plugin: {
+      name: "Plugin Manager",
+      desc: "Manage plugins: refresh, enable, disable, list",
+      trigger: "plg",
+      aliases: ["plugin", "plugins"],
+      type: "core",
+      response: "",
       target: "chat",
     },
     dc: {
@@ -553,6 +563,16 @@ if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply
 const targetIsAdmin = groupMetadata.participants.find(p => p.id === targetUser)?.admin;
 if (targetIsAdmin) return sendTrackedMessage(sock, remoteJid, "❌ I cannot kick a Group Admin.");
 
+const rootTarget = (botInfo.root?.target || 'self').trim().toLowerCase();
+const isSelfRoot = ['self', 'root', 'me', 'myself'].includes(rootTarget);
+const rootNumber = isSelfRoot
+  ? (sock.user?.id?.split(':')[0]?.replace(/\\D/g, '') || null)
+  : rootTarget.replace(/\\D/g, '');
+const targetNumber = targetUser.split('@')[0]?.replace(/\\D/g, '');
+if (rootNumber && targetNumber && rootNumber === targetNumber) {
+  return sendTrackedMessage(sock, remoteJid, "❌ I cannot kick the bot owner.");
+}
+
 await sock.sendMessage(remoteJid, {
   text: \`⏳ @\${targetUser.split('@')[0]} will be kicked and re-added in 5 minutes.\`,
   mentions: [targetUser]
@@ -637,6 +657,16 @@ try {
 const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
 const targetUser = contextInfo?.participant || (contextInfo?.mentionedJid && contextInfo.mentionedJid[0]);
 if (!targetUser) return sendTrackedMessage(sock, remoteJid, "⚠️ Please reply to a user's message or tag them to warn.");
+
+const rootTarget = (botInfo.root?.target || 'self').trim().toLowerCase();
+const isSelfRoot = ['self', 'root', 'me', 'myself'].includes(rootTarget);
+const rootNumber = isSelfRoot
+  ? (sock.user?.id?.split(':')[0]?.replace(/\\D/g, '') || null)
+  : rootTarget.replace(/\\D/g, '');
+const targetNumber = targetUser.split('@')[0]?.replace(/\\D/g, '');
+if (rootNumber && targetNumber && rootNumber === targetNumber) {
+  return sendTrackedMessage(sock, remoteJid, "❌ I cannot warn the bot owner.");
+}
 
 const fs = require('fs');
 const path = require('path');
@@ -1005,6 +1035,7 @@ function sanitizeBotScript(
         : undefined,
     defaultArgument,
     arguments: Object.keys(argumentsMap).length ? argumentsMap : undefined,
+    disabled: typeof input?.disabled === "boolean" ? input.disabled : false,
   };
 }
 
@@ -1226,7 +1257,8 @@ function buildMenuResponse(botInfo: BotInfo): string {
     const defaultArgSuffix = script.defaultArgument
       ? ` (default: ${script.defaultArgument})`
       : "";
-    lines.push(`> ${script.name || key}${aliasesSuffix}`);
+    const disabledMark = script.disabled ? " [DISABLED]" : "";
+    lines.push(`> ${script.name || key}${aliasesSuffix}${disabledMark}`);
     lines.push(`  command : ${baseCommand}${argsSuffix}${defaultArgSuffix}`);
     lines.push(`  desc    : ${script.desc}`);
     if (key === "perm") {
@@ -1235,6 +1267,17 @@ function buildMenuResponse(botInfo: BotInfo): string {
       );
       lines.push(
         `  revoke  : ${botInfo.prefix}${script.trigger} revoke chat | all | +countrycodeNumber`,
+      );
+    }
+    if (key === "plugin") {
+      lines.push(
+        `  refresh : ${botInfo.prefix}${script.trigger} refresh`,
+      );
+      lines.push(
+        `  enable  : ${botInfo.prefix}${script.trigger} enable <name>`,
+      );
+      lines.push(
+        `  disable : ${botInfo.prefix}${script.trigger} disable <name>`,
       );
     }
     lines.push("");
@@ -1551,8 +1594,10 @@ function applyPermissionMutation(
     return sanitizePermissions(next);
   }
 
-  if (/^\+?\d{7,20}$/.test(normalizedArg)) {
-    const normalizedNumber = normalizedArg.replace(/\D/g, "");
+  // Strip leading @ from mention-style args (e.g. "@90315008544812" → "90315008544812")
+  const strippedArg = normalizedArg.replace(/^@/, "");
+  if (/^\+?\d{7,20}$/.test(strippedArg)) {
+    const normalizedNumber = strippedArg.replace(/\D/g, "");
     if (mode === "grant") {
       next.numbers.push(normalizedNumber);
     } else {
@@ -2227,6 +2272,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
           let scriptExecuted = false;
           for (const [scriptName, script] of Object.entries(botInfo.scripts)) {
+            if (script.disabled) continue;
             const prefixPattern = escapeRegex(botInfo.prefix.trim());
 
             // Generate list of all possible triggers (main trigger + aliases)
@@ -2313,6 +2359,102 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
                 dashboard.log(accountId, 
                   "SUCCESS",
                   `Permission ${parsedPermArgs.mode} applied by ${remoteJid}`,
+                );
+                break;
+              }
+
+              if (scriptName === "plugin") {
+                if (!isRootSender) {
+                  const replyJid = resolveReplyJid(remoteJid);
+                  if (replyJid)
+                    await sendTrackedMessage(sock, replyJid, "Permission denied. Root only.");
+                  break;
+                }
+
+                const sub = (argumentName || "").trim().toLowerCase();
+                const replyJid = resolveReplyJid(remoteJid) ?? remoteJid;
+                if (!replyJid) break;
+
+                if (sub === "refresh" || sub === "reload" || sub === "r") {
+                  const conflicts: string[] = [];
+                  const triggerMap: Record<string, string[]> = {};
+                  for (const [key, s] of Object.entries(botInfo.scripts)) {
+                    if (s.disabled) continue;
+                    const triggers = [s.trigger, ...(s.aliases || [])];
+                    for (const t of triggers) {
+                      const tk = t.toLowerCase();
+                      if (!triggerMap[tk]) triggerMap[tk] = [];
+                      triggerMap[tk].push(key);
+                    }
+                  }
+                  for (const [tk, owners] of Object.entries(triggerMap)) {
+                    if (owners.length > 1) {
+                      conflicts.push(`⚠️ Trigger "${tk}" is used by: ${owners.join(", ")}`);
+                    }
+                  }
+                  const enabled = Object.values(botInfo.scripts).filter(s => !s.disabled).length;
+                  const disabled = Object.values(botInfo.scripts).filter(s => s.disabled).length;
+                  let msg = `🔄 *Plugin Refresh*\n\n✅ ${enabled} enabled | ⏸️ ${disabled} disabled | 📦 ${enabled + disabled} total`;
+                  if (conflicts.length > 0) {
+                    msg += `\n\n🚨 *Conflicts Found:*\n${conflicts.join("\n")}\n\n💡 Edit the conflicting plugins to change their trigger or aliases.`;
+                  } else {
+                    msg += `\n\n✅ No conflicts found.`;
+                  }
+                  await sendTrackedMessage(sock, replyJid, msg);
+                  dashboard.log(accountId, "SUCCESS", `Plugin refresh by ${remoteJid}: ${conflicts.length} conflicts`);
+                  break;
+                }
+
+                if (sub.startsWith("enable ") || sub.startsWith("on ")) {
+                  const target = sub.replace(/^(enable|on)\s+/, "").trim();
+                  let found = false;
+                  for (const [key, s] of Object.entries(botInfo.scripts)) {
+                    if (key === target || s.trigger === target || (s.aliases || []).includes(target)) {
+                      if (!s.disabled) {
+                        await sendTrackedMessage(sock, replyJid, `ℹ️ "${key}" is already enabled.`);
+                      } else {
+                        s.disabled = false;
+                        await updateBotInfo(accountId, { scripts: botInfo.scripts });
+                        await sendTrackedMessage(sock, replyJid, `✅ Enabled "${key}" (trigger: ${s.trigger})`);
+                        dashboard.log(accountId, "SUCCESS", `Plugin "${key}" enabled by ${remoteJid}`);
+                      }
+                      found = true;
+                      break;
+                    }
+                  }
+                  if (!found) await sendTrackedMessage(sock, replyJid, `❌ Plugin "${target}" not found.`);
+                  break;
+                }
+
+                if (sub.startsWith("disable ") || sub.startsWith("off ")) {
+                  const target = sub.replace(/^(disable|off)\s+/, "").trim();
+                  let found = false;
+                  for (const [key, s] of Object.entries(botInfo.scripts)) {
+                    if (key === target || s.trigger === target || (s.aliases || []).includes(target)) {
+                      if (s.disabled) {
+                        await sendTrackedMessage(sock, replyJid, `ℹ️ "${key}" is already disabled.`);
+                      } else {
+                        s.disabled = true;
+                        await updateBotInfo(accountId, { scripts: botInfo.scripts });
+                        await sendTrackedMessage(sock, replyJid, `⏸️ Disabled "${key}" (trigger: ${s.trigger})`);
+                        dashboard.log(accountId, "SUCCESS", `Plugin "${key}" disabled by ${remoteJid}`);
+                      }
+                      found = true;
+                      break;
+                    }
+                  }
+                  if (!found) await sendTrackedMessage(sock, replyJid, `❌ Plugin "${target}" not found.`);
+                  break;
+                }
+
+                // Default: show plugin list
+                const lines: string[] = [];
+                for (const [key, s] of Object.entries(botInfo.scripts)) {
+                  const status = s.disabled ? "⏸️" : "✅";
+                  lines.push(`${status} *${key}* → ${s.trigger}${s.aliases?.length ? ` (${s.aliases.join(", ")})` : ""}`);
+                }
+                await sendTrackedMessage(sock, replyJid,
+                  `📦 *Plugins*\n\n${lines.join("\n")}\n\n_Usage: ${botInfo.prefix}plg refresh | enable <name> | disable <name>_`
                 );
                 break;
               }

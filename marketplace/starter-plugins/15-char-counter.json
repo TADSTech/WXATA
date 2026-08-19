@@ -1,0 +1,13 @@
+{
+  "name": "Character Counter",
+  "desc": "Count characters, words, lines, and sentences in text",
+  "trigger": "count",
+  "aliases": ["chars", "wordcount"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !count <text>');\nconst text = argumentName;\nconst chars = text.length;\nconst charsNoSpaces = text.replace(/\\s/g, '').length;\nconst words = text.trim().split(/\\s+/).filter(w => w.length > 0).length;\nconst lines = text.split('\\n').length;\nconst sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;\nawait sendTrackedMessage(sock, remoteJid, `📊 Text Stats:\\n\\nCharacters: ${chars}\\nCharacters (no spaces): ${charsNoSpaces}\\nWords: ${words}\\nLines: ${lines}\\nSentences: ${sentences}`);",
+  "version": "1.0.0",
+  "tags": ["tools", "text", "counter"]
+}

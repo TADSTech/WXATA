@@ -1,0 +1,13 @@
+{
+  "name": "Weather",
+  "desc": "Get current weather for any city worldwide",
+  "trigger": "weather",
+  "aliases": ["w", "temp"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const axios = require('axios');\nif (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !weather <city>\\nExample: !weather London');\nawait sendTrackedMessage(sock, remoteJid, '🔍 Fetching weather...');\ntry {\n  const res = await axios.get(`https://wttr.in/${encodeURIComponent(argumentName.trim())}?format=4`);\n  await sendTrackedMessage(sock, remoteJid, `🌤️ ${res.data}`);\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ City not found. Check the spelling and try again.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "weather", "utility"]
+}

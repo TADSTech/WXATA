@@ -1,0 +1,13 @@
+{
+  "name": "Random Joke",
+  "desc": "Fetch a random joke from JokeAPI. Tell me a category or get a random one!",
+  "trigger": "joke",
+  "aliases": ["jk", "jokes"],
+  "type": "fun",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const axios = require('axios');\nconst cat = argumentName?.trim() || 'Any';\nawait sendTrackedMessage(sock, remoteJid, '😂 Fetching a joke...');\ntry {\n  const res = await axios.get(`https://v2.jokeapi.dev/joke/${encodeURIComponent(cat)}?safe-mode&type=single`);\n  if (res.data.error) {\n    await sendTrackedMessage(sock, remoteJid, `❌ No jokes found for '${cat}'. Try: Programming, Pun, Misc`);\n  } else {\n    await sendTrackedMessage(sock, remoteJid, `😂 ${res.data.joke}`);\n  }\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Failed to fetch joke.');\n}",
+  "version": "1.0.0",
+  "tags": ["fun", "jokes", "entertainment"]
+}

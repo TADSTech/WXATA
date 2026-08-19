@@ -1,0 +1,13 @@
+{
+  "name": "Bot Stats",
+  "desc": "Show bot statistics — uptime, installed plugins, system info",
+  "trigger": "botstats",
+  "aliases": ["stats", "sysinfo"],
+  "type": "core",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const os = require('os');\nconst uptime = process.uptime();\nconst hours = Math.floor(uptime / 3600);\nconst minutes = Math.floor((uptime % 3600) / 60);\nconst memUsed = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);\nconst memTotal = Math.round(os.totalmem() / 1024 / 1024);\nconst pluginCount = Object.keys(botInfo.scripts || {}).length;\nconst scriptNames = Object.keys(botInfo.scripts || {}).slice(0, 10);\nlet msg = `📊 *WXATA Bot Stats*\\n\\n`;\nmsg += `⏱️ Uptime: ${hours}h ${minutes}m\\n`;\nmsg += `💾 Memory: ${memUsed}MB / ${memTotal}MB\\n`;\nmsg += `🖥️ Platform: ${os.platform()} ${os.arch()}\\n`;\nmsg += `📦 Plugins: ${pluginCount} installed\\n`;\nmsg += `🔧 Prefix: ${botInfo.prefix}\\n`;\nmsg += `📋 Node: ${process.version}\\n`;\nif (scriptNames.length > 0) {\n  msg += `\\n*Installed Plugins:*\\n`;\n  scriptNames.forEach(name => { msg += `• ${name}\\n`; });\n  if (pluginCount > 10) msg += `... and ${pluginCount - 10} more\\n`;\n}\nawait sendTrackedMessage(sock, remoteJid, msg);",
+  "version": "1.0.0",
+  "tags": ["core", "stats", "system"]
+}

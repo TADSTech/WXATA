@@ -1,0 +1,13 @@
+{
+  "name": "Math Calculator",
+  "desc": "Evaluate math expressions safely — basic arithmetic, powers, roots",
+  "trigger": "calc",
+  "aliases": ["math", "calculate"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !calc <expression>\\nExample: !calc 2+2, !calc sqrt(144), !calc 2^10');\ntry {\n  const expr = argumentName.trim()\n    .replace(/\\^/g, '**')\n    .replace(/sqrt\\(([^)]+)\\)/gi, 'Math.sqrt($1)')\n    .replace(/sin\\(([^)]+)\\)/gi, 'Math.sin($1)')\n    .replace(/cos\\(([^)]+)\\)/gi, 'Math.cos($1)')\n    .replace(/tan\\(([^)]+)\\)/gi, 'Math.tan($1)')\n    .replace(/log\\(([^)]+)\\)/gi, 'Math.log10($1)')\n    .replace(/ln\\(([^)]+)\\)/gi, 'Math.log($1)')\n    .replace(/pi/gi, 'Math.PI')\n    .replace(/abs\\(([^)]+)\\)/gi, 'Math.abs($1)');\n  if (/[^0-9+\\-*/().,%\\sMath.sqrbcostalgepi]/.test(expr.replace(/Math\\.[a-z]+/gi, ''))) {\n    return sendTrackedMessage(sock, remoteJid, '❌ Invalid expression.');\n  }\n  const result = Function(`\"use strict\"; return (${expr})`)();\n  if (typeof result !== 'number' || isNaN(result)) {\n    return sendTrackedMessage(sock, remoteJid, '❌ Could not evaluate expression.');\n  }\n  await sendTrackedMessage(sock, remoteJid, `🧮 ${argumentName.trim()} = ${result}`);\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Invalid math expression.');\n}",
+  "version": "1.0.0",
+  "tags": ["tools", "math", "calculator"]
+}

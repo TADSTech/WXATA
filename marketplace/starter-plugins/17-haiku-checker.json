@@ -1,0 +1,13 @@
+{
+  "name": "Haiku Checker",
+  "desc": "Check if your text follows the 5-7-5 syllable pattern of a haiku",
+  "trigger": "haiku",
+  "aliases": ["hk"],
+  "type": "fun",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !haiku <three lines separated by | or newlines>');\nconst countSyllables = (word) => {\n  word = word.toLowerCase().replace(/[^a-z]/g, '');\n  if (word.length <= 3) return 1;\n  word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');\n  word = word.replace(/^y/, '');\n  const m = word.match(/[aeiouy]{1,2}/g);\n  return m ? m.length : 1;\n};\nconst countLineSyllables = (line) => line.trim().split(/\\s+/).reduce((sum, w) => sum + countSyllables(w), 0);\nconst lines = argumentName.split(/[|\\n]/).map(l => l.trim()).filter(l => l.length > 0);\nif (lines.length !== 3) return sendTrackedMessage(sock, remoteJid, 'A haiku needs exactly 3 lines (separate with | ):\\n!haiku Line one | Line two here | Line three');\nconst syllables = lines.map(countLineSyllables);\nconst pattern = [5, 7, 5];\nconst isHaiku = syllables.every((s, i) => s === pattern[i]);\nlet msg = `📝 Syllable count: ${syllables.join('-')}\\n\\n`;\nlines.forEach((l, i) => { msg += `${l} (${syllables[i]} syllables)\\n`; });\nmsg += isHaiku ? '\\n✅ Perfect haiku!' : `\\n❌ Not a haiku — expected 5-7-5, got ${syllables.join('-')}`;\nawait sendTrackedMessage(sock, remoteJid, msg);",
+  "version": "1.0.0",
+  "tags": ["fun", "haiku", "poetry"]
+}

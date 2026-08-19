@@ -1,0 +1,13 @@
+{
+  "name": "Random Quote",
+  "desc": "Get an inspirational quote to brighten your day",
+  "trigger": "quote",
+  "aliases": ["inspire", "motivation"],
+  "type": "fun",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "const axios = require('axios');\nawait sendTrackedMessage(sock, remoteJid, '✨ Fetching inspiration...');\ntry {\n  const res = await axios.get('https://zenquotes.io/api/random');\n  if (res.data && res.data[0]) {\n    await sendTrackedMessage(sock, remoteJid, `💬 \"${res.data[0].q}\"\\n\\n— ${res.data[0].a}`);\n  } else {\n    await sendTrackedMessage(sock, remoteJid, '❌ Could not fetch a quote.');\n  }\n} catch (e) {\n  await sendTrackedMessage(sock, remoteJid, '❌ Quote service unavailable.');\n}",
+  "version": "1.0.0",
+  "tags": ["fun", "quotes", "inspiration"]
+}

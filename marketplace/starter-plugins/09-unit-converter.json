@@ -1,0 +1,13 @@
+{
+  "name": "Unit Converter",
+  "desc": "Convert between common units: kg↔lb, km↔mi, °C↔°F, L↔gal",
+  "trigger": "convert",
+  "aliases": ["cv", "unit"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !convert <value> <from> <to>\\n\\nSupported:\\nkg ↔ lb | km ↔ mi | °C ↔ °F | L ↔ gal | cm ↔ in | m ↔ ft');\nconst parts = argumentName.trim().split(/\\s+/);\nif (parts.length < 3) return sendTrackedMessage(sock, remoteJid, 'Usage: !convert 100 kg lb');\nconst val = parseFloat(parts[0]);\nif (isNaN(val)) return sendTrackedMessage(sock, remoteJid, '❌ Invalid number.');\nconst from = parts[1].toLowerCase();\nconst to = parts[2].toLowerCase();\nconst conversions = {\n  'kg-lb': v => v * 2.20462,\n  'lb-kg': v => v / 2.20462,\n  'km-mi': v => v * 0.621371,\n  'mi-km': v => v / 0.621371,\n  'c-f': v => v * 9/5 + 32,\n  'f-c': v => (v - 32) * 5/9,\n  'l-gal': v => v * 0.264172,\n  'gal-l': v => v / 0.264172,\n  'cm-in': v => v / 2.54,\n  'in-cm': v => v * 2.54,\n  'm-ft': v => v * 3.28084,\n  'ft-m': v => v / 3.28084,\n};\nconst key = `${from}-${to}`;\nif (!conversions[key]) return sendTrackedMessage(sock, remoteJid, '❌ Unsupported conversion. Type !convert for help.');\nconst result = conversions[key](val);\nawait sendTrackedMessage(sock, remoteJid, `📐 ${val} ${from} = ${result.toFixed(4)} ${to}`);",
+  "version": "1.0.0",
+  "tags": ["tools", "converter", "utility"]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "ROT13 Cipher",
+  "desc": "Encode or decode ROT13 cipher text",
+  "trigger": "rot13",
+  "aliases": ["r13", "cipher"],
+  "type": "fun",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "",
+  "code": "if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !rot13 <text>');\nconst rot13 = str => str.replace(/[a-zA-Z]/g, c => {\n  const base = c <= 'Z' ? 65 : 97;\n  return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);\n});\nconst input = argumentName.trim();\nconst encoded = rot13(input);\nawait sendTrackedMessage(sock, remoteJid, `🔐 ROT13:\\n${encoded}\\n\\n🔓 Decoded:\\n${rot13(encoded)}`);",
+  "version": "1.0.0",
+  "tags": ["fun", "cipher", "encoding"]
+}

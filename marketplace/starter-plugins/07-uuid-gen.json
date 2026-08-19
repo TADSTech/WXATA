@@ -1,0 +1,13 @@
+{
+  "name": "UUID Generator",
+  "desc": "Generate v4 UUIDs (Universally Unique Identifiers)",
+  "trigger": "uuid",
+  "aliases": ["uid"],
+  "type": "tools",
+  "target": "chat",
+  "response": "",
+  "defaultArgument": "1",
+  "code": "const crypto = require('crypto');\nconst count = Math.min(parseInt(argumentName?.trim()) || 1, 10);\nlet result = [];\nfor (let i = 0; i < count; i++) {\n  result.push(crypto.randomUUID());\n}\nawait sendTrackedMessage(sock, remoteJid, `🆔 Generated ${count} UUID(s):\\n${result.join('\\n')}`);",
+  "version": "1.0.0",
+  "tags": ["tools", "uuid", "utility"]
+}

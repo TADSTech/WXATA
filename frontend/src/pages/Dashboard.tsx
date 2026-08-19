@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw,
   LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X,
-  Palette, BookOpen, GripVertical
+  Palette, BookOpen, GripVertical, Upload, Power, PowerOff
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -39,6 +39,7 @@ interface BotScript {
   code?: string;
   defaultArgument?: string;
   arguments?: Record<string, BotScriptArgument>;
+  disabled?: boolean;
 }
 
 interface BotScriptArgument {
@@ -348,7 +349,7 @@ interface ScriptManagerProps {
   setAddingScript: (v: boolean) => void;
   newScriptDraft: BotScript;
   setNewScriptDraft: (fn: (d: BotScript) => BotScript) => void;
-  handleScriptFieldChange: (key: string, field: keyof BotScript, value: string) => void;
+  handleScriptFieldChange: (key: string, field: keyof BotScript, value: string | boolean) => void;
   handleScriptArgumentChange: (argName: string, field: keyof BotScriptArgument, value: string) => void;
   handleDeleteScript: (key: string) => void;
   handleAddScript: () => void;
@@ -395,12 +396,50 @@ function ScriptManager({
     <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-3">
       <div className="flex justify-between items-center border-b border-border-strong/10 pb-2">
         <h3 className="text-xs uppercase tracking-widest opacity-50">Scripts ({scriptKeys.length})</h3>
-        <button
-          onClick={() => { setAddingScript(true); setExpandedScript(null); }}
-          className="flex items-center gap-1 text-xs text-accent-light hover:text-accent-light border border-border-strong px-2 py-1 rounded"
-        >
-          <Plus className="w-3 h-3" /> New Script
-        </button>
+        <div className="flex gap-2">
+          <label className="flex items-center gap-1 text-xs text-accent-light hover:text-accent-light border border-border-strong px-2 py-1 rounded cursor-pointer">
+            <Upload className="w-3 h-3" /> Import
+            <input
+              type="file"
+              accept=".wxata.json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  try {
+                    const data = JSON.parse(ev.target?.result as string);
+                    const key = (data.trigger || data.name || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                    if (!key) return;
+                    const script: BotScript = {
+                      name: data.name || key,
+                      desc: data.desc || data.description || '',
+                      trigger: data.trigger || key,
+                      aliases: data.aliases || [],
+                      type: data.type || 'misc',
+                      response: data.response || '',
+                      target: data.target || 'chat',
+                      code: data.code || '',
+                      defaultArgument: data.defaultArgument || data.default_argument || '',
+                      disabled: data.disabled || false,
+                    };
+                    setBotInfo(prev => ({ ...prev, scripts: { ...prev.scripts, [key]: script } }));
+                    setExpandedScript(key);
+                  } catch {}
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <button
+            onClick={() => { setAddingScript(true); setExpandedScript(null); }}
+            className="flex items-center gap-1 text-xs text-accent-light hover:text-accent-light border border-border-strong px-2 py-1 rounded"
+          >
+            <Plus className="w-3 h-3" /> New Script
+          </button>
+        </div>
       </div>
 
       {/* Add new script form */}
@@ -509,8 +548,18 @@ function ScriptManager({
                     </div>
                     {script.code && <span className="text-[9px] text-info-text border border-info-subtle px-1 rounded shrink-0">JS</span>}
                     {script.type && <span className="text-[9px] text-warning-text border border-warning-subtle px-1 rounded shrink-0">{script.type}</span>}
+                    {script.disabled && <span className="text-[9px] text-danger-text border border-danger-subtle px-1 rounded shrink-0">OFF</span>}
                   </div>
-                  {isExpanded ? <ChevronUp className="w-3 h-3 text-text-muted shrink-0" /> : <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleScriptFieldChange(key, 'disabled', !script.disabled); }}
+                      className={`p-1 rounded transition-colors ${script.disabled ? 'text-danger-text hover:text-danger-base' : 'text-success-text hover:text-success-base'}`}
+                      title={script.disabled ? 'Enable plugin' : 'Disable plugin'}
+                    >
+                      {script.disabled ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                    </button>
+                    {isExpanded ? <ChevronUp className="w-3 h-3 text-text-muted shrink-0" /> : <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />}
+                  </div>
                 </button>
               </div>
 
@@ -594,6 +643,9 @@ function ScriptManager({
                       )}
                       {!isCore && (
                         <div className="flex gap-2">
+                          <button onClick={() => handleScriptFieldChange(key, 'disabled', !script.disabled)} className={`flex items-center gap-1 border px-2 py-1 rounded text-[10px] transition-colors ${script.disabled ? 'text-success-text hover:text-success-base border-success-subtle hover:border-success-base' : 'text-warning-text hover:text-warning-base border-warning-subtle hover:border-warning-base'}`}>
+                            {script.disabled ? <Power className="w-3 h-3" /> : <PowerOff className="w-3 h-3" />} {script.disabled ? 'Enable' : 'Disable'}
+                          </button>
                           <button onClick={() => handleDeleteScript(key)} className="flex items-center gap-1 text-danger-text hover:text-danger-base border border-danger-subtle hover:border-danger-base px-2 py-1 rounded text-[10px] transition-colors">
                             <Trash2 className="w-3 h-3" /> Delete Script
                           </button>
@@ -1000,7 +1052,7 @@ const Dashboard = () => {
     setConfigStatus('Unsaved changes');
   };
 
-  const handleScriptFieldChange = (scriptKey: string, field: keyof BotScript, value: string) => {
+  const handleScriptFieldChange = (scriptKey: string, field: keyof BotScript, value: string | boolean) => {
     let finalValue: unknown = value;
     if (field === 'aliases' && typeof value === 'string') {
       finalValue = value.split(',').map(s => s.trim()).filter(Boolean);
