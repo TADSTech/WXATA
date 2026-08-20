@@ -274,8 +274,8 @@ class DashboardServer {
         return auth.startsWith("Bearer ") ? auth.slice(7) : null;
       }
 
-      // GET /api/marketplace/plugins — list plugins
-      if (req.method === "GET" && req.url?.startsWith("/api/marketplace/plugins") && !req.url.includes("/download")) {
+      // GET /api/marketplace/plugins — list plugins (exact path only, no sub-paths)
+      if (req.method === "GET" && (req.url === "/api/marketplace/plugins" || req.url?.startsWith("/api/marketplace/plugins?"))) {
         setCorsHeaders(res);
         try {
           const urlObj = new URL(req.url, `http://${req.headers.host}`);
