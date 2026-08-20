@@ -1,7 +1,23 @@
 const API_BASE = (() => {
   const url = localStorage.getItem("wxata_backend_url");
   if (url) {
-    try { return new URL(url).origin; } catch {}
+    try {
+      const u = new URL(url);
+      // Convert wss:// to https:// for REST API calls
+      if (u.protocol === "wss:") u.protocol = "https:";
+      else if (u.protocol === "ws:") u.protocol = "http:";
+      return u.origin;
+    } catch {}
+  }
+  // Fallback to backend server from env
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  if (envUrl) {
+    try {
+      const u = new URL(envUrl);
+      if (u.protocol === "wss:") u.protocol = "https:";
+      else if (u.protocol === "ws:") u.protocol = "http:";
+      return u.origin;
+    } catch {}
   }
   return window.location.origin;
 })();

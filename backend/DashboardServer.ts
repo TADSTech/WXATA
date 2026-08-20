@@ -131,7 +131,11 @@ class DashboardServer {
       }
 
       if (req.url?.startsWith("/api/")) {
-        if (!checkAuth(req)) { rejectAuth(res); return; }
+        // Marketplace browse/detail/download are public — skip auth
+        const isPublicMarketplace = req.url.startsWith("/api/marketplace/plugins") &&
+          (req.method === "GET") &&
+          !req.url.includes("/pending");
+        if (!isPublicMarketplace && !checkAuth(req)) { rejectAuth(res); return; }
       }
 
       if (req.method === "POST" && req.url === "/api/twitter/grab") {
