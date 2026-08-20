@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Shield, Activity, QrCode, Phone, Wifi, RefreshCw,
   LogOut, ChevronDown, ChevronUp, Plus, Trash2, Edit3, Save, X,
-  Palette, BookOpen, GripVertical, Upload, Power, PowerOff
+  Palette, BookOpen, GripVertical, Upload, Power, PowerOff, Download
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme, KNOWN_THEMES, type Theme } from '../components/ThemeProvider';
 import { useWXATASocket } from '../hooks/useWXATASocket';
 import { TwitterGrabber } from '../components/TwitterGrabber';
+import MarketplaceBrowser from '../components/MarketplaceBrowser';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -355,6 +356,7 @@ interface ScriptManagerProps {
   handleDeleteScript: (key: string) => void;
   handleAddScript: () => void;
   onReorder: (newOrder: string[]) => void;
+  onOpenMarketplace: () => void;
 }
 
 function ScriptManager({
@@ -363,7 +365,7 @@ function ScriptManager({
   newScriptDraft, setNewScriptDraft,
   handleScriptFieldChange, handleScriptArgumentChange,
   handleDeleteScript, handleAddScript,
-  onReorder
+  onReorder, onOpenMarketplace
 }: ScriptManagerProps) {
   const prefix = botInfo.prefix;
   const scriptKeys = Object.keys(botInfo.scripts);
@@ -398,6 +400,12 @@ function ScriptManager({
       <div className="flex justify-between items-center border-b border-border-strong/10 pb-2">
         <h3 className="text-xs uppercase tracking-widest opacity-50">Scripts ({scriptKeys.length})</h3>
         <div className="flex gap-2">
+          <button
+            onClick={onOpenMarketplace}
+            className="flex items-center gap-1 text-xs text-accent-primary hover:text-accent-light border border-accent-subtle px-2 py-1 rounded transition-colors"
+          >
+            <Download className="w-3 h-3" /> Marketplace
+          </button>
           <label className="flex items-center gap-1 text-xs text-accent-light hover:text-accent-light border border-border-strong px-2 py-1 rounded cursor-pointer">
             <Upload className="w-3 h-3" /> Import
             <input
@@ -954,6 +962,7 @@ const Dashboard = () => {
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [showQuickActionsModal, setShowQuickActionsModal] = useState(false);
   const [showTwitterModal, setShowTwitterModal] = useState(false);
+  const [showMarketplaceModal, setShowMarketplaceModal] = useState(false);
 
   // ── Persist account selection & Send GET_BOT_INFO on connect & account switch ─────────────────────────────
   useEffect(() => {
@@ -1397,6 +1406,7 @@ const Dashboard = () => {
                   handleDeleteScript={handleDeleteScript}
                   handleAddScript={handleAddScript}
                   onReorder={handleScriptReorder}
+                  onOpenMarketplace={() => setShowMarketplaceModal(true)}
                 />
               </div>
             </motion.div>
@@ -1497,6 +1507,28 @@ const Dashboard = () => {
                 selectedAccountId={selectedAccountId}
               />
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Marketplace Browser Modal */}
+      <AnimatePresence>
+        {showMarketplaceModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <MarketplaceBrowser
+              installedTriggers={Object.values(botInfo.scripts).map(s => s.trigger)}
+              onInstall={(key, script) => {
+                setBotInfo(prev => ({ ...prev, scripts: { ...prev.scripts, [key]: script } }));
+                setExpandedScript(key);
+                setShowMarketplaceModal(false);
+                addToast(`Installed "${script.name || key}"`, 'success');
+              }}
+              onClose={() => setShowMarketplaceModal(false)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
