@@ -347,7 +347,7 @@ export function seedStarterPlugins(): void {
     );
   }
 
-  const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith(".wxata.json"));
+  const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith(".json"));
   for (const file of files) {
     try {
       const raw = fs.readFileSync(path.resolve(pluginsDir, file), "utf-8");
@@ -358,10 +358,10 @@ export function seedStarterPlugins(): void {
         INSERT OR IGNORE INTO plugins (id, name, description, trigger, aliases, type, target, response, code, default_argument, author_id, author_username, status, version, tags)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?)
       `).run(
-        id, plugin.name, plugin.description, plugin.trigger,
+        id, plugin.name, plugin.desc || plugin.description || "", plugin.trigger,
         JSON.stringify(plugin.aliases || []), plugin.type || "misc",
         plugin.target || "chat", plugin.response || "",
-        plugin.code || "", plugin.default_argument || "",
+        plugin.code || "", plugin.defaultArgument || plugin.default_argument || "",
         systemId, "WXATA", plugin.version || "1.0.0",
         JSON.stringify(plugin.tags || [])
       );
