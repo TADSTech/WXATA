@@ -1,0 +1,87 @@
+/* Hallmark · theme: Cobalt · genre: modern-minimal
+ * Paper band: cool light (L 98.5%, hue ~250)
+ * Display style: grotesk-sans (Space Grotesk)
+ * Accent hue: electric cobalt (oklch(58% 0.20 256))
+ */
+
+:root {
+  /* ── Paper & ink ── */
+  --color-paper:      oklch(98.5% 0.004 250);
+  --color-paper-2:    oklch(96% 0.006 250);
+  --color-paper-3:    oklch(93% 0.008 250);
+  --color-graphite:   oklch(22% 0.016 260);
+  --color-graphite-2: oklch(28% 0.014 258);
+
+  /* ── Ink ── */
+  --color-ink:        oklch(24% 0.02 258);
+  --color-ink-2:      oklch(34% 0.018 257);
+  --color-muted:      oklch(52% 0.012 255);
+
+  /* ── Rules ── */
+  --color-rule:       oklch(88% 0.008 250);
+  --color-rule-2:     oklch(80% 0.010 250);
+
+  /* ── Accent — the one cobalt signal ── */
+  --color-accent:     oklch(58% 0.20 256);
+  --color-accent-dim: oklch(50% 0.16 256);
+  --color-accent-ink: oklch(98% 0.004 250);
+
+  /* ── Focus ── */
+  --color-focus:      oklch(58% 0.20 256);
+
+  /* ── Semantic ── */
+  --color-danger:     oklch(62% 0.22 25);
+  --color-success:    oklch(62% 0.18 155);
+  --color-warning:    oklch(78% 0.16 85);
+
+  /* ── Typography ── */
+  --font-display:  "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body:     "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:     "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Type scale (major third 1.25) ── */
+  --text-xs:       0.64rem;
+  --text-sm:       0.8rem;
+  --text-base:     1rem;
+  --text-md:       1.25rem;
+  --text-lg:       1.5625rem;
+  --text-xl:       1.9531rem;
+  --text-2xl:      2.4414rem;
+  --text-3xl:      3.0518rem;
+  --text-4xl:      3.8147rem;
+  --text-display:  clamp(2.5rem, 4vw + 1rem, 4.75rem);
+  --text-display-s: clamp(2rem, 3vw + 0.75rem, 3.5rem);
+
+  /* ── Spacing (4pt scale) ── */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  /* ── Motion ── */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro:   120ms;
+  --dur-short:   220ms;
+  --dur-long:    420ms;
+
+  /* ── Radii ── */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+
+  /* ── Z-index ── */
+  --z-base:     1;
+  --z-raised:   10;
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-modal:    400;
+  --z-toast:    500;
+}

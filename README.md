@@ -1,21 +1,21 @@
 # WXATA — FOSS WhatsApp Bot Platform
 
-A self-hosted WhatsApp automation bot built on [Baileys](https://github.com/WhiskeySockets/Baileys) and [Bun](https://bun.sh). Connect your WhatsApp account, use built-in commands, write custom scripts, and manage everything from a live web dashboard.
+A self-hosted WhatsApp automation bot built on [Baileys](https://github.com/WhiskeySockets/Baileys) and [Bun](https://bun.sh). Connect your WhatsApp account, use built-in commands, write custom scripts via config, install community plugins, and manage everything from a live web dashboard.
 
-**License:** MIT
+**Live site:** [wxata-live-ruby.vercel.app](https://wxata-live-ruby.vercel.app/)
+**License:** GPL-3.0
 
 ---
 
 ## Features
 
-- **Dual Accounts** — Run primary and secondary WhatsApp accounts simultaneously
-- **Live Dashboard** — Real-time WebSocket dashboard for logs, QR codes, and bot control
-- **Anti-Delete** — Recover deleted messages with local SQLite cache
-- **Command System** — Built-in commands + custom JS script execution
-- **TV Mode** — Restrict bot to root user only
-- **Group Management** — Warn system, tag-all, anti-broadcast
-- **Developer API** — REST API for sending WhatsApp messages programmatically
-- **Extension Marketplace** — Community-contributed plugins
+- **Custom Scripts** — Add commands via `botinfo.json`. No code changes, just config.
+- **Live Dashboard** — Real-time WebSocket dashboard for logs, QR codes, and bot control.
+- **Anti-Delete** — Recover deleted messages with local SQLite cache.
+- **Built-in Commands** — Ten commands out of the box: `+menu`, `+ping`, `+help`, `+tagall`, `+warn`, `+antidel`, `+sticker`, `+ss`, `+vars`, `+perm`.
+- **Permissions** — Granular command permissions. Control who can use what.
+- **Extension Marketplace** — Community-contributed plugins. Browse, download, import.
+- **One-Command Deploy** — Docker or PM2. Deploy to any VPS in seconds.
 
 ---
 
@@ -24,7 +24,6 @@ A self-hosted WhatsApp automation bot built on [Baileys](https://github.com/Whis
 ### Prerequisites
 
 - [Bun](https://bun.sh) runtime
-- Node.js 18+ (for compatibility)
 
 ### 1. Clone & Setup
 
@@ -65,7 +64,7 @@ Edit `botinfo.json` to customize commands and behavior.
 bun run all
 ```
 
-- Frontend: http://localhost:5173
+- Dashboard: http://localhost:5173
 - Backend WebSocket: ws://localhost:5000
 
 ### 4. Connect WhatsApp
@@ -85,13 +84,12 @@ wxata/
 │   ├── connection.ts        # Baileys socket management
 │   ├── DashboardServer.ts   # HTTP + WebSocket server
 │   ├── db.ts                # SQLite message cache (anti-delete)
-│   ├── firebase.ts          # Firebase data layer (optional)
 │   └── commands/            # Modular command system
 ├── frontend/                # Vite + React dashboard
 │   └── src/
 │       ├── pages/           # Dashboard, TV mode, X Grabber
 │       └── components/      # UI components
-├── landing/                 # Static landing page + docs
+├── landing/                 # Vite + React landing page + docs
 ├── primary/                 # Primary account config
 ├── secondary/               # Secondary account config
 ├── .env.example             # Environment template
@@ -135,7 +133,7 @@ Add custom commands to `botinfo.json`:
       "trigger": "hello",
       "aliases": ["hi"],
       "type": "fun",
-      "response": "Hello! 👋",
+      "response": "Hello!",
       "target": "chat",
       "code": ""
     }
@@ -174,9 +172,6 @@ See `deploy-oracle.sh` for automated Oracle Cloud deployment.
 | `PORT` | `5000` | Backend server port |
 | `DB_RETENTION_DAYS` | `3` | Message cache retention |
 | `VITE_BACKEND_URL` | `http://localhost:5000/ws` | WebSocket URL for frontend |
-| `FIREBASE_PROJECT_ID` | — | Firebase project (optional) |
-| `FIREBASE_CLIENT_EMAIL` | — | Firebase service account (optional) |
-| `FIREBASE_PRIVATE_KEY` | — | Firebase service account (optional) |
 
 ---
 
@@ -192,7 +187,7 @@ See `deploy-oracle.sh` for automated Oracle Cloud deployment.
 
 ## License
 
-MIT — do whatever you want with it.
+GPL-3.0 — see [LICENSE](LICENSE) for full text.
 
 ---
 

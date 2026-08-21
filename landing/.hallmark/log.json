@@ -1,0 +1,20 @@
+[
+  {
+    "id": "2026-08-21-hallmark-first-run",
+    "project": "wxata-landing",
+    "date": "2026-08-21",
+    "macro": "bento-grid",
+    "theme": "cobalt",
+    "genre": "modern-minimal",
+    "nav": "n13-inline-cmdk-pill",
+    "footer": "ft2-inline-single-line",
+    "enrichment": "none",
+    "files": [
+      "tokens.css",
+      "src/index.css",
+      "src/pages/LandingPage.tsx",
+      "index.html"
+    ],
+    "notes": "First Hallmark run. Bento Grid chosen to show many small things (features, commands, marketplace, architecture). Cobalt chosen for dev-tool register. Nav upgraded from floating pill (N5) to N13 (⌘K search pill) per Cobalt signature. Architecture section uses dark graphite band. Code is the hero — asymmetric split hero. Diversification constraints: none (first run)."
+  }
+]

@@ -120,7 +120,6 @@ bun run install:all`}</Code>
             ["PORT", "5000", "Backend server port"],
             ["DB_RETENTION_DAYS", "3", "Message cache retention"],
             ["VITE_BACKEND_URL", "http://localhost:5000/ws", "WebSocket URL for frontend"],
-            ["FIREBASE_PROJECT_ID", "—", "Firebase project (optional)"],
           ]} />
           <h3 className="text-lg font-bold mt-6 mb-2">botinfo.json</h3>
           <p className="text-text-muted text-sm mb-4">The main bot configuration file. Controls commands, prefix, permissions, and behavior.</p>
@@ -164,7 +163,7 @@ bun run install:all`}</Code>
           <h2 id="plugin-schema" className="text-xl font-bold mt-12 mb-4 pt-4 border-t border-border-subtle">Plugin Schema</h2>
           <p className="text-text-muted text-sm mb-4">Each plugin is a JSON object matching this schema:</p>
           <Code>{`{
-  "name": "string — display name shown in !menu",
+  "name": "string — display name shown in +menu",
   "desc": "string — short description",
   "trigger": "string — primary command word",
   "aliases": ["array", "of", "alternative", "triggers"],
@@ -182,11 +181,11 @@ bun run install:all`}</Code>
 }`}</Code>
           <h3 className="text-lg font-bold mt-6 mb-2">Field Reference</h3>
           <Table headers={["Field", "Required", "Description"]} rows={[
-            ["trigger", "Yes", "The command word. User types !trigger to run it."],
+            ["trigger", "Yes", "The command word. User types +trigger to run it."],
             ["response", "Yes", "Static text response. Can be empty if code is used."],
             ["target", "Yes", '"chat" sends to current chat. "self" sends to your DM.'],
             ["name", "Recommended", "Display name in menus. Defaults to trigger if omitted."],
-            ["desc", "Recommended", "Description shown in !mn detailed and !hp."],
+            ["desc", "Recommended", "Description shown in +menu and +help."],
             ["aliases", "Optional", 'Extra triggers. e.g. ["weather", "w"]'],
             ["type", "Optional", 'Category for menu grouping. Default: "misc"'],
             ["code", "Optional", "JavaScript code. If present, overrides response."],
@@ -223,10 +222,10 @@ const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;`}</
 remoteJid.endsWith('@g.us')        // true if group chat
 remoteJid.endsWith('@s.whatsapp.net') // true if DM`}</Code>
           <h3 className="text-lg font-bold mt-6 mb-2"><code className="bg-bg-panel px-1 rounded">argumentName</code> — Command Argument</h3>
-          <Code>{`// User types: !weather Lagos
+          <Code>{`// User types: +weather Lagos
 argumentName  // → "Lagos"
 
-// User types: !weather
+// User types: +weather
 argumentName  // → undefined
 
 // Safe usage:
@@ -256,11 +255,11 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2));`}</Code>
           <Code>{`// No code needed — just set the response field:
 // response: "Hello! This is my plugin."`}</Code>
           <h3 className="text-lg font-bold mt-6 mb-2">Template 2 — Echo with Argument</h3>
-          <Code>{`if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !echo <text>');
+          <Code>{`if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: +echo <text>');
 await sendTrackedMessage(sock, remoteJid, argumentName);`}</Code>
           <h3 className="text-lg font-bold mt-6 mb-2">Template 3 — HTTP API Call</h3>
           <Code>{`const axios = require('axios');
-if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !weather <city>');
+if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: +weather <city>');
 
 await sendTrackedMessage(sock, remoteJid, '🔍 Fetching...');
 try {
@@ -418,7 +417,7 @@ Backend (Bun + Baileys)
   └── Firebase (optional)`}</Code>
 
           <p className="text-text-muted text-xs mt-12 pt-4 border-t border-border-subtle">
-            Built by <a href="https://x.com/tads_tech" className="text-accent-primary hover:underline">TADS Tech</a> · MIT License
+            Built by <a href="https://x.com/tads_tech" className="text-accent-primary hover:underline">TADS Tech</a> · GPL-3.0
           </p>
         </main>
       </div>

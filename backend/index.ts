@@ -175,7 +175,7 @@ await sock.sendMessage(remoteJid, {
             body: isDetailed ? 'Detailed Command Overview' : 'Advanced WhatsApp Automation',
             mediaType: 1,
             thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',
-            sourceUrl: 'https://wxata.tadstech.dev'
+            sourceUrl: 'https://wxata-live-ruby.vercel.app/'
         }
     }
 });`,
@@ -220,7 +220,7 @@ await sock.sendMessage(remoteJid, {
       body: 'WXATA Documentation System',
       mediaType: 1,
       thumbnailUrl: 'https://files.catbox.moe/7pqr0j.jpeg',
-      sourceUrl: 'https://wxata.tadstech.dev/docs'
+      sourceUrl: 'https://wxata-live-ruby.vercel.app/docs'
     }
   }
 });`,
@@ -251,7 +251,7 @@ await sock.sendMessage(remoteJid, {
       type: "core",
       response: "",
       target: "chat",
-      code: `await sendTrackedMessage(sock, remoteJid, '📚 *WXATA Documentation*\\n\\nhttps://wxata.tadstech.dev/docs');`,
+      code: `await sendTrackedMessage(sock, remoteJid, '📚 *WXATA Documentation*\\n\\nhttps://wxata-live-ruby.vercel.app/docs');`,
     },
     owner: {
       name: "Bot Owner",
@@ -939,7 +939,7 @@ await commandHandler.dispatch('wrg', { sock, msg, remoteJid, argumentName, botIn
   },
   welcome: {
     enabled: true,
-    text: "*───『 WXATA • PREMIUM 』───*\\n\\nHello! Thank you for connecting with the WXATA engine.\\nThe system is currently *ONLINE* and ready to assist.\\n\\n🚀 *Get Started:*\\nType *{prefix}{menu}* to view the professional command console.\\n\\n🔗 *Resources:*\\n• Website: https://wxata.tadstech.dev\\n• Docs: https://wxata.tadstech.dev/docs\\n• X: @tads_tech\\n• Telegram: https://t.me/+dR5zABepmkNhYjQ0\\n\\n_Powered by TADSTech_",
+        text: "*───『 WXATA • PREMIUM 』───*\\n\\nHello! Thank you for connecting with the WXATA engine.\\nThe system is currently *ONLINE* and ready to assist.\\n\\n> *Get Started:*\\n> Type *{prefix}{menu}* to view the professional command console.\\n\\n🔗 *Resources:*\\n- *Website:* https://wxata-live-ruby.vercel.app/\\n- *Documentation:* https://wxata-live-ruby.vercel.app/docs\\n- *X (Twitter):* @tads_tech\\n- *Telegram:* https://t.me/+dR5zABepmkNhYjQ0\\n\\n_Powered by TADSTech_",
   },
   permissions: {
     allowAll: false,

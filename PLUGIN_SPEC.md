@@ -37,11 +37,11 @@ A WXATA plugin is a JavaScript snippet that runs inside the bot when a user send
 
 | Field | Required | Description |
 |---|---|---|
-| `trigger` | ✅ | The command word. User types `!trigger` to run it. |
+| `trigger` | ✅ | The command word. User types `+trigger` to run it. |
 | `response` | ✅ | Static text response. Can be empty string `""` if `code` is used. |
 | `target` | ✅ | `"chat"` sends to current chat. `"self"` sends to your own DM. |
 | `name` | recommended | Display name in menus. Defaults to trigger if omitted. |
-| `desc` | recommended | Description shown in `!mn detailed` and `!hp`. |
+| `desc` | recommended | Description shown in `+menu` and `+help`. |
 | `aliases` | optional | Extra triggers. e.g. `["weather", "w"]` |
 | `type` | optional | Category for menu grouping. Default: `"misc"` |
 | `code` | optional | JavaScript code. If present, overrides `response`. |
@@ -131,13 +131,13 @@ remoteJid.endsWith('@s.whatsapp.net') // true if DM
 Everything the user typed after the trigger word.
 
 ```js
-// User types: !weather Lagos
+// User types: +weather Lagos
 argumentName  // → "Lagos"
 
-// User types: !weather
+// User types: +weather
 argumentName  // → undefined
 
-// User types: !ta Hello everyone, meeting now
+// User types: +ta Hello everyone, meeting now
 argumentName  // → "Hello everyone, meeting now"
 
 // Safe usage:
@@ -157,7 +157,7 @@ await sendTrackedMessage(sock, remoteJid, `Result: ${value}`);
 The current bot config object.
 
 ```js
-botInfo.prefix              // Command prefix (e.g. "!")
+botInfo.prefix              // Command prefix (e.g. "+")
 botInfo.scripts             // All installed scripts
 botInfo.permissions.allowAll
 botInfo.permissions.numbers // Allowed phone numbers
@@ -222,14 +222,14 @@ const varsPath = path.resolve(__rootdir, 'vars.json');
 
 ### Template 2 — Echo with Argument
 ```js
-if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !echo <text>');
+if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: +echo <text>');
 await sendTrackedMessage(sock, remoteJid, argumentName);
 ```
 
 ### Template 3 — HTTP API Call
 ```js
 const axios = require('axios');
-if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !weather <city>');
+if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: +weather <city>');
 
 await sendTrackedMessage(sock, remoteJid, '🔍 Fetching...');
 try {
@@ -288,7 +288,7 @@ await sendTrackedMessage(sock, remoteJid, `You quoted @${quotedSender?.split('@'
 
 ### Template 7 — Send Image from URL
 ```js
-if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: !img <url>');
+if (!argumentName) return sendTrackedMessage(sock, remoteJid, 'Usage: +img <url>');
 let url = argumentName.trim();
 if (!url.startsWith('http')) url = 'https://' + url;
 

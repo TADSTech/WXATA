@@ -15,8 +15,7 @@ wxata/
 │   ├── connection.ts       # Baileys socket management
 │   ├── DashboardServer.ts  # HTTP + WebSocket server
 │   ├── db.ts               # SQLite message cache
-│   ├── firebase.ts         # Firebase data layer (optional)
-│   └── commands/           # Modular command system
+│   └── commands/            # Modular command system
 ├── landing/                # Static docs site (HTML)
 ├── .env.example            # Environment template
 ├── botinfo.example.json    # Bot config template

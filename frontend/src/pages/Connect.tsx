@@ -39,7 +39,7 @@ const Connect = () => {
               value={url}
               onChange={e => setUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleConnect()}
-              placeholder="wss://wxata-api.tadstech.dev"
+              placeholder="wss://api.com"
               className="w-full bg-bg-panel border border-border-strong p-3 text-accent-light font-mono text-sm outline-none focus:border-border-strong transition-colors"
             />
           </div>
@@ -64,7 +64,7 @@ const Connect = () => {
           </button>
 
           <p className="text-[10px] text-text-muted text-center opacity-50">
-            Examples: wss://wxata-api.tadstech.dev · ws://localhost:5000
+            Examples: ws://localhost:5000
           </p>
         </div>
       </div>
