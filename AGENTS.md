@@ -20,7 +20,7 @@ wxata/
 ├── .env.example            # Environment template
 ├── botinfo.example.json    # Bot config template
 ├── setup.ps1 / setup.sh    # Setup scripts
-└── Dockerfile              # Docker deployment
+└── ecosystem.config.cjs    # PM2 production config
 ```
 
 ## Databases
@@ -48,4 +48,4 @@ bun run pm2:start      # Production via PM2
 1. **Always run type-checks** after modifying backend: `bun run backend:type-check`
 2. **Dynamic config first** — Use `vars.json` getters, don't hardcode values
 3. **Never commit secrets** — .env, auth_info/, ipman are all gitignored
-4. **Keep Dockerfile working** — Test with `docker build .` after structural changes
+4. **Keep PM2 config working** — Test with `pm2 start ecosystem.config.cjs` after structural changes

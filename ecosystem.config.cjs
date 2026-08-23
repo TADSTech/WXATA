@@ -1,8 +1,7 @@
 /**
  * PM2 Ecosystem Config for WXATA
  *
- * Docker:  CMD ["pm2-runtime", "ecosystem.config.cjs"]  (no-daemon mode)
- * Bare VPS: pm2 start ecosystem.config.cjs
+ * Start: pm2 start ecosystem.config.cjs
  *
  * Exit code semantics (see backend/index.ts QUICK_ACTION handler):
  *   0  → restart requested by dashboard  → PM2 restarts automatically
@@ -26,7 +25,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: '5000',
-        // /data is the persistent volume mount point (Docker & Render disk).
+        // /data is the persistent disk mount point (if available).
         // connection.ts and index.ts already check for /data automatically.
       },
 

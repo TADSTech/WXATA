@@ -75,7 +75,7 @@ export class WXATAConnection {
       browser: ['Mac OS', 'Chrome', '121.0.0.0'],
       connectTimeoutMs: 120000,
       defaultQueryTimeoutMs: 0,
-      keepAliveIntervalMs: 15000,    // more frequent pings to detect stalls earlier
+      keepAliveIntervalMs: 30000,    // 30s keepalive — avoids WhatsApp rate-limiting while still detecting stalls
       retryRequestDelayMs: 250,      // faster retry on failed requests
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
@@ -103,26 +103,21 @@ export class WXATAConnection {
       this.options.onSocketCreated(this.sock);
     }
 
-    // Handle Pairing Code
-    if (this.options.usePairingCode && !this.sock.authState.creds.registered && this.options.phoneNumber) {
-      const phoneNumber = this.options.phoneNumber;
-      this.sock.ev.on('connection.update', async (update) => {
-        if (update.qr && this.sock && !this.sock.authState.creds.registered) {
-          try {
-            const code = await this.sock.requestPairingCode(phoneNumber.replace(/\D/g, ''));
-            if (this.options.onPairingCode) this.options.onPairingCode(code);
-            dashboard.log(this.options.accountId, 'SUCCESS', `Pairing code generated for ${phoneNumber}`);
-          } catch (err) {
-            logger.error({ err }, 'Failed to request pairing code');
-            dashboard.log(this.options.accountId, 'ERROR', 'Failed to generate pairing code');
-          }
-        }
-      });
-    }
-
-    // Connection events
+    // Connection events (single handler for all connection.update events)
     this.sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
+
+      // Handle Pairing Code — request it when QR arrives (or re-request on reconnect)
+      if (qr && this.options.usePairingCode && !this.sock!.authState.creds.registered && this.options.phoneNumber) {
+        try {
+          const code = await this.sock!.requestPairingCode(this.options.phoneNumber.replace(/\D/g, ''));
+          if (this.options.onPairingCode) this.options.onPairingCode(code);
+          dashboard.log(this.options.accountId, 'SUCCESS', `Pairing code generated for ${this.options.phoneNumber}`);
+        } catch (err) {
+          logger.error({ err }, 'Failed to request pairing code');
+          dashboard.log(this.options.accountId, 'ERROR', 'Failed to generate pairing code');
+        }
+      }
 
       if (qr && !this.options.usePairingCode && this.options.onQR) {
         this.options.onQR(qr);

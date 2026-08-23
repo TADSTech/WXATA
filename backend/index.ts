@@ -2933,14 +2933,15 @@ async function startBot() {
   await ensureConfigFiles("primary");
   await ensureConfigFiles("secondary");
 
-  // Start the watchdog
-  const WATCHDOG_TIMEOUT_MS = 4 * 60 * 1000;
+  // Start the watchdog — lightweight keepalive check, NOT a destroy/recreate cycle.
+  // Baileys already handles its own reconnection via connection.update. The watchdog
+  // only needs to detect truly dead sockets and trigger a normal reconnect.
+  const WATCHDOG_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes — give Baileys time to self-heal
   setInterval(async () => {
     for (const accountId of ["primary", "secondary"]) {
       const connectionManager = connectionManagers.get(accountId);
-      const lastConnectionParams = lastConnectionParamsMap.get(accountId);
       
-      if (!connectionManager || !lastConnectionParams) continue;
+      if (!connectionManager) continue;
       const sock = connectionManager.getSocket();
       if (!sock) continue;
 
@@ -2948,12 +2949,32 @@ async function startBot() {
       const silentMs = Date.now() - lastMessageAt;
       
       if (silentMs > WATCHDOG_TIMEOUT_MS) {
-        dashboard.log(accountId, "WARN", `Watchdog: No messages for ${Math.round(silentMs / 1000)}s — force reconnecting...`);
-        console.log(`🔁 Watchdog triggered after ${Math.round(silentMs / 1000)}s silence for ${accountId} — reconnecting`);
+        // Check if the websocket is actually still connected before doing anything drastic
+        const wsRef = (sock as any).ws;
+        const isWsOpen = wsRef && typeof wsRef.readyState === 'number' && wsRef.readyState === 1; // 1 = OPEN
+
+        if (isWsOpen) {
+          // Socket looks alive — Baileys keepalive is probably working, just no messages.
+          // Reset the timer and let it be.
+          console.log(`⏱️ Watchdog: ${accountId} silent for ${Math.round(silentMs / 1000)}s but WS is open — extending timer`);
+          dashboard.log(accountId, "INFO", `Watchdog: Silent ${Math.round(silentMs / 1000)}s but connection alive — no action needed`);
+          lastMessageAtMap.set(accountId, Date.now());
+          continue;
+        }
+
+        // Socket is actually dead — trigger a normal reconnect via Baileys' own mechanism
+        dashboard.log(accountId, "WARN", `Watchdog: No messages for ${Math.round(silentMs / 1000)}s and WS is closed — triggering reconnect...`);
+        console.log(`🔁 Watchdog triggered after ${Math.round(silentMs / 1000)}s silence + dead WS for ${accountId} — reconnecting`);
         lastMessageAtMap.set(accountId, Date.now());
 
         try {
+          // Clean up the dead socket (this is safe — it's already dead)
           await connectionManager.destroy();
+          
+          // Recreate with Baileys' own reconnection flow, not a full nuke
+          const lastConnectionParams = lastConnectionParamsMap.get(accountId);
+          if (!lastConnectionParams) continue;
+
           const newManager = new WXATAConnection({
             accountId: accountId as "primary"|"secondary",
             phoneNumber: lastConnectionParams.phoneNumber,
