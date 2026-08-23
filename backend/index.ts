@@ -2175,7 +2175,7 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
           // Standalone Special Command: chai! (prefix becomes suffix)
           // This command is hidden from the menu and botinfo.json
-          const chaiTrigger = `chai!`; // Hardcode to what the user explicitly requested
+          const chaiTrigger = `omo.`; // Hardcode to what the user explicitly requested
           if (
             normalizedText === chaiTrigger ||
             normalizedText.startsWith(chaiTrigger + " ")
