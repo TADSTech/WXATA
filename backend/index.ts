@@ -2927,11 +2927,82 @@ const connectionManagers = new Map<string, WXATAConnection>();
 const lastConnectionParamsMap = new Map<string, { method: string; phoneNumber?: string }>();
 const lastMessageAtMap = new Map<string, number>();
 
+// Shared connection launcher used by the dashboard, watchdog, and boot-time
+// auto-restore so every path wires identical handlers.
+async function launchConnection(
+  accountId: string,
+  params: { method: string; phoneNumber?: string },
+): Promise<WXATAConnection> {
+  const { method, phoneNumber } = params;
+  const manager = new WXATAConnection({
+    accountId: accountId as "primary" | "secondary",
+    phoneNumber,
+    usePairingCode: method === "PHONE",
+    onQR: (qr) => {
+      dashboard.sendQR(accountId, qr);
+      require("qrcode-terminal").generate(qr, { small: true });
+    },
+    onPairingCode: (code) => {
+      dashboard.sendPairingCode(accountId, code);
+    },
+    onSocketCreated: (sock) => {
+      dashboard.setSock(accountId, sock);
+      attachMessageHandler(
+        sock,
+        accountId,
+        () => lastMessageAtMap.set(accountId, Date.now()),
+      );
+    },
+    onOpen: () => {
+      dashboard.log(accountId, "SUCCESS", "Bot is now fully operational");
+      setTimeout(() => {
+        const socketForWelcome = manager.getSocket();
+        if (socketForWelcome) {
+          initTVMiniapp(socketForWelcome, accountId);
+          setTvSock(socketForWelcome);
+          sendWelcomeMessage(socketForWelcome, accountId).catch((err) => {
+            console.error("Failed to send welcome message", err);
+            dashboard.log(accountId, "ERROR", "Failed to send welcome message");
+          });
+        }
+      }, 15000);
+    },
+    onLogout: () => {
+      dashboard.log(accountId, "WARN", "Session expired. Please re-pair from the dashboard.");
+    },
+  });
+
+  connectionManagers.set(accountId, manager);
+  await manager.createConnection();
+  return manager;
+}
+
 async function startBot() {
   console.log("🚀 Initializing WXATA Backend for Dual Accounts...");
   
   await ensureConfigFiles("primary");
   await ensureConfigFiles("secondary");
+
+  // Auto-restore saved sessions at boot. Without this, every PM2 restart
+  // (RESTART button, crash recovery, server reboot) leaves both accounts
+  // unpaired until someone manually clicks START_CONNECTION in the dashboard.
+  for (const accountId of ["primary", "secondary"] as const) {
+    const authDir = require("fs").existsSync("/data")
+      ? `/data/auth_info_${accountId}`
+      : path.resolve(__dirname, `auth_info_${accountId}`);
+    const credsPath = path.resolve(authDir, "creds.json");
+    if (!require("fs").existsSync(credsPath)) {
+      dashboard.log(accountId, "INFO", "No saved session — waiting for pairing via dashboard");
+      continue;
+    }
+    dashboard.log(accountId, "INFO", "Saved session found — auto-restoring connection...");
+    try {
+      await launchConnection(accountId, { method: "AUTO" });
+    } catch (err) {
+      dashboard.log(accountId, "ERROR", `Boot auto-connect failed for ${accountId}: ${err}`);
+      connectionManagers.delete(accountId);
+    }
+  }
 
   // Start the watchdog — lightweight keepalive check, NOT a destroy/recreate cycle.
   // Baileys already handles its own reconnection via connection.update. The watchdog
@@ -2970,25 +3041,19 @@ async function startBot() {
         try {
           // Clean up the dead socket (this is safe — it's already dead)
           await connectionManager.destroy();
-          
-          // Recreate with Baileys' own reconnection flow, not a full nuke
-          const lastConnectionParams = lastConnectionParamsMap.get(accountId);
-          if (!lastConnectionParams) continue;
 
-          const newManager = new WXATAConnection({
-            accountId: accountId as "primary"|"secondary",
-            phoneNumber: lastConnectionParams.phoneNumber,
-            usePairingCode: lastConnectionParams.method === "PHONE",
-            onQR: (qr) => { dashboard.sendQR(accountId, qr); require('qrcode-terminal').generate(qr, { small: true }); },
-            onPairingCode: (code) => { dashboard.sendPairingCode(accountId, code); },
-            onSocketCreated: (sock) => { dashboard.setSock(accountId, sock); attachMessageHandler(sock, accountId, () => lastMessageAtMap.set(accountId, Date.now())); },
-            onOpen: () => { dashboard.log(accountId, "SUCCESS", "Watchdog reconnect successful"); },
-            onLogout: () => { dashboard.log(accountId, "WARN", "Session expired during watchdog reconnect"); }
-          });
-          connectionManagers.set(accountId, newManager);
-          await newManager.createConnection();
+          // Recreate with Baileys' own reconnection flow, not a full nuke
+          if (!lastConnectionParamsMap.get(accountId)) {
+            // Fall back to the saved-session flow used at boot
+            await launchConnection(accountId, { method: "AUTO" });
+          } else {
+            await launchConnection(accountId, lastConnectionParamsMap.get(accountId)!);
+          }
         } catch (err) {
           dashboard.log(accountId, "ERROR", `Watchdog reconnect failed: ${err}`);
+          try {
+            connectionManagers.delete(accountId);
+          } catch {}
         }
       }
     }
@@ -3009,36 +3074,16 @@ async function startBot() {
         lastConnectionParamsMap.set(accountId, { method, phoneNumber });
 
         dashboard.log(accountId, "INFO", `Starting connection via ${method}...`);
-        let connectionManager = connectionManagers.get(accountId);
-        if (connectionManager) {
-          await connectionManager.destroy();
+        const existing = connectionManagers.get(accountId);
+        if (existing) {
+          await existing.destroy();
         }
-
-        connectionManager = new WXATAConnection({
-          accountId: accountId as "primary"|"secondary",
-          phoneNumber,
-          usePairingCode: method === "PHONE",
-          onQR: (qr) => { dashboard.sendQR(accountId, qr); require('qrcode-terminal').generate(qr, { small: true }); },
-          onPairingCode: (code) => { dashboard.sendPairingCode(accountId, code); },
-          onSocketCreated: (sock) => { dashboard.setSock(accountId, sock); attachMessageHandler(sock, accountId, () => lastMessageAtMap.set(accountId, Date.now())); },
-          onOpen: () => { 
-            dashboard.log(accountId, "SUCCESS", "Bot is now fully operational"); 
-            setTimeout(() => {
-                const socketForWelcome = connectionManager?.getSocket();
-                if (socketForWelcome) {
-                    initTVMiniapp(socketForWelcome, accountId);
-                    setTvSock(socketForWelcome);
-                    sendWelcomeMessage(socketForWelcome, accountId).catch(err => {
-                        console.error("Failed to send welcome message", err);
-                        dashboard.log(accountId, "ERROR", "Failed to send welcome message");
-                    });
-                }
-            }, 15000);
-          }
-        });
-        
-        connectionManagers.set(accountId, connectionManager);
-        await connectionManager.createConnection();
+        try {
+          await launchConnection(accountId, { method, phoneNumber });
+        } catch (err) {
+          dashboard.log(accountId, "ERROR", `Failed to start connection: ${err}`);
+          dashboard.setConnectionStatus(accountId, "DISCONNECTED");
+        }
       }
 
       if (payload.command === "GET_BOT_INFO") {
@@ -3087,18 +3132,21 @@ async function startBot() {
             dashboard.log(accountId, "INFO", "Restarting bot process via PM2...");
             if (connectionManager) { await connectionManager.destroy(); connectionManagers.delete(accountId); }
             dashboard.setConnectionStatus(accountId, "DISCONNECTED");
-            dashboard.log(accountId, "SUCCESS", "Graceful shutdown complete. PM2 will restart the process.");
+            dashboard.log(accountId, "SUCCESS", "Graceful shutdown complete. PM2 will restart the process and auto-restore sessions.");
             setTimeout(() => process.exit(0), 500);
             break;
           case "TERMINATE":
-            dashboard.log(accountId, "WARN", "Terminating bot process and clearing session...");
+            dashboard.log(accountId, "WARN", "Terminating bot session (logout + wipe)...");
             if (connectionManager) {
               await connectionManager.logout();
               await connectionManager.destroy();
               connectionManagers.delete(accountId);
             }
             dashboard.setConnectionStatus(accountId, "DISCONNECTED");
-            setTimeout(() => process.exit(2), 500);
+            // Exit 0 (not 2): PM2 restarts the process with a fresh unpaired
+            // state so the dashboard stays reachable and the server self-recovers.
+            dashboard.log(accountId, "SUCCESS", "Session terminated. PM2 will restart — re-pair via the dashboard.");
+            setTimeout(() => process.exit(0), 500);
             break;
           case "LOGOUT":
             dashboard.log(accountId, "WARN", "Logging out and clearing session data...");
@@ -3113,11 +3161,9 @@ async function startBot() {
           case "CLEAR_AUTH":
             dashboard.log(accountId, "WARN", "Force-clearing auth files...");
             if (connectionManager) {
-              const sock = connectionManager.getSocket();
-              try { sock?.ev.removeAllListeners('connection.update'); } catch {}
-              try { sock?.ev.removeAllListeners('creds.update'); } catch {}
-              try { sock?.ev.removeAllListeners('messaging-history.set'); } catch {}
-              try { sock?.ws?.close(); } catch {}
+              // destroy() removes listeners, closes the ws, marks the manager
+              // shut down and cancels any pending reconnect timer.
+              await connectionManager.destroy();
               await connectionManager.clearSession();
               connectionManagers.delete(accountId);
             } else {

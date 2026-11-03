@@ -4,9 +4,9 @@
  * Start: pm2 start ecosystem.config.cjs
  *
  * Exit code semantics (see backend/index.ts QUICK_ACTION handler):
- *   0  → restart requested by dashboard  → PM2 restarts automatically
+ *   0  → restart (RESTART_BOT / TERMINATE flag bot off only, session wiped) → PM2 restarts automatically
  *   1  → unhandled crash                 → PM2 restarts automatically
- *   2  → terminate requested by dashboard → PM2 stops, does NOT restart
+ *   2  → terminate requested by dashboard → PM2 stops, does NOT restart (dashboard goes down; revive via `pm2 restart wxata`)
  */
 
 module.exports = {

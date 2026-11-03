@@ -37,6 +37,7 @@ interface ConnectionOptions {
 export class WXATAConnection {
   private sock: WASocket | null = null;
   private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnected = false;
   private isShuttingDown = false;
 
@@ -56,6 +57,14 @@ export class WXATAConnection {
    * Initialize the connection with robust state handling
    */
   public async createConnection(): Promise<WASocket> {
+    // Refuse to spawn a connection on a manager that was explicitly shut down
+    // (e.g. by LOGOUT / CLEAR_AUTH / destroy) — otherwise a stale reconnect
+    // timer could resurrect the session and attach duplicate handlers.
+    if (this.isShuttingDown) {
+      logger.info(`createConnection skipped — manager for ${this.options.accountId} is shut down`);
+      dashboard.log(this.options.accountId, 'WARN', 'Blocked a stale connection attempt on a shut-down session.');
+      return (this.sock ?? null) as WASocket;
+    }
     const authDir = this.getAuthDir();
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version } = await fetchLatestBaileysVersion();
@@ -193,9 +202,10 @@ export class WXATAConnection {
   private handleReconnect() {
     const delay = RECONNECT_INTERVALS[Math.min(this.reconnectAttempts, RECONNECT_INTERVALS.length - 1)] ?? 60000;
     this.reconnectAttempts++;
-    
+
     logger.info(`Reconnecting in ${delay / 1000}s (Attempt ${this.reconnectAttempts})...`);
-    setTimeout(() => this.createConnection(), delay);
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => this.createConnection(), delay);
   }
 
   /**
@@ -235,6 +245,10 @@ export class WXATAConnection {
    */
   public async destroy() {
     this.isShuttingDown = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     try {
       if (this.sock) {
         this.sock.ev.removeAllListeners('connection.update');
