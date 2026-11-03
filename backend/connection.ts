@@ -132,7 +132,7 @@ export class WXATAConnection {
         console.log(`[${this.options.accountId.toUpperCase()}] Connection closed. Reason: ${statusCode} (${reason})`);
         dashboard.log(this.options.accountId, 'ERROR', `Connection closed: ${statusCode}`);
 
-        if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 428) {
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
           logger.warn(`Auth failure (${statusCode}). Clearing session and stopping — manual re-pair required.`);
           dashboard.log(this.options.accountId, 'WARN', `Auth failure (${statusCode}). Session cleared. Please re-pair from the dashboard.`);
           await this.clearSession();
