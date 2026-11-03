@@ -2175,11 +2175,11 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
 
           // Standalone Special Command: chai! (prefix becomes suffix)
           // This command is hidden from the menu and botinfo.json
-          const chaiTrigger = `omo.`; // Hardcode to what the user explicitly requested
-          if (
-            normalizedText === chaiTrigger ||
-            normalizedText.startsWith(chaiTrigger + " ")
-          ) {
+          const chaiTriggers = [`omo.`, `chai!`]; // Multiple supported triggers
+          const chaiMatched = chaiTriggers.some(
+            (t) => normalizedText === t || normalizedText.startsWith(t + " ")
+          );
+          if (chaiMatched) {
             dashboard.log(accountId, "DEBUG", `[Chai] Triggered by ${remoteJid}. hasPermission=${hasPermission}`);
             if (hasPermission && remoteJid) {
               const rootJid =
