@@ -19,6 +19,18 @@ interface BotTvConfig {
   welcomeMessage: string;
 }
 
+interface BotAzaConfig {
+  enabled: boolean;
+  text: string;
+  triggers: string[];
+  matchMode: 'word' | 'exact' | 'contains';
+  cooldownSeconds: number;
+  delaySeconds: number;
+  allowGroups: boolean;
+  respondToSelf: boolean;
+  quoteReply: boolean;
+}
+
 interface BotInfo {
   prefix: string;
   scripts: Record<string, BotScript>;
@@ -27,7 +39,20 @@ interface BotInfo {
   permissions: BotPermissions;
   tvMode?: boolean;
   tvConfig?: BotTvConfig;
+  aza?: BotAzaConfig;
 }
+
+const DEFAULT_AZA: BotAzaConfig = {
+  enabled: false,
+  text: 'Account Name: \nBank: \nAccount Number: ',
+  triggers: ['aza'],
+  matchMode: 'word',
+  cooldownSeconds: 60,
+  delaySeconds: 1,
+  allowGroups: true,
+  respondToSelf: true,
+  quoteReply: false,
+};
 
 interface BotScript {
   name?: string;
@@ -842,6 +867,108 @@ function WelcomeEditor({ welcome, root, onChange, onRootChange, onSave }: Welcom
   );
 }
 
+// ─── AzaEditor ────────────────────────────────────────────────────────────────
+
+interface AzaEditorProps {
+  aza?: BotAzaConfig;
+  onChange: (a: BotAzaConfig) => void;
+  onSave: () => void;
+}
+
+function AzaEditor({ aza, onChange, onSave }: AzaEditorProps) {
+  const cfg = aza ?? DEFAULT_AZA;
+  const inputCls = 'w-full bg-bg-panel border border-border-strong p-2 text-text-main outline-none focus:border-accent-primary transition-colors';
+  const toggle = (label: string, hint: string, key: 'enabled' | 'allowGroups' | 'respondToSelf' | 'quoteReply') => (
+    <label className="flex items-center justify-between gap-3 border border-border-subtle p-2 rounded cursor-pointer">
+      <span>
+        <span className="text-text-muted uppercase tracking-wider block">{label}</span>
+        <span className="text-[11px] text-text-muted">{hint}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={cfg[key]}
+        onChange={e => onChange({ ...cfg, [key]: e.target.checked })}
+        className="w-4 h-4 accent-accent-primary"
+      />
+    </label>
+  );
+
+  return (
+    <div className="bg-bg-panel border border-border-subtle rounded p-4 space-y-4 text-xs">
+      <h3 className="text-xs uppercase tracking-widest opacity-50 border-b border-border-strong/10 pb-2">Aza Auto-Reply</h3>
+
+      {toggle('Enabled', 'Send account details whenever a trigger word is said', 'enabled')}
+
+      <label className="block space-y-1">
+        <span className="text-text-muted uppercase tracking-wider">Aza Text</span>
+        <textarea
+          value={cfg.text}
+          onChange={e => onChange({ ...cfg, text: e.target.value })}
+          rows={5}
+          className={`${inputCls} font-mono whitespace-pre-wrap`}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-text-muted uppercase tracking-wider">Trigger Words (comma separated)</span>
+        <input
+          type="text"
+          value={cfg.triggers.join(', ')}
+          onChange={e => onChange({ ...cfg, triggers: e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean) })}
+          className={inputCls}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-text-muted uppercase tracking-wider">Match Mode</span>
+        <select
+          value={cfg.matchMode}
+          onChange={e => onChange({ ...cfg, matchMode: e.target.value as BotAzaConfig['matchMode'] })}
+          className={inputCls}
+        >
+          <option value="word">Whole word (“send me aza pls”)</option>
+          <option value="exact">Exact (message is only “aza”)</option>
+          <option value="contains">Contains (also inside other words)</option>
+        </select>
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block space-y-1">
+          <span className="text-text-muted uppercase tracking-wider">Cooldown (s/chat)</span>
+          <input
+            type="number"
+            min={0}
+            value={cfg.cooldownSeconds}
+            onChange={e => onChange({ ...cfg, cooldownSeconds: Math.max(0, Number(e.target.value) || 0) })}
+            className={inputCls}
+          />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-text-muted uppercase tracking-wider">Reply Delay (s)</span>
+          <input
+            type="number"
+            min={0}
+            value={cfg.delaySeconds}
+            onChange={e => onChange({ ...cfg, delaySeconds: Math.max(0, Number(e.target.value) || 0) })}
+            className={inputCls}
+          />
+        </label>
+      </div>
+
+      {toggle('Work in groups', 'Reply in group chats too', 'allowGroups')}
+      {toggle('Respond to my own aza', 'Trigger when you type the word yourself', 'respondToSelf')}
+      {toggle('Quote the message', 'Reply as a quote of the trigger message', 'quoteReply')}
+
+      <button
+        onClick={onSave}
+        className="w-full border border-border-strong bg-success-subtle text-accent-light hover:bg-accent-subtle px-4 py-2 text-xs font-bold transition-colors"
+      >
+        <Save className="w-3 h-3 inline mr-1" /> Save Aza Config
+      </button>
+    </div>
+  );
+}
+
 // ─── ThemeSwitcher ────────────────────────────────────────────────────────────
 
 const THEME_META: Record<string, { name: string; color: string }> = {
@@ -919,6 +1046,7 @@ const DEFAULT_BOT_INFO: BotInfo = {
   welcome: { enabled: false, text: '' },
   permissions: { allowAll: false, chats: [], numbers: [] },
   tvMode: false,
+  aza: DEFAULT_AZA,
   tvConfig: {
     triggerText: "hey, i want to join tadstech. my name is ",
     welcomeMessage: "Welcome! I’ve saved your number as {{name}}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.",
@@ -1339,6 +1467,13 @@ const Dashboard = () => {
                 root={botInfo.root}
                 onChange={w => { setBotInfo(prev => ({ ...prev, welcome: w })); setConfigStatus('Unsaved changes'); }}
                 onRootChange={v => { setBotInfo(prev => ({ ...prev, root: { ...prev.root, target: v } })); setConfigStatus('Unsaved changes'); }}
+                onSave={handleWelcomeSave}
+              />
+
+              {/* Aza Editor */}
+              <AzaEditor
+                aza={botInfo.aza}
+                onChange={a => { setBotInfo(prev => ({ ...prev, aza: a })); setConfigStatus('Unsaved changes'); }}
                 onSave={handleWelcomeSave}
               />
 

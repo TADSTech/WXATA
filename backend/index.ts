@@ -62,6 +62,18 @@ interface BotTvConfig {
   welcomeMessage: string;
 }
 
+interface BotAzaConfig {
+  enabled: boolean;
+  text: string;
+  triggers: string[];
+  matchMode: "word" | "exact" | "contains";
+  cooldownSeconds: number; // per-chat; 0 = no cooldown
+  delaySeconds: number; // wait before replying
+  allowGroups: boolean;
+  respondToSelf: boolean; // react to aza typed by the account owner
+  quoteReply: boolean;
+}
+
 interface BotInfo {
   prefix: string;
   scripts: Record<string, BotScript>;
@@ -70,6 +82,7 @@ interface BotInfo {
   permissions: BotPermissions;
   tvMode?: boolean;
   tvConfig?: BotTvConfig;
+  aza?: BotAzaConfig;
 }
 
 interface BotRoot {
@@ -950,7 +963,71 @@ await commandHandler.dispatch('wrg', { sock, msg, remoteJid, argumentName, botIn
     triggerText: "hey, i want to join tadstech. my name is ",
     welcomeMessage: "Welcome! I’ve saved your number as {{name}}. To see my daily statuses, updates, and giveaways, save my number as 'Tadstech' right now and reply 'DONE'.",
   },
+  aza: {
+    enabled: false,
+    text: "Account Name: \nBank: \nAccount Number: ",
+    triggers: ["aza"],
+    matchMode: "word",
+    cooldownSeconds: 60,
+    delaySeconds: 1,
+    allowGroups: true,
+    respondToSelf: true,
+    quoteReply: false,
+  },
 };
+
+function sanitizeBotAza(input: Partial<BotAzaConfig> | undefined): BotAzaConfig {
+  const d = DEFAULT_BOT_INFO.aza!;
+  const num = (v: unknown, fallback: number, max: number) =>
+    typeof v === "number" && Number.isFinite(v)
+      ? Math.min(Math.max(Math.round(v), 0), max)
+      : fallback;
+  const triggers = Array.isArray(input?.triggers)
+    ? Array.from(
+        new Set(
+          input!.triggers
+            .filter((t): t is string => typeof t === "string")
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      )
+    : [];
+  return {
+    enabled: typeof input?.enabled === "boolean" ? input.enabled : d.enabled,
+    text:
+      typeof input?.text === "string" && input.text.trim()
+        ? input.text
+        : d.text,
+    triggers: triggers.length ? triggers : d.triggers,
+    matchMode:
+      input?.matchMode === "exact" || input?.matchMode === "contains"
+        ? input.matchMode
+        : "word",
+    cooldownSeconds: num(input?.cooldownSeconds, d.cooldownSeconds, 86400),
+    delaySeconds: num(input?.delaySeconds, d.delaySeconds, 60),
+    allowGroups:
+      typeof input?.allowGroups === "boolean" ? input.allowGroups : d.allowGroups,
+    respondToSelf:
+      typeof input?.respondToSelf === "boolean"
+        ? input.respondToSelf
+        : d.respondToSelf,
+    quoteReply:
+      typeof input?.quoteReply === "boolean" ? input.quoteReply : d.quoteReply,
+  };
+}
+
+function azaMatches(normalizedText: string, cfg: BotAzaConfig): boolean {
+  return cfg.triggers.some((t) => {
+    if (cfg.matchMode === "exact") return normalizedText === t;
+    if (cfg.matchMode === "contains") return normalizedText.includes(t);
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}($|[^\\p{L}\\p{N}_])`, "u").test(
+      normalizedText,
+    );
+  });
+}
+
+const azaLastSent = new Map<string, number>();
 
 function sanitizeBotScript(
   input: Partial<BotScript> | undefined,
@@ -1230,6 +1307,11 @@ function sanitizeBotInfo(
     ),
     tvMode: !!input.tvMode,
     tvConfig: sanitizeBotTvConfig(tvConfigInput as Partial<BotTvConfig> | undefined),
+    aza: sanitizeBotAza(
+      (input.aza && typeof input.aza === "object" ? input.aza : undefined) as
+        | Partial<BotAzaConfig>
+        | undefined,
+    ),
   };
 }
 
@@ -2065,6 +2147,38 @@ function attachMessageHandler(sock: Awaited<ReturnType<WXATAConnection["createCo
                      continue;
                  }
              }
+          }
+
+          // Aza auto-responder: anyone saying a trigger word gets the account details in that chat.
+          // Non-blocking: does not consume the message, so other handlers still run.
+          const aza = botInfo.aza;
+          if (
+            aza?.enabled &&
+            remoteJid &&
+            !remoteJid.endsWith("@broadcast") &&
+            (aza.allowGroups || !remoteJid.endsWith("@g.us")) &&
+            (aza.respondToSelf || !msg.key?.fromMe) &&
+            azaMatches(normalizedText, aza)
+          ) {
+            const key = `${accountId}:${remoteJid}`;
+            const now = Date.now();
+            if (now - (azaLastSent.get(key) ?? 0) >= aza.cooldownSeconds * 1000) {
+              azaLastSent.set(key, now);
+              const azaJid = remoteJid;
+              setTimeout(async () => {
+                try {
+                  rememberOutboundMessage(azaJid, aza.text);
+                  await sock.sendMessage(
+                    azaJid,
+                    { text: aza.text },
+                    aza.quoteReply ? { quoted: msg } : undefined,
+                  );
+                  dashboard.log(accountId, "SUCCESS", `[Aza] Sent account details to ${azaJid}`);
+                } catch (e) {
+                  dashboard.log(accountId, "ERROR", `[Aza] Failed to send to ${azaJid}: ${String(e)}`);
+                }
+              }, aza.delaySeconds * 1000);
+            }
           }
 
           // TV Mode Interception
